@@ -12,6 +12,7 @@ import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
 import * as scheduler from './gateway/scheduler.js';
+import { runWithContext } from './gateway/context.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 18789;
@@ -42,7 +43,7 @@ const app = async (req, res) => {
     res.end(JSON.stringify({
       llmProvider: process.env.LLM_PROVIDER || 'anthropic',
       llmModel: process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
-      availableProviders: ['anthropic', 'gemini'],
+      availableProviders: ['anthropic', 'gemini', 'openai'],
       authRequired: !!process.env.WEB_PASSWORD,
     }));
     return;
@@ -89,8 +90,9 @@ async function handleLlmTest(req, res) {
     }
     const provider = payload?.provider || payload?.llmProvider || process.env.LLM_PROVIDER || 'anthropic';
     const apiKey = payload?.apiKey || process.env.ANTHROPIC_API_KEY || '';
+    const baseUrl = payload?.llmBaseUrl || process.env.OPENAI_BASE_URL || '';
     const { testConnection } = await import('./llm/provider.js');
-    const result = await testConnection({ provider, apiKey: apiKey.trim() || undefined });
+    const result = await testConnection({ provider, apiKey: apiKey.trim() || undefined, baseUrl: baseUrl.trim() || undefined });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
   } catch (err) {
@@ -118,8 +120,12 @@ async function handlePostChat(req, res) {
   const message = payload?.message;
   const llmProvider = payload?.llmProvider || process.env.LLM_PROVIDER || 'anthropic';
   const apiKey = payload?.apiKey || null;
+  const llmBaseUrl = payload?.llmBaseUrl || null;
+  const vhiBaseUrl = payload?.vhiBaseUrl || null;
+  const vhiUser = payload?.vhiUser || null;
+  const vhiPassword = payload?.vhiPassword || null;
+  const vhiProject = payload?.vhiProject || null;
 
-  // Removed process.env overwrites from UI payload to prevent breaking .env credentials
   if (!message || typeof message !== 'string') {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Missing or invalid message' }));
@@ -128,7 +134,9 @@ async function handlePostChat(req, res) {
   try {
     const { createRouter } = await import('./gateway/router.js');
     const router = createRouter(() => { });
-    const reply = await router.handleIncoming(conversationId, message, { llmProvider, apiKey });
+    const reply = await runWithContext({
+      vhiBaseUrl, vhiUser, vhiPassword, vhiProject
+    }, () => router.handleIncoming(conversationId, message, { llmProvider, apiKey, baseUrl: llmBaseUrl }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ reply, conversationId }));
   } catch (err) {

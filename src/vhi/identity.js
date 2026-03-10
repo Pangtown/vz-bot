@@ -3,8 +3,10 @@
  * Never log or store credentials; use env only.
  */
 
+import { getContextValue } from '../gateway/context.js';
+
 const getBaseUrl = () => {
-  const base = process.env.VHI_BASE_URL || 'https://172.16.218.7';
+  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL') || 'https://172.16.218.7';
   return base.replace(/\/$/, '');
 };
 
@@ -12,9 +14,9 @@ export async function getToken() {
   const base = getBaseUrl();
   const port = process.env.VHI_IDENTITY_PORT || 5000;
   const url = `${base}:${port}/v3/auth/tokens`;
-  const user = process.env.VHI_USER || '';
-  const password = process.env.VHI_PASSWORD || '';
-  const projectName = process.env.VHI_PROJECT_NAME || 'admin';
+  const user = getContextValue('vhiUser', 'VHI_USER');
+  const password = getContextValue('vhiPassword', 'VHI_PASSWORD');
+  const projectName = getContextValue('vhiProject', 'VHI_PROJECT_NAME') || 'admin';
   const domainName = process.env.VHI_DOMAIN_NAME || 'Default';
 
   if (!user || !password) {

@@ -2,7 +2,7 @@
  * VM lifecycle tools – list, get, reboot, start, stop
  */
 
-import { listServers, getServer, rebootServer, startServer, stopServer, createServer } from '../vhi/compute.js';
+import { listServers, getServer, rebootServer, startServer, stopServer, createServer, deleteServer } from '../vhi/compute.js';
 
 export async function listVms(args = {}) {
   const servers = await listServers({
@@ -51,4 +51,10 @@ export async function createVm(args) {
   }
   const server = await createServer(args);
   return { ok: true, action: 'create_vm', server_id: server.id, server };
+}
+
+export async function deleteVm(args) {
+  if (!args.server_id) throw new Error('server_id required');
+  await deleteServer(args.server_id);
+  return { ok: true, action: 'delete_vm', server_id: args.server_id };
 }

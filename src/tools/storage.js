@@ -1,9 +1,15 @@
 /**
- * Storage and network tools – list volumes, list networks
+ * Storage tools – get, list, create, delete, attach, detach volumes
  */
 
-import { listVolumes as fetchVolumes, createVolume as apiCreateVolume } from '../vhi/block.js';
-import { listNetworks as fetchNetworks, createNetwork as apiCreateNetwork } from '../vhi/network.js';
+import {
+  listVolumes as fetchVolumes,
+  getVolume as fetchVolume,
+  createVolume as apiCreateVolume,
+  deleteVolume as apiDeleteVolume,
+  attachVolume as apiAttachVolume,
+  detachVolume as apiDetachVolume
+} from '../vhi/block.js';
 
 export async function listVolumes(args = {}) {
   const volumes = await fetchVolumes();
@@ -18,16 +24,11 @@ export async function listVolumes(args = {}) {
   };
 }
 
-export async function listNetworks(args = {}) {
-  const networks = await fetchNetworks();
-  return {
-    count: (networks || []).length,
-    networks: (networks || []).map(n => ({
-      id: n.id,
-      name: n.name,
-      status: n.status,
-    })),
-  };
+export async function getVolume(args) {
+  if (!args.volume_id) throw new Error('volume_id required');
+  const volume = await fetchVolume(args.volume_id);
+  if (!volume) return { found: false, volume_id: args.volume_id };
+  return { found: true, volume };
 }
 
 export async function createVolume(args) {
@@ -36,8 +37,20 @@ export async function createVolume(args) {
   return { ok: true, action: 'create_volume', volume_id: volume.id, volume };
 }
 
-export async function createNetwork(args) {
-  if (!args.name) throw new Error('name required');
-  const network = await apiCreateNetwork(args);
-  return { ok: true, action: 'create_network', network_id: network.id, network };
+export async function deleteVolume(args) {
+  if (!args.volume_id) throw new Error('volume_id required');
+  await apiDeleteVolume(args.volume_id);
+  return { ok: true, action: 'delete_volume', volume_id: args.volume_id };
+}
+
+export async function attachVolume(args) {
+  if (!args.server_id || !args.volume_id) throw new Error('server_id and volume_id required');
+  const attachment = await apiAttachVolume(args.server_id, args.volume_id, args.device);
+  return { ok: true, action: 'attach_volume', attachment };
+}
+
+export async function detachVolume(args) {
+  if (!args.server_id || !args.attachment_id) throw new Error('server_id and attachment_id required');
+  await apiDetachVolume(args.server_id, args.attachment_id);
+  return { ok: true, action: 'detach_volume', server_id: args.server_id };
 }

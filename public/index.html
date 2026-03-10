@@ -15,7 +15,8 @@
       margin: 0;
       background: #1a1d23;
       color: #e2e4e9;
-      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
     }
@@ -30,6 +31,7 @@
       align-items: center;
       gap: 1rem;
       flex-wrap: wrap;
+      flex-shrink: 0;
     }
 
     .header span {
@@ -306,8 +308,10 @@
       <select id="llmProvider" title="Choose LLM provider">
         <option value="anthropic">Claude (Anthropic)</option>
         <option value="gemini">Gemini (Google)</option>
-        <option value="openai" disabled>OpenAI (coming soon)</option>
+        <option value="openai">OpenAI / Local</option>
       </select>
+      <input type="text" id="llmBaseUrl" class="llm-api-key" placeholder="Base URL (e.g. http://localhost:11434/v1)"
+        autocomplete="off" style="display: none;" />
       <input type="password" id="llmApiKey" class="llm-api-key" placeholder="API key (or set in .env)"
         autocomplete="off" />
       <button type="button" id="llmTest" class="llm-test-btn">Test connection</button>
@@ -338,8 +342,15 @@
   <div id="settingsOverlay" class="login-overlay hidden">
     <div class="login-box">
       <h2>VHI Settings</h2>
-      <p>Configure your Virtualization Infrastructure credentials in the <code>.env</code> file directly.</p>
+      <p>Configure your Virtualization Infrastructure credentials, overriding the <code>.env</code> file.</p>
+      <input type="text" id="vhiBaseUrlInput" placeholder="Base URL (e.g. https://172.16...)" />
+      <input type="text" id="vhiUserInput" placeholder="Username" />
+      <input type="password" id="vhiPasswordInput" placeholder="Password" />
+      <input type="text" id="vhiProjectInput" placeholder="Project name (e.g. admin)" />
+      <p style="font-size: 0.8rem; color: #fca5a5; margin-top: 5px; margin-bottom: 10px;">Note: Project Name should
+        usually match your username (e.g. admin). "Default" is often incorrect.</p>
       <button id="saveSettingsBtn">Save Settings</button>
+      <button id="clearSettingsBtn" style="background: #374151; margin-top: 0.5rem;">Clear Overrides</button>
     </div>
   </div>
 
@@ -353,6 +364,18 @@
     const llmTestBtn = document.getElementById('llmTest');
     const llmStatus = document.getElementById('llmStatus');
     const llmPicker = document.getElementById('llmPicker');
+
+    const llmBaseUrl = document.getElementById('llmBaseUrl');
+
+    llmSelect.addEventListener('change', () => {
+      if (llmSelect.value === 'openai') {
+        llmBaseUrl.style.display = 'inline-block';
+        llmApiKey.placeholder = 'API key (optional for local)';
+      } else {
+        llmBaseUrl.style.display = 'none';
+        llmApiKey.placeholder = 'API key (or set in .env)';
+      }
+    });
 
     function handleAuthError(data) {
       if (data && (data.error || '').includes('Unauthorized')) {
@@ -378,11 +401,39 @@
       if (e.key === 'Enter') document.getElementById('loginBtn').click();
     });
 
+    function loadSettings() {
+      document.getElementById('vhiBaseUrlInput').value = localStorage.getItem('vhiBaseUrl') || '';
+      document.getElementById('vhiUserInput').value = localStorage.getItem('vhiUser') || '';
+      document.getElementById('vhiPasswordInput').value = localStorage.getItem('vhiPassword') || '';
+      document.getElementById('vhiProjectInput').value = localStorage.getItem('vhiProject') || '';
+
+      const savedBaseUrl = localStorage.getItem('llmBaseUrl');
+      if (savedBaseUrl) llmBaseUrl.value = savedBaseUrl;
+    }
+
     document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+      const url = document.getElementById('vhiBaseUrlInput').value.trim();
+      const user = document.getElementById('vhiUserInput').value.trim();
+      const pass = document.getElementById('vhiPasswordInput').value.trim();
+      const proj = document.getElementById('vhiProjectInput').value.trim();
+      if (url) localStorage.setItem('vhiBaseUrl', url); else localStorage.removeItem('vhiBaseUrl');
+      if (user) localStorage.setItem('vhiUser', user); else localStorage.removeItem('vhiUser');
+      if (pass) localStorage.setItem('vhiPassword', pass); else localStorage.removeItem('vhiPassword');
+      if (proj) localStorage.setItem('vhiProject', proj); else localStorage.removeItem('vhiProject');
+      document.getElementById('settingsOverlay').classList.add('hidden');
+    });
+
+    document.getElementById('clearSettingsBtn').addEventListener('click', () => {
+      localStorage.removeItem('vhiBaseUrl');
+      localStorage.removeItem('vhiUser');
+      localStorage.removeItem('vhiPassword');
+      localStorage.removeItem('vhiProject');
+      loadSettings();
       document.getElementById('settingsOverlay').classList.add('hidden');
     });
 
     document.getElementById('settingsBtn').addEventListener('click', () => {
+      loadSettings();
       document.getElementById('settingsOverlay').classList.remove('hidden');
     });
 
@@ -390,7 +441,10 @@
       try {
         const res = await fetch('/api/config');
         const cfg = await res.json();
-        if (cfg.llmProvider && llmSelect) llmSelect.value = cfg.llmProvider;
+        if (cfg.llmProvider && llmSelect) {
+          llmSelect.value = cfg.llmProvider;
+          llmSelect.dispatchEvent(new Event('change'));
+        }
         if (cfg.authRequired) {
           document.getElementById('loginOverlay').classList.remove('hidden');
         }
@@ -411,6 +465,12 @@
     llmTestBtn.addEventListener('click', async function () {
       const provider = llmSelect ? llmSelect.value : 'anthropic';
       const apiKey = (llmApiKey && llmApiKey.value) ? llmApiKey.value.trim() : '';
+      const baseUrl = (llmBaseUrl && llmBaseUrl.value) ? llmBaseUrl.value.trim() : '';
+
+      if (provider === 'openai' && baseUrl) {
+        localStorage.setItem('llmBaseUrl', baseUrl);
+      }
+
       llmStatus.textContent = 'Testing…';
       llmStatus.style.color = '#9ca3af';
       llmPicker.classList.remove('connected');
@@ -419,7 +479,7 @@
         const res = await fetch('/api/llm/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider, apiKey, webPassword })
+          body: JSON.stringify({ provider, apiKey, llmBaseUrl: baseUrl, webPassword })
         });
         const data = await res.json();
         if (handleAuthError(data)) {
@@ -455,6 +515,13 @@
       try {
         const provider = llmSelect ? llmSelect.value : 'anthropic';
         const apiKey = (llmApiKey && llmApiKey.value) ? llmApiKey.value.trim() : null;
+        const baseUrl = (llmBaseUrl && llmBaseUrl.value) ? llmBaseUrl.value.trim() : null;
+
+        if (provider === 'openai' && baseUrl) {
+          localStorage.setItem('llmBaseUrl', baseUrl);
+        }
+
+        const vhiBaseUrl = localStorage.getItem('vhiBaseUrl');
         const vhiUser = localStorage.getItem('vhiUser');
         const vhiProject = localStorage.getItem('vhiProject');
         const vhiPassword = localStorage.getItem('vhiPassword');
@@ -466,6 +533,8 @@
             conversationId: 'web-ui',
             llmProvider: provider,
             apiKey: apiKey || undefined,
+            llmBaseUrl: baseUrl || undefined,
+            vhiBaseUrl,
             vhiUser,
             vhiProject,
             vhiPassword,

@@ -12,6 +12,9 @@ export function start(config = {}) {
   const intervalMinutes = config.healthPollIntervalMinutes || 5;
   if (healthJob) return;
   healthJob = cron.schedule(`*/${intervalMinutes} * * * *`, async () => {
+    if (!process.env.VHI_USER || !process.env.VHI_PASSWORD) {
+      return; // Skip health poll if credentials are not set in the environment
+    }
     try {
       const result = await healthPoller.runHealthPoll();
       await alerts.emitAlerts(result);

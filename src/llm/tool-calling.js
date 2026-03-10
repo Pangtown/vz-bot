@@ -177,3 +177,44 @@ export function parseGeminiToolUse(message) {
   }
   return uses;
 }
+
+/**
+ * Convert to OpenAI tool format
+ */
+export function toOpenAITools() {
+  return getToolDefinitions().map(t => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: {
+        type: 'object',
+        properties: t.input_schema?.properties || {},
+        required: t.input_schema?.required || []
+      }
+    }
+  }));
+}
+
+/**
+ * Parse tool_calls from OpenAI response message
+ */
+export function parseOpenAIToolUse(message) {
+  const uses = [];
+  if (message.tool_calls && message.tool_calls.length > 0) {
+    for (const call of message.tool_calls) {
+      if (call.type === 'function') {
+        let args = {};
+        try {
+          args = JSON.parse(call.function.arguments || '{}');
+        } catch (e) { }
+        uses.push({
+          id: call.id,
+          name: call.function.name,
+          args: args
+        });
+      }
+    }
+  }
+  return uses;
+}

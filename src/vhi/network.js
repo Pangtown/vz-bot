@@ -3,9 +3,10 @@
  */
 
 import { getClient } from './client.js';
+import { getContextValue } from '../gateway/context.js';
 
 const getBaseUrl = () => {
-  const base = process.env.VHI_BASE_URL || 'https://172.16.218.7';
+  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL') || 'https://172.16.218.7';
   return base.replace(/\/$/, '');
 };
 
@@ -50,4 +51,68 @@ export async function createNetwork(options = {}) {
   }
   const data = await res.json();
   return data.network || null;
+}
+
+export async function getNetwork(networkId) {
+  const client = await getClient();
+  const res = await client.fetch(networkUrl(`/networks/${networkId}`));
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    const text = await res.text();
+    throw new Error(`VHI Network getNetwork failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.network || null;
+}
+
+export async function deleteNetwork(networkId) {
+  const client = await getClient();
+  const res = await client.fetch(networkUrl(`/networks/${networkId}`), { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text();
+    throw new Error(`VHI Network deleteNetwork failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
+export async function listSubnets(options = {}) {
+  const client = await getClient();
+  let path = '/subnets';
+  const params = new URLSearchParams();
+  if (options.network_id) params.set('network_id', options.network_id);
+  const qs = params.toString();
+  if (qs) path += `?${qs}`;
+
+  const res = await client.fetch(networkUrl(path));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Network listSubnets failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.subnets || [];
+}
+
+export async function createSubnet(options = {}) {
+  const client = await getClient();
+  const res = await client.fetch(networkUrl('/subnets'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subnet: options }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Network createSubnet failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.subnet || null;
+}
+
+export async function deleteSubnet(subnetId) {
+  const client = await getClient();
+  const res = await client.fetch(networkUrl(`/subnets/${subnetId}`), { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text();
+    throw new Error(`VHI Network deleteSubnet failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
 }

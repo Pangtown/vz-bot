@@ -3,9 +3,10 @@
  */
 
 import { getClient } from './client.js';
+import { getContextValue } from '../gateway/context.js';
 
 const getBaseUrl = () => {
-  const base = process.env.VHI_BASE_URL || 'https://172.16.218.7';
+  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL') || 'https://172.16.218.7';
   return base.replace(/\/$/, '');
 };
 
