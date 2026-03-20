@@ -816,6 +816,10 @@
         <span class="nav-icon">🔔</span>
         <span class="nav-label">Alerts</span>
       </div>
+      <div class="nav-item" data-panel="chat">
+        <span class="nav-icon">🤖</span>
+        <span class="nav-label">AI Assistant</span>
+      </div>
 
       <!-- Compute -->
       <div class="sidebar-section">Compute</div>
@@ -1192,6 +1196,21 @@
               <tr class="skeleton-row"><td colspan="6"><div class="skeleton"></div></td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- ── AI ASSISTANT PANEL ── -->
+      <div class="panel" id="panel-chat" style="height: 100%; display: flex; flex-direction: column; padding: 0;">
+        <div class="panel-header" style="padding: 1rem 1.5rem; margin-bottom: 0; border-bottom: 1px solid var(--border);">
+          <h2>AI Assistant</h2>
+          <span class="panel-badge">Powered by VZ Bot</span>
+        </div>
+        <div id="panelChatMessages" class="chat-messages" style="flex: 1; padding: 1.5rem;">
+          <!-- Messages will be mirrored here -->
+        </div>
+        <div class="chat-input-wrap" style="padding: 1.5rem; background: var(--bg-card);">
+          <textarea id="panelChatInput" placeholder="Ask anything about your VHI infrastructure..." rows="1" style="flex: 1; padding: .8rem 1rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; font-size: .95rem; outline: none; resize: none; height: 48px; max-height: 150px; transition: border-color var(--transition); line-height: 1.5;"></textarea>
+          <button id="panelChatSend" style="padding: 0 1.5rem; border: none; border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer; font: inherit; font-weight: 600; font-size: 1rem; transition: background var(--transition), transform .1s; flex-shrink: 0;">Send</button>
         </div>
       </div>
 
@@ -1746,6 +1765,12 @@ document.querySelectorAll('.nav-item').forEach(item => {
     const panelId = 'panel-' + item.dataset.panel;
     const panel = document.getElementById(panelId);
     if (panel) panel.classList.add('active');
+    
+    // AI Assistant focus/scroll
+    if (item.dataset.panel === 'chat') {
+      panelChatMsgs.scrollTop = panelChatMsgs.scrollHeight;
+      setTimeout(() => panelChatInput.focus(), 50);
+    }
   });
 });
 
@@ -3166,6 +3191,11 @@ const chatMsgs    = document.getElementById('chatMessages');
 const chatInput   = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSend');
 
+// Panel Chat elements
+const panelChatMsgs    = document.getElementById('panelChatMessages');
+const panelChatInput   = document.getElementById('panelChatInput');
+const panelChatSendBtn = document.getElementById('panelChatSend');
+
 let chatOpen = false;
 let chatHistory = []; // [{role,content}]
 
@@ -3175,7 +3205,11 @@ function setChatOpen(open) {
   chatToggle.classList.toggle('open', open);
   chatToggle.title = open ? 'Close AI Chat' : 'Open AI Chat';
   if (open) {
-    setTimeout(() => chatInput.focus(), 280);
+    if (document.getElementById('panel-chat').classList.contains('active')) {
+      setTimeout(() => panelChatInput.focus(), 50);
+    } else {
+      setTimeout(() => chatInput.focus(), 280);
+    }
   }
 }
 
@@ -3186,41 +3220,75 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && chatOpen) setChatOpen(false);
 });
 
-// auto-grow textarea
-chatInput.addEventListener('input', () => {
-  chatInput.style.height = '42px';
-  chatInput.style.height = Math.min(chatInput.scrollHeight, 130) + 'px';
+// Sync both textareas
+[chatInput, panelChatInput].forEach(inp => {
+  inp.addEventListener('input', () => {
+    const val = inp.value;
+    chatInput.value = val;
+    panelChatInput.value = val;
+    
+    // auto-grow logic for both
+    [chatInput, panelChatInput].forEach(ti => {
+      ti.style.height = (ti === chatInput ? '42px' : '48px');
+      ti.style.height = Math.min(ti.scrollHeight, (ti === chatInput ? 130 : 150)) + 'px';
+    });
+  });
+
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChat();
+    }
+  });
 });
 
-chatInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendChat();
-  }
-});
 chatSendBtn.addEventListener('click', sendChat);
+panelChatSendBtn.addEventListener('click', sendChat);
 
 function appendMsg(role, text, cls = '') {
-  const div = document.createElement('div');
-  div.className = 'msg ' + (role === 'user' ? 'msg-user' : 'msg-ai') + (cls ? ' ' + cls : '');
-  div.textContent = text;
-  chatMsgs.appendChild(div);
+  const msgClass = 'msg ' + (role === 'user' ? 'msg-user' : 'msg-ai') + (cls ? ' ' + cls : '');
+  
+  // Create for drawer
+  const div1 = document.createElement('div');
+  div1.className = msgClass;
+  div1.textContent = text;
+  chatMsgs.appendChild(div1);
   chatMsgs.scrollTop = chatMsgs.scrollHeight;
-  return div;
+
+  // Create for panel
+  const div2 = document.createElement('div');
+  div2.className = msgClass;
+  div2.textContent = text;
+  panelChatMsgs.appendChild(div2);
+  panelChatMsgs.scrollTop = panelChatMsgs.scrollHeight;
+
+  return [div1, div2];
 }
 
 function buildSystemContext() {
-  const vmSummary = _vms.length
-    ? `${_vms.length} VMs (${_vms.filter(v => v.status === 'ACTIVE').length} running)`
-    : 'no VMs loaded';
-  const nodeSummary = _nodes.length ? `${_nodes.length} compute nodes` : 'no nodes loaded';
   const cluster = session?.baseUrl || 'unknown';
-  return `You are an AI assistant for Virtuozzo Hybrid Infrastructure (VHI/OpenStack).
-Current cluster: ${cluster}
-VMs: ${vmSummary}
-Nodes: ${nodeSummary}
-Volumes: ${_vols.length || 0} | Networks: ${_nets.length || 0} | Images: ${_imgs.length || 0}
-Answer concisely. Use markdown sparingly. If asked to perform an action, explain what you'd do.`;
+  const vmSummary = _vms.length ? `${_vms.length} VMs (${_vms.filter(v => v.status === 'ACTIVE').length} active)` : 'No VMs';
+  const nodeSummary = _nodes.length ? `${_nodes.length} nodes` : 'No nodes';
+  
+  // Inventory details to help the LLM suggest IDs
+  const policies = _volTypes.map(t => t.name).join(', ') || 'None';
+  const nets = _nets.map(n => `${n.name || 'unnamed'} (${n.id.slice(0,8)})`).join(', ') || 'None';
+  const imgs = _imgs.slice(0, 10).map(i => `${i.name || 'unnamed'} (${i.id.slice(0,8)})`).join(', ') || 'None';
+  const flavors = _flavors.slice(0, 8).map(f => `${f.name} (${f.id.slice(0,8)})`).join(', ') || 'None';
+
+  return `You are VZ Bot, an AI assistant for Virtuozzo Hybrid Infrastructure (VHI).
+Cluster: ${cluster}
+State: ${vmSummary}, ${nodeSummary}, ${_vols.length} volumes, ${_nets.length} networks, ${_imgs.length} images.
+Storage Policies: ${policies}
+Available Networks: ${nets}
+Available Images (Top 10): ${imgs}
+Available Flavors (Top 8): ${flavors}
+
+Guidelines:
+1. Use provided IDs/Names if the user refers to resources.
+2. If asked to create something, use the available policies/flavors/networks.
+3. If IDs are missing, ask the user or use 'list_*' tools to find them.
+4. Answer concisely. Use markdown tables for lists.`;
 }
 
 async function sendChat() {
@@ -3228,18 +3296,23 @@ async function sendChat() {
   if (!text) return;
 
   chatInput.value = '';
+  panelChatInput.value = '';
   chatInput.style.height = '42px';
+  panelChatInput.style.height = '48px';
   chatSendBtn.disabled = true;
+  panelChatSendBtn.disabled = true;
 
   appendMsg('user', text);
   chatHistory.push({ role: 'user', content: text });
 
-  const thinkingEl = appendMsg('assistant', 'Thinking…', 'thinking');
+  const [thinkingEl1, thinkingEl2] = appendMsg('assistant', 'Thinking…', 'thinking');
 
   try {
     const payload = {
       message: text,
       conversationId: 'web-session',
+      systemContext: buildSystemContext(),
+      chatHistory: chatHistory.slice(-10), // Send last 10 messages
       llmProvider: localStorage.getItem('llmProvider') || undefined,
       apiKey: localStorage.getItem('llmApiKey') || undefined,
       llmBaseUrl: localStorage.getItem('llmBaseUrl') || undefined,
@@ -3264,18 +3337,28 @@ async function sendChat() {
     }
 
     const reply = data.reply || 'No response from AI agent.';
-    thinkingEl.classList.remove('thinking');
-    thinkingEl.textContent = reply;
+    [thinkingEl1, thinkingEl2].forEach(el => {
+      el.classList.remove('thinking');
+      el.textContent = reply;
+    });
     chatMsgs.scrollTop = chatMsgs.scrollHeight;
+    panelChatMsgs.scrollTop = panelChatMsgs.scrollHeight;
 
     chatHistory.push({ role: 'assistant', content: reply });
 
   } catch (err) {
-    thinkingEl.classList.remove('thinking');
-    thinkingEl.textContent = '⚠ ' + (err.message || 'Request failed');
+    [thinkingEl1, thinkingEl2].forEach(el => {
+      el.classList.remove('thinking');
+      el.textContent = '⚠ ' + (err.message || 'Request failed');
+    });
   } finally {
     chatSendBtn.disabled = false;
-    chatInput.focus();
+    panelChatSendBtn.disabled = false;
+    if (document.getElementById('panel-chat').classList.contains('active')) {
+      panelChatInput.focus();
+    } else {
+      chatInput.focus();
+    }
   }
 }
 

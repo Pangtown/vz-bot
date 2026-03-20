@@ -96,13 +96,45 @@ export async function deleteServer(serverId) {
 
 export async function createServer(options = {}) {
   const client = await getClient();
+  
+  // Abstraction for easier LLM use
+  const payload = {
+    name: options.name,
+    imageRef: options.imageRef,
+    flavorRef: options.flavorRef,
+    networks: options.networks || [],
+    min_count: options.min_count || 1,
+    max_count: options.max_count || 1,
+  };
+
+  // If networks is just a string (ID), convert to object
+  if (typeof payload.networks === 'string') {
+    payload.networks = [{ uuid: payload.networks }];
+  }
+
+  // If volume_size or volume_type is provided, use block_device_mapping_v2
+  if (options.volume_size || options.volume_type) {
+    payload.block_device_mapping_v2 = [{
+      boot_index: 0,
+      uuid: options.imageRef,
+      source_type: 'image',
+      destination_type: 'volume',
+      volume_size: options.volume_size || 50,
+      volume_type: options.volume_type || undefined,
+      delete_on_termination: options.delete_on_termination !== false
+    }];
+    // When using block_device_mapping_v2 for boot, imageRef should null or handled by BDM
+    // But Nova sometimes requires it depending on version. 2.67+ supports it in BDM.
+    delete payload.imageRef; 
+  }
+
   const res = await client.fetch(await computeUrl('/servers'), {
     method: 'POST',
     headers: { 
       'Content-Type': 'application/json',
-      'Openstack-Api-Version': 'compute 2.67' // Required for volume_type in block_device_mapping_v2
+      'Openstack-Api-Version': 'compute 2.67' 
     },
-    body: JSON.stringify({ server: options }),
+    body: JSON.stringify({ server: payload }),
   });
   if (!res.ok) {
     const text = await res.text();

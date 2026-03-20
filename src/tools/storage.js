@@ -8,7 +8,8 @@ import {
   createVolume as apiCreateVolume,
   deleteVolume as apiDeleteVolume,
   attachVolume as apiAttachVolume,
-  detachVolume as apiDetachVolume
+  detachVolume as apiDetachVolume,
+  listVolumeTypes as fetchVolumeTypes
 } from '../vhi/block.js';
 
 export async function listVolumes(args = {}) {
@@ -20,6 +21,19 @@ export async function listVolumes(args = {}) {
       name: v.name,
       status: v.status,
       size: v.size,
+    })),
+  };
+}
+
+export async function listVolumeTypes(args = {}) {
+  const types = await fetchVolumeTypes();
+  return {
+    count: types.length,
+    volume_types: (types || []).map(t => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      is_public: t.is_public,
     })),
   };
 }

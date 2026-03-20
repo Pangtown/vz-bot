@@ -76,10 +76,18 @@ export async function deletePort(portId) {
 
 export async function createNetwork(options = {}) {
   const client = await getClient();
+  
+  // Map 'external' to 'router:external' for VHI/OpenStack
+  const payload = { ...options };
+  if (payload.external !== undefined) {
+    payload['router:external'] = payload.external;
+    delete payload.external;
+  }
+
   const res = await client.fetch(networkUrl('/networks'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ network: options }),
+    body: JSON.stringify({ network: payload }),
   });
   if (!res.ok) {
     const text = await res.text();

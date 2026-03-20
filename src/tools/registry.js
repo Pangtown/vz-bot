@@ -21,6 +21,7 @@ const TOOLS = {
 
   // Storage
   list_volumes: storage.listVolumes,
+  list_volume_types: storage.listVolumeTypes,
   get_volume: storage.getVolume,
   create_volume: storage.createVolume,
   delete_volume: storage.deleteVolume,
@@ -49,7 +50,7 @@ const TOOLS = {
 
 const ALLOWED_WITHOUT_CONFIRM = new Set([
   'list_vms', 'get_vm',
-  'list_volumes', 'get_volume',
+  'list_volumes', 'get_volume', 'list_volume_types',
   'list_networks', 'get_network', 'list_subnets',
   'list_images', 'get_image',
   'run_health_check'

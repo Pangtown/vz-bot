@@ -83,24 +83,31 @@ export function getToolDefinitions() {
       input_schema: { type: 'object', properties: { limit: { type: 'number', description: 'Max items' } } },
     },
     {
+      name: 'list_volume_types',
+      description: 'List block storage volume types (storage policies) in VHI.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
       name: 'list_networks',
       description: 'List networks in VHI.',
       input_schema: { type: 'object', properties: { limit: { type: 'number', description: 'Max items' } } },
     },
     {
       name: 'create_vm',
-      description: 'Create a new VM in VHI.',
+      description: 'Create a new VM in VHI. You can optionally specify boot disk size and storage policy.',
       input_schema: {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'Name of the VM' },
           imageRef: { type: 'string', description: 'Image ID to use' },
           flavorRef: { type: 'string', description: 'Flavor/Size ID to use' },
+          volume_size: { type: 'number', description: 'Boot disk size in GB (optional, defaults to 50 if policy is set)' },
+          volume_type: { type: 'string', description: 'Storage policy name for the boot disk (optional)' },
           networks: {
             type: 'array',
             items: {
               type: 'object',
-              properties: { uuid: { type: 'string' } }
+              properties: { uuid: { type: 'string', description: 'Network UUID' } }
             },
             description: 'List of networks to connect to (optional)'
           }
@@ -115,7 +122,9 @@ export function getToolDefinitions() {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'Name of the volume' },
-          size: { type: 'number', description: 'Size of the volume in GB' }
+          size: { type: 'number', description: 'Size of the volume in GB' },
+          volume_type: { type: 'string', description: 'Storage policy name (e.g., "standard")' },
+          description: { type: 'string', description: 'Optional volume description' }
         },
         required: ['name', 'size']
       }
@@ -127,14 +136,16 @@ export function getToolDefinitions() {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'Name of the network' },
-          admin_state_up: { type: 'boolean', description: 'Whether admin state is up', default: true }
+          admin_state_up: { type: 'boolean', description: 'Whether admin state is up', default: true },
+          shared: { type: 'boolean', description: 'Whether the network is shared across projects', default: false },
+          external: { type: 'boolean', description: 'Whether this is an external/public network', default: false }
         },
         required: ['name']
       }
     },
     {
       name: 'execute_vinfra_cli',
-      description: 'Execute arbitrary vinfra CLI commands on the VHI cluster. Provide an array of command arguments, e.g., ["cluster", "list"], or ["node", "list"]. This tool is highly capable of full infrastructure viewing and management. Use this tool when standard REST endpoints fall short.',
+      description: 'Execute arbitrary vinfra CLI commands on the VHI cluster. Provide an array of command arguments, e.g., ["cluster", "list"], or ["node", "list"]. This tool is for advanced infrastructure management and viewing details not available via REST. Use this for cluster-wide status or low-level node maintenance.',
       input_schema: {
         type: 'object',
         properties: {
@@ -143,7 +154,7 @@ export function getToolDefinitions() {
             items: {
               type: 'string'
             },
-            description: 'Array of strings representing the vinfra command arguments. Omit the "vinfra" prefix and omit the format flags (like -f json) as those are handled automatically.'
+            description: 'Array of strings representing the vinfra command arguments. Omit the "vinfra" prefix.'
           }
         },
         required: ['args']
