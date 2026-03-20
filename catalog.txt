@@ -1,0 +1,82 @@
+﻿Fetching https://172.16.218.7:5000/v3/auth/tokens for user admin and project admin
+{
+  auth: {
+    identity: {
+      methods: [ 'password' ],
+      password: {
+        user: {
+          name: 'admin',
+          domain: { name: 'Default' },
+          password: 'Nexpass8188!'
+        }
+      }
+    },
+    scope: { project: { name: 'admin', domain: { name: 'Default' } } }
+  }
+}
+Service Catalog:
+- Service: identity (keystone)
+  - internal: https://compute-api.svc.vstoragedomain.:35357/v3
+  - admin: https://compute-api.svc.vstoragedomain.:35357/v3
+  - public: https://172.16.218.7:5000/v3
+- Service: image (glance)
+  - public: https://172.16.218.7:9292
+  - internal: https://compute-api.svc.vstoragedomain.:9293
+  - admin: https://compute-api.svc.vstoragedomain.:9293
+- Service: volumev3 (cinderv3)
+  - public: https://172.16.218.7:8776/v3/aeba0066a44540d984349d01ab79ec7f
+  - internal: https://compute-api.svc.vstoragedomain.:8777/v3/aeba0066a44540d984349d01ab79ec7f
+  - admin: https://compute-api.svc.vstoragedomain.:8777/v3/aeba0066a44540d984349d01ab79ec7f
+- Service: placement (placement)
+  - public: https://172.16.218.7:8780
+  - internal: https://compute-api.svc.vstoragedomain.:8781
+  - admin: https://compute-api.svc.vstoragedomain.:8781
+- Service: key-manager (barbican)
+  - public: https://172.16.218.7:9313
+  - internal: https://compute-api.svc.vstoragedomain.:9312
+  - admin: https://compute-api.svc.vstoragedomain.:9312
+- Service: compute (nova)
+  - public: https://172.16.218.7:8774/v2.1/aeba0066a44540d984349d01ab79ec7f
+  - internal: https://compute-api.svc.vstoragedomain.:8784/v2.1/aeba0066a44540d984349d01ab79ec7f
+  - admin: https://compute-api.svc.vstoragedomain.:8784/v2.1/aeba0066a44540d984349d01ab79ec7f
+- Service: network (neutron)
+  - public: https://172.16.218.7:9696
+  - internal: https://compute-api.svc.vstoragedomain.:9697
+  - admin: https://compute-api.svc.vstoragedomain.:9697
+- Service: orchestration (heat)
+  - public: https://172.16.218.7:8004/v1/aeba0066a44540d984349d01ab79ec7f
+  - internal: https://compute-api.svc.vstoragedomain.:8005/v1/aeba0066a44540d984349d01ab79ec7f
+  - admin: https://compute-api.svc.vstoragedomain.:8005/v1/aeba0066a44540d984349d01ab79ec7f
+- Service: infra-optim (watcher)
+  - public: https://172.16.218.7:8746
+  - internal: https://compute-api.svc.vstoragedomain.:8747
+  - admin: https://compute-api.svc.vstoragedomain.:8747
+- Service: metric (gnocchi)
+  - public: https://172.16.218.7:8041
+  - internal: https://compute-api.svc.vstoragedomain.:8042
+  - admin: https://compute-api.svc.vstoragedomain.:8042
+- Service: load-balancer (octavia)
+  - public: https://172.16.218.7:9888
+  - internal: https://compute-api.svc.vstoragedomain.:9887
+  - admin: https://compute-api.svc.vstoragedomain.:9887
+- Service: container-infra (magnum)
+  - public: https://172.16.218.7:9513/v1
+  - internal: https://compute-api.svc.vstoragedomain.:9512/v1
+  - admin: https://compute-api.svc.vstoragedomain.:9512/v1
+- Service: vstorage (vstorage)
+
+Detected Compute URL: https://172.16.218.7:8774/v2.1/aeba0066a44540d984349d01ab79ec7f
+
+Checking versions at https://172.16.218.7:8774/v2.1/aeba0066a44540d984349d01ab79ec7f
+<html>
+ <head>
+  <title>404 Not Found</title>
+ </head>
+ <body>
+  <h1>404 Not Found</h1>
+  The resource could not be found.<br /><br />
+
+
+
+ </body>
+</html>

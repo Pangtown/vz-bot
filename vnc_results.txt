@@ -1,0 +1,25 @@
+﻿Fetching https://172.16.218.7:5000/v3/auth/tokens for user admin and project admin
+{
+  auth: {
+    identity: {
+      methods: [ 'password' ],
+      password: {
+        user: {
+          name: 'admin',
+          domain: { name: 'Default' },
+          password: 'Nexpass8188!'
+        }
+      }
+    },
+    scope: { project: { name: 'admin', domain: { name: 'Default' } } }
+  }
+}
+Getting servers...
+Testing with server: eed31a11-d432-4918-99f4-c4119695ac52
+Running: remote-console [compute 2.6]
+Running: remote-console [compute 2.67]
+Running: remote-console [compute 2.87]
+Running: remote-console [Nova 2.6]
+Running: remote-console [Nova 2.87]
+Running: os-getVNCConsole [no headers]
+Diagnostic complete. Results in vnc_diag_results.txt

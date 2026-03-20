@@ -28,11 +28,15 @@ export async function testConnection(options = {}) {
   const apiKey = options.apiKey || '';
   const baseUrl = options.baseUrl || '';
 
-  if (provider === 'openai') {
+  if (provider === 'openai' || provider === 'perplexity') {
+    const isPerp = provider === 'perplexity';
     try {
-      const client = getOpenAIClient(apiKey, baseUrl);
+      const actualKey = isPerp ? (apiKey || process.env.PERPLEXITY_API_KEY || '') : apiKey;
+      const actualBaseUrl = isPerp ? 'https://api.perplexity.ai/' : baseUrl;
+
+      const client = getOpenAIClient(actualKey, actualBaseUrl);
       await client.chat.completions.create({
-        model: options.model || process.env.LLM_MODEL || 'gpt-4o-mini',
+        model: options.model || (isPerp ? 'sonar-pro' : (process.env.LLM_MODEL || 'gpt-4o-mini')),
         messages: [{ role: 'user', content: 'Reply with OK.' }],
         max_tokens: 10,
       });
@@ -129,18 +133,22 @@ function toOpenAIMessages(messages) {
 export async function chat(messages, options = {}) {
   const provider = (options.provider || process.env.LLM_PROVIDER || 'anthropic').toLowerCase();
 
-  if (provider === 'openai') {
-    const client = getOpenAIClient(options.apiKey?.trim(), options.baseUrl?.trim());
+  if (provider === 'openai' || provider === 'perplexity') {
+    const isPerp = provider === 'perplexity';
+    const actualKey = isPerp ? (options.apiKey?.trim() || process.env.PERPLEXITY_API_KEY || '') : options.apiKey?.trim();
+    const actualBaseUrl = isPerp ? 'https://api.perplexity.ai/' : options.baseUrl?.trim();
+
+    const client = getOpenAIClient(actualKey, actualBaseUrl);
     const openaiMessages = toOpenAIMessages(messages);
 
     const res = await client.chat.completions.create({
-      model: options.model || process.env.LLM_MODEL || 'gpt-4o-mini',
+      model: options.model || (isPerp ? 'sonar-pro' : (process.env.LLM_MODEL || 'gpt-4o-mini')),
       messages: openaiMessages,
       tools: toOpenAITools(),
     });
 
     const choice = res.choices[0]?.message;
-    if (!choice) return { text: 'No response from OpenAI provider.', toolCalls: [], assistantContent: null };
+    if (!choice) return { text: `No response from ${isPerp ? 'Perplexity' : 'OpenAI'} provider.`, toolCalls: [], assistantContent: null };
 
     const toolUses = parseOpenAIToolUse(choice);
     if (toolUses.length > 0) {

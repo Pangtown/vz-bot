@@ -1,0 +1,3284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>VI Manager – Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── reset & tokens ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      /* Default Light Theme */
+      --bg-sidebar:  #f4f5f7;
+      --bg-dark:     #ffffff;
+      --bg-medium:   #e9ecef;
+      --bg-light:    #dee2e6;
+      --bg-card:     #ffffff;
+      --bg-content:  #f8f9fa;
+      --accent:      #e3000f;
+      --accent2:     #ff3333;
+      --text:        #212529;
+      --text-sidebar:#495057;
+      --text-dim:    #6c757d;
+      --text-muted:  #adb5bd;
+      --success:     #198754;
+      --warning:     #ffc107;
+      --danger:      #dc3545;
+      --border:      #dee2e6;
+      --border-dark: #ced4da;
+      --shadow:      0 2px 8px rgba(0,0,0,.08);
+      --radius:      6px;
+      --transition:  0.15s ease;
+      --font:        'Inter', 'Segoe UI', system-ui, sans-serif;
+    }
+
+    [data-theme="dark"] {
+      /* Dark Theme Overlay */
+      --bg-sidebar:  #1e1e1e;
+      --bg-dark:     #121212;
+      --bg-medium:   #2a2a2a;
+      --bg-light:    #3a3a3a;
+      --bg-card:     #242424;
+      --bg-content:  #121212;
+      --accent:      #e3000f;
+      --accent2:     #ff3333;
+      --text:        #e0e0e0;
+      --text-sidebar:#cccccc;
+      --text-dim:    #aaaaaa;
+      --text-muted:  #777777;
+      --success:     #27ae60;
+      --warning:     #f39c12;
+      --danger:      #e74c3c;
+      --border:      #333333;
+      --border-dark: #222222;
+      --shadow:      0 2px 8px rgba(0,0,0,.4);
+    }
+
+    /* custom select dropdown for multi-select */
+    .custom-dropdown {
+      position: relative;
+      width: 100%;
+    }
+    .dropdown-selected {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: .6rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      font-size: .92rem;
+    }
+    .dropdown-selected:hover {
+      border-color: var(--accent);
+    }
+    .dropdown-list {
+      position: absolute;
+      top: 105%;
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      z-index: 1001;
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 4px;
+    }
+    .dropdown-list.hidden {
+      display: none;
+    }
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .5rem .75rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background var(--transition);
+      font-size: .85rem;
+    }
+    .dropdown-item:hover {
+      background: var(--bg-light);
+    }
+    .dropdown-item input {
+      width: auto !important;
+      margin: 0 !important;
+    }
+    .dropdown-item label {
+      cursor: pointer;
+      margin: 0 !important;
+      flex: 1;
+      text-transform: none !important;
+      font-weight: 400 !important;
+      letter-spacing: normal !important;
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: var(--font);
+      background: var(--bg-content);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      font-size: 14px;
+    }
+
+    /* ── scrollbar ──────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+    /* ── login overlay ──────────────────────────────────────── */
+    #loginOverlay {
+      position: fixed; inset: 0;
+      background: var(--bg-sidebar);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+      transition: opacity .35s ease;
+    }
+    #loginOverlay.hidden { opacity: 0; pointer-events: none; }
+
+    .login-card {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 10px;
+      padding: 2.5rem 2.8rem;
+      width: 420px;
+      max-width: 95vw;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+      animation: fadeUp .4s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 1.4rem;
+    }
+    .login-logo .vz-brand {
+      font-size: 1.8rem; font-weight: 800;
+      color: #fff; letter-spacing: -1px;
+      display: block; line-height: 1;
+    }
+    .login-logo .vz-brand span { color: var(--accent); }
+    .login-logo h1 {
+      font-size: 1rem; font-weight: 500;
+      margin-top: .5rem;
+      color: #aaa;
+      letter-spacing: .2px;
+    }
+    .login-logo p {
+      font-size: .8rem;
+      color: #777;
+      margin-top: .2rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    .form-group label {
+      display: block;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: .4rem;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: .72rem 1rem;
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      color: #eee;
+      font: inherit;
+      font-size: .92rem;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      outline: none;
+    }
+    .form-group input::placeholder { color: #666; }
+    .form-group input:focus, .form-group select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(227,0,15,.2);
+    }
+
+    .advanced-toggle {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-dim); font: inherit; font-size: .8rem;
+      padding: .3rem 0; display: flex; align-items: center; gap: .4rem;
+      transition: color var(--transition);
+    }
+    .advanced-toggle:hover { color: var(--accent); }
+
+    .advanced-fields { display: none; padding-top: .5rem; }
+    .advanced-fields.open { display: block; }
+
+    .advanced-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: .8rem;
+    }
+
+    .btn-group { display: flex; gap: .75rem; margin-top: 1.4rem; }
+
+    .btn {
+      flex: 1; padding: .78rem 1rem;
+      border: none; border-radius: 8px;
+      font: inherit; font-weight: 600; font-size: .92rem;
+      cursor: pointer; transition: background var(--transition), transform .1s;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent2); }
+    .btn-primary:disabled { background: var(--bg-light); cursor: not-allowed; }
+    .btn-secondary { background: var(--bg-light); color: var(--text); }
+    .btn-secondary:hover { background: var(--accent); color: #fff; }
+
+    .login-status {
+      margin-top: .9rem; font-size: .83rem;
+      text-align: center; min-height: 1.2em;
+      color: var(--text-dim);
+    }
+    .login-status.error { color: var(--danger); }
+    .login-status.success { color: var(--success); }
+
+    /* ── app shell ──────────────────────────────────────────── */
+    #appShell {
+      display: none; flex: 1; overflow: hidden;
+      flex-direction: column;
+    }
+    #appShell.visible { display: flex; }
+
+    /* header */
+    .app-header {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 0 1.5rem;
+      height: 52px; min-height: 52px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .app-header .logo { font-size: 1.1rem; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+    .app-header .logo span { color: var(--accent); }
+    .app-header .cluster-pill {
+      font-size: .76rem; font-weight: 500;
+      background: rgba(39,174,96,.1);
+      color: var(--success);
+      border-radius: 20px; padding: .2rem .75rem;
+      border: 1px solid rgba(39,174,96,.3);
+    }
+    .app-header .spacer { flex: 1; }
+    .header-link {
+      font-size: .8rem; color: var(--text-dim); text-decoration: none;
+      padding: .3rem .7rem; border-radius: 6px;
+      transition: background var(--transition), color var(--transition);
+    }
+    .header-link:hover { background: var(--bg-light); color: var(--text); }
+    .btn-chat-toggle {
+      font-size: .78rem; background: none; border: 1px solid var(--border);
+      color: var(--text-dim); padding: .3rem .8rem; border-radius: 6px;
+      cursor: pointer; font: inherit;
+      transition: border-color var(--transition), color var(--transition), background var(--transition);
+    }
+    .btn-chat-toggle:hover, .btn-chat-toggle.open {
+      border-color: var(--accent); color: var(--accent);
+    }
+    .btn-chat-toggle.connected {
+      color: var(--success); border-color: var(--success);
+    }
+    .btn-chat-toggle.connected:hover, .btn-chat-toggle.connected.open {
+      background: rgba(39,174,96,.1); color: var(--success); border-color: var(--success);
+    }
+    .btn-logout {
+      font-size: .78rem; background: none; border: 1px solid var(--border);
+      color: var(--text-dim); padding: .3rem .8rem; border-radius: 6px;
+      cursor: pointer; font: inherit;
+      transition: border-color var(--transition), color var(--transition);
+    }
+    .btn-logout:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* main layout: sidebar + content */
+    .app-body { display: flex; flex: 1; overflow: hidden; }
+
+    /* sidebar */
+    .sidebar {
+      width: 220px; min-width: 220px;
+      background: var(--bg-sidebar);
+      display: flex; flex-direction: column;
+      overflow-y: auto;
+    }
+    /* Virtuozzo brand block at top of sidebar */
+    .sidebar-brand {
+      padding: 1.1rem 1.2rem;
+      font-size: 1.15rem; font-weight: 800;
+      color: #ffffff; letter-spacing: -.5px;
+      border-bottom: 1px solid #333;
+      flex-shrink: 0;
+    }
+    .sidebar-brand span { color: var(--accent); }
+    .sidebar-section {
+      padding: .9rem 1.2rem .3rem;
+      font-size: .68rem; font-weight: 700; letter-spacing: 1px;
+      color: #666; text-transform: uppercase;
+      user-select: none;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: .7rem;
+      padding: .6rem 1.2rem .6rem 1.5rem;
+      cursor: pointer; color: #aaa; font-size: .87rem; font-weight: 400;
+      transition: background var(--transition), color var(--transition);
+      user-select: none;
+    }
+    .nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+    .nav-item.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .nav-icon { font-size: .95rem; width: 18px; text-align: center; opacity: .75; }
+    .nav-item.active .nav-icon { opacity: 1; }
+    .nav-badge {
+      margin-left: auto;
+      background: rgba(255,255,255,.15);
+      font-size: .65rem; font-weight: 700;
+      padding: .1rem .4rem; border-radius: 10px;
+      color: #fff;
+    }
+    .nav-item.active .nav-badge { background: rgba(255,255,255,.25); }
+    .sidebar-footer {
+      margin-top: auto;
+      padding: .9rem 1.2rem;
+      border-top: 1px solid #333;
+      display: flex; align-items: center; gap: .6rem;
+      font-size: .8rem; color: #888; cursor: default;
+    }
+    .sidebar-footer .cluster-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--success); flex-shrink: 0;
+    }
+    .sidebar-footer .cluster-name { color: #ccc; font-weight: 500; }
+    .sidebar-divider {
+      border: none; border-top: 1px solid #333;
+      margin: .4rem 0;
+    }
+
+    /* content area */
+    .content {
+      flex: 1; overflow-y: auto; padding: 1.5rem;
+      background: var(--bg-content);
+    }
+
+    /* panels */
+    .panel { display: none !important; animation: fadeIn .2s ease; }
+    .panel.active { display: block !important; }
+    #panel-overview.active { display: flex !important; flex-direction: column; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .panel-header {
+      display: flex; align-items: center; gap: 1rem;
+      margin-bottom: 1.3rem;
+    }
+    .panel-header h2 { font-size: 1.25rem; font-weight: 700; }
+    .panel-header .panel-badge {
+      font-size: .75rem; color: var(--text-dim);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px; padding: .15rem .5rem;
+    }
+    .panel-actions { margin-left: auto; display: flex; gap: .5rem; }
+
+    /* stat cards */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.2rem;
+    }
+    .stat-card .stat-label {
+      font-size: .7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .6px; color: var(--text-muted); margin-bottom: .4rem;
+    }
+    .stat-card .stat-value {
+      font-size: 2rem; font-weight: 700; color: var(--text);
+    }
+    .stat-card .stat-sub {
+      font-size: .75rem; color: var(--text-muted); margin-top: .2rem;
+    }
+
+    /* table */
+    .table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .table-toolbar {
+      display: flex; align-items: center; gap: .75rem;
+      padding: .85rem 1.1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .search-input {
+      padding: .45rem .85rem;
+      background: var(--bg-content);
+      border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font: inherit; font-size: .85rem;
+      width: 220px; outline: none;
+      transition: border-color var(--transition);
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--text-muted); }
+    .tbl-refresh {
+      padding: .38rem .85rem;
+      background: var(--bg-content); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text-dim); cursor: pointer; font: inherit; font-size: .82rem;
+      transition: background var(--transition), color var(--transition), border-color var(--transition);
+      display: flex; align-items: center; gap: .4rem;
+    }
+    .tbl-refresh:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .tbl-refresh.spinning .ri { display: inline-block; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: var(--bg-content); }
+    th {
+      padding: .72rem 1rem; text-align: left;
+      font-size: .72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background var(--transition);
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--bg-medium); }
+    td {
+      padding: .75rem 1rem; font-size: .87rem; color: var(--text);
+      white-space: nowrap;
+    }
+    td.wrap { white-space: normal; word-break: break-all; }
+    .text-dim { color: var(--text-dim); font-size: .82rem; }
+    .text-muted { color: var(--text-muted); font-size: .8rem; }
+    .mono { font-family: 'Consolas', monospace; font-size: .83rem; color: var(--text-dim); }
+
+    /* status badges */
+    .badge {
+      display: inline-block;
+      padding: .15rem .55rem; border-radius: 20px;
+      font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+    }
+    .badge-active, .badge-up, .badge-running, .badge-available { background: rgba(39,174,96,.12); color: #27ae60; border: 1px solid rgba(39,174,96,.25); }
+    .badge-error, .badge-down, .badge-failed  { background: rgba(227,0,15,.1); color: var(--accent); border: 1px solid rgba(227,0,15,.2); }
+    .badge-build, .badge-migrating, .badge-resize { background: rgba(243,156,18,.12); color: #e67e22; border: 1px solid rgba(243,156,18,.25); }
+    .badge-shutoff, .badge-stopped { background: var(--bg-light); color: var(--text-dim); border: 1px solid var(--border); }
+    .badge-default { background: var(--bg-light); color: var(--text-dim); border: 1px solid var(--border); }
+
+    /* action buttons */
+    .act-btn {
+      padding: .28rem .62rem; border-radius: 6px; border: none;
+      font: inherit; font-size: .76rem; font-weight: 600;
+      cursor: pointer; transition: background var(--transition), color var(--transition);
+    }
+    .act-start  { background: rgba(39,174,96,.1); color: #27ae60; border: 1px solid rgba(39,174,96,.2); }
+    .act-start:hover  { background: #27ae60; color: #fff; border-color: #27ae60; }
+    .act-stop   { background: rgba(227,0,15,.08); color: var(--accent); border: 1px solid rgba(227,0,15,.2); }
+    .act-stop:hover   { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .act-reboot { background: rgba(243,156,18,.1); color: #e67e22; border: 1px solid rgba(243,156,18,.2); }
+    .act-reboot:hover { background: #e67e22; color: #fff; border-color: #e67e22; }
+
+    /* text action buttons */
+    .txt-btn {
+      background: transparent !important; border: none !important; padding: .26rem .45rem !important;
+      font: inherit; cursor: pointer; color: var(--text-dim);
+      border-radius: 4px; transition: background 0.2s, color 0.2s;
+      display: inline-flex; align-items: center; gap: .3rem; outline: none;
+    }
+    .txt-btn:hover:not(:disabled) { background: rgba(0,0,0,0.05) !important; color: var(--text); }
+    .txt-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* empty state */
+    .empty-state {
+      padding: 3.5rem 1rem; text-align: center; color: var(--text-muted);
+    }
+    .empty-state .es-icon { font-size: 2.4rem; margin-bottom: .7rem; display: block; }
+    .empty-state p { font-size: .9rem; }
+
+    /* loading skeleton */
+    .skeleton-row td {
+      padding: .85rem 1rem;
+    }
+    .skeleton {
+      height: 14px; border-radius: 4px; background: #e8e8e8;
+      animation: shimmer 1.3s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%, 100% { opacity: .5; }
+      50% { opacity: 1; }
+    }
+
+    /* toast */
+    #toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: .8rem 1.2rem;
+      font-size: .87rem; font-weight: 500;
+      box-shadow: var(--shadow); z-index: 9998;
+      opacity: 0; transform: translateY(8px);
+      transition: opacity .25s, transform .25s;
+      display: flex; align-items: center; gap: .6rem;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.toast-ok  { border-color: var(--success); color: var(--success); }
+    #toast.toast-err { border-color: var(--danger); color: var(--danger); }
+    #toast.toast-inf { border-color: var(--warning); color: var(--warning); }
+
+    /* progress bar */
+    .bar-wrap { width: 100px; height: 7px; background: var(--bg-medium); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; }
+    .bar-fill { height: 100%; border-radius: 4px; }
+    .bar-ok   { background: var(--success); }
+    .bar-warn { background: var(--warning); }
+    .bar-crit { background: var(--danger); }
+
+    /* ── AI Chat toggle button ─────────────────────────────── */
+    .btn-chat-toggle {
+      font-size: .8rem; font: inherit; font-weight: 600;
+      background: rgba(233,69,96,.15);
+      border: 1px solid rgba(233,69,96,.4);
+      color: var(--accent); padding: .3rem .9rem; border-radius: 6px;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+      white-space: nowrap;
+    }
+    .btn-chat-toggle:hover,
+    .btn-chat-toggle.open { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* ── AI Chat drawer ─────────────────────────────────────── */
+    #chatDrawer {
+      position: fixed;
+      top: 58px;           /* below header */
+      right: -420px;       /* hidden off-screen */
+      width: 420px;
+      max-width: 94vw;
+      bottom: 0;
+      background: var(--bg-medium);
+      border-left: 1px solid var(--border);
+      box-shadow: -8px 0 32px rgba(0,0,0,.5);
+      display: flex; flex-direction: column;
+      z-index: 800;
+      transition: right .28s cubic-bezier(.4,0,.2,1);
+    }
+    #chatDrawer.open { right: 0; }
+    
+    /* ── Info Drawer (VM Details) ────────────────────────────── */
+    .info-drawer {
+      position: fixed;
+      top: 58px;
+      right: -520px;
+      width: 520px;
+      max-width: 95vw;
+      bottom: 0;
+      background: var(--bg-card);
+      border-left: 1px solid var(--border);
+      box-shadow: -12px 0 48px rgba(0,0,0,.3);
+      display: flex; flex-direction: column;
+      z-index: 850;
+      transition: right .3s cubic-bezier(.4,0,.2,1);
+    }
+    .info-drawer.open { right: 0; }
+    
+    .drawer-header {
+      padding: 1.2rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .drawer-body {
+      flex: 1; overflow-y: auto; padding: 1.5rem;
+    }
+    .drawer-section { margin-bottom: 2rem; }
+    .drawer-section h4 { 
+      font-size: .75rem; color: var(--text-muted); text-transform: uppercase; 
+      letter-spacing: .8px; margin-bottom: 1rem; border-bottom: 1px solid var(--border);
+      padding-bottom: .4rem;
+    }
+    .detail-grid { display: grid; grid-template-columns: 120px 1fr; gap: .8rem .5rem; font-size: .88rem; }
+    .detail-label { color: var(--text-dim); font-weight: 500; }
+    .detail-val { color: var(--text); font-family: var(--font); }
+    .detail-val.mono { font-family: 'Consolas', monospace; font-size: .82rem; }
+
+    .chat-header {
+      display: flex; align-items: center; gap: .7rem;
+      padding: .9rem 1.1rem;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .chat-header h3 { font-size: .95rem; font-weight: 700; flex: 1; }
+    .chat-header .chat-sub { font-size: .73rem; color: var(--text-muted); }
+    .chat-close {
+      background: none; border: none; cursor: pointer; color: var(--text-dim);
+      font-size: 1.2rem; line-height: 1; padding: .2rem .4rem; border-radius: 4px;
+      transition: background var(--transition), color var(--transition);
+    }
+    .chat-close:hover { background: var(--bg-light); color: var(--text); }
+
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 1rem;
+      display: flex; flex-direction: column; gap: .75rem;
+    }
+
+    .msg {
+      max-width: 88%; padding: .65rem .9rem;
+      border-radius: 12px; font-size: .88rem; line-height: 1.55;
+      word-break: break-word; white-space: pre-wrap;
+      animation: msgIn .15s ease;
+    }
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .msg-user {
+      align-self: flex-end;
+      background: var(--accent); color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .msg-ai {
+      align-self: flex-start;
+      background: var(--bg-card); color: var(--text);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+    .msg-ai.thinking { color: var(--text-muted); font-style: italic; }
+
+    .chat-input-wrap {
+      padding: .85rem 1rem;
+      border-top: 1px solid var(--border);
+      display: flex; gap: .6rem;
+      flex-shrink: 0;
+    }
+    #chatInput {
+      flex: 1; padding: .65rem .85rem;
+      background: var(--bg-dark);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font: inherit; font-size: .88rem; outline: none;
+      resize: none; height: 42px; max-height: 130px;
+      transition: border-color var(--transition);
+      line-height: 1.4;
+    }
+    #chatInput:focus { border-color: var(--accent); }
+    #chatInput::placeholder { color: var(--text-muted); }
+    #chatSend {
+      padding: .55rem .9rem; border: none; border-radius: 8px;
+      background: var(--accent); color: #fff;
+      cursor: pointer; font: inherit; font-size: .98rem;
+      transition: background var(--transition), transform .1s;
+      flex-shrink: 0;
+    }
+    #chatSend:hover { background: var(--accent2); }
+    #chatSend:active { transform: scale(.95); }
+    #chatSend:disabled { background: var(--bg-light); cursor: not-allowed; }
+
+    /* responsive */
+    @media (max-width: 720px) {
+      .sidebar { width: 54px; min-width: 54px; }
+      .nav-label, .nav-badge, .sidebar-section { display: none; }
+      .nav-item { justify-content: center; padding: .7rem 0; }
+    }
+
+    /* ── Modals ───────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.65);
+      z-index: 9000; display: flex; align-items: center; justify-content: center;
+      transition: opacity .2s; backdrop-filter: blur(2px);
+    }
+    .modal-overlay.hidden { opacity: 0; pointer-events: none; }
+    .modal-card {
+      background: var(--bg-medium); border: 1px solid var(--border);
+      border-radius: 12px; width: 480px; max-width: 95vw;
+      box-shadow: 0 16px 48px rgba(0,0,0,.6);
+      display: flex; flex-direction: column; overflow: hidden;
+      transform: translateY(0); transition: transform .3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .modal-overlay.hidden .modal-card { transform: translateY(20px); }
+    .modal-header {
+      padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-header h3 { font-size: 1.1rem; font-weight: 700; margin: 0; }
+    .modal-close { background: none; border: none; font-size: 1.2rem; color: var(--text-dim); cursor: pointer; }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 1.5rem; overflow-y: auto; max-height: 70vh; }
+    .modal-footer {
+      padding: 1rem 1.5rem; border-top: 1px solid var(--border);
+      display: flex; justify-content: flex-end; gap: .75rem; background: var(--bg-light);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ LOGIN OVERLAY ═══════════════ -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="vz-brand">Virtuozzo<span> Infrastructure</span></span>
+      <h1>VI Manager</h1>
+      <p>Connect to your infrastructure cluster</p>
+    </div>
+
+    <div class="form-group">
+      <label>Cluster Address</label>
+      <input type="text" id="loginHost" placeholder="hostname or IP (e.g. 192.168.1.10)" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="loginUser" placeholder="admin" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <button class="advanced-toggle" id="advToggle" type="button">
+      <span id="advArrow">▶</span> <span>Advanced Options</span>
+    </button>
+
+    <div class="advanced-fields" id="advFields">
+      <div class="advanced-grid">
+        <div class="form-group">
+          <label>User Domain</label>
+          <input type="text" id="loginUserDomain" value="Default" placeholder="Default">
+        </div>
+        <div class="form-group">
+          <label>Project Domain</label>
+          <input type="text" id="loginProjDomain" value="Default" placeholder="Default">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Project Name</label>
+        <input type="text" id="loginProject" value="admin" placeholder="admin">
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-secondary" id="discoverBtn" type="button">Discover</button>
+      <button class="btn btn-primary" id="connectBtn" type="button">Connect</button>
+    </div>
+    <div class="login-status" id="loginStatus"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ APP SHELL ═══════════════ -->
+<div id="appShell">
+
+  <!-- header -->
+  <header class="app-header">
+    <span class="logo">Virtuozzo<span> Infrastructure</span></span>
+    <span class="spacer"></span>
+    <a href="/clusters" class="btn-chat-toggle" style="text-decoration:none; margin-right:0.5rem;" title="Multi-Cluster Dashboard">🌐 Clusters</a>
+    <button class="btn-chat-toggle" id="themeToggle" title="Toggle Theme" style="margin-right:0.5rem">🌓 Theme</button>
+    <button class="btn-chat-toggle" id="settingsToggle" title="Settings" style="margin-right:0.5rem">⚙ Settings</button>
+    <button class="btn-chat-toggle" id="chatToggle" title="Open AI Chat">💬 AI Chat</button>
+    <button class="btn-logout" id="logoutBtn">Disconnect</button>
+  </header>
+
+  <div class="app-body">
+
+    <!-- sidebar -->
+    <nav class="sidebar">
+      <!-- Brand -->
+      <div class="sidebar-brand">Virtuozzo<span> Infrastructure</span></div>
+
+      <!-- Monitoring -->
+      <div class="sidebar-section">Monitoring</div>
+      <div class="nav-item active" data-panel="overview">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Dashboard</span>
+      </div>
+      <div class="nav-item" data-panel="alerts">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">Alerts</span>
+      </div>
+
+      <!-- Compute -->
+      <div class="sidebar-section">Compute</div>
+      <div class="nav-item" data-panel="vms">
+        <span class="nav-icon">🖥</span>
+        <span class="nav-label">Virtual Machines</span>
+        <span class="nav-badge" id="vmBadge">–</span>
+      </div>
+      <div class="nav-item" data-panel="nodes">
+        <span class="nav-icon">📦</span>
+        <span class="nav-label">Nodes</span>
+        <span class="nav-badge" id="nodeBadge">–</span>
+      </div>
+
+      <!-- Storage Services -->
+      <div class="sidebar-section">Storage Services</div>
+      <div class="nav-item" data-panel="storage">
+        <span class="nav-icon">💾</span>
+        <span class="nav-label">Volumes</span>
+        <span class="nav-badge" id="volBadge">–</span>
+      </div>
+
+      <!-- Infrastructure -->
+      <div class="sidebar-section">Infrastructure</div>
+      <div class="nav-item" data-panel="networks">
+        <span class="nav-icon">🌐</span>
+        <span class="nav-label">Networks</span>
+        <span class="nav-badge" id="netBadge">–</span>
+      </div>
+      <div class="nav-item" data-panel="images">
+        <span class="nav-icon">🗂</span>
+        <span class="nav-label">Images</span>
+        <span class="nav-badge" id="imgBadge">–</span>
+      </div>
+
+      <!-- Settings -->
+      <div class="sidebar-section">Settings</div>
+      <div class="nav-item" data-panel="projects">
+        <span class="nav-icon">🏢</span>
+        <span class="nav-label">Projects</span>
+        <span class="nav-badge" id="projBadge">–</span>
+      </div>
+      <div class="nav-item" data-panel="users">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">Users</span>
+        <span class="nav-badge" id="userBadge">–</span>
+      </div>
+      <!-- Cluster footer -->
+      <div class="sidebar-footer">
+        <div class="cluster-dot" id="clusterDot"></div>
+        <span class="cluster-name" id="clusterName">Not connected</span>
+      </div>
+    </nav>
+
+    <!-- main content -->
+    <main class="content">
+
+      <!-- ── OVERVIEW / DASHBOARD ── -->
+      <div class="panel active" id="panel-overview">
+        <div class="panel-header" style="flex-shrink: 0; margin-bottom: 1rem;">
+          <h2>Dashboard</h2>
+          <span class="panel-badge" id="overviewTs">–</span>
+        </div>
+        <div class="stats-row" id="statsRow" style="flex-shrink: 0;">
+          <div class="stat-card"><div class="stat-label">VMs</div><div class="stat-value" id="statVms">–</div><div class="stat-sub">total</div></div>
+          <div class="stat-card"><div class="stat-label">Running</div><div class="stat-value" id="statRunning" style="color:var(--success)">–</div><div class="stat-sub">active</div></div>
+          <div class="stat-card"><div class="stat-label">Nodes</div><div class="stat-value" id="statNodes">–</div><div class="stat-sub">hypervisors</div></div>
+          <div class="stat-card"><div class="stat-label">Volumes</div><div class="stat-value" id="statVols">–</div><div class="stat-sub">block storage</div></div>
+          <div class="stat-card"><div class="stat-label">Networks</div><div class="stat-value" id="statNets">–</div><div class="stat-sub">tenant networks</div></div>
+          <div class="stat-card"><div class="stat-label">Images</div><div class="stat-value" id="statImgs">–</div><div class="stat-sub">templates</div></div>
+        </div>
+
+        <!-- Cluster Info Grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+
+          <!-- VM Status Breakdown -->
+          <div class="table-card">
+            <div class="table-toolbar"><strong style="font-size:.88rem;">VM Status Breakdown</strong></div>
+            <div style="padding:1rem 1.2rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                <span style="font-size:.84rem;color:var(--text-dim);">Active</span>
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                  <div style="width:120px;height:7px;background:#eee;border-radius:4px;overflow:hidden;"><div id="barActive" style="height:100%;background:var(--success);border-radius:4px;width:0%;transition:width .4s;"></div></div>
+                  <span id="cntActive" style="font-size:.84rem;font-weight:700;color:var(--success);min-width:24px;text-align:right;">–</span>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                <span style="font-size:.84rem;color:var(--text-dim);">Stopped</span>
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                  <div style="width:120px;height:7px;background:#eee;border-radius:4px;overflow:hidden;"><div id="barStopped" style="height:100%;background:#9ca3af;border-radius:4px;width:0%;transition:width .4s;"></div></div>
+                  <span id="cntStopped" style="font-size:.84rem;font-weight:700;color:#9ca3af;min-width:24px;text-align:right;">–</span>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                <span style="font-size:.84rem;color:var(--text-dim);">Error</span>
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                  <div style="width:120px;height:7px;background:#eee;border-radius:4px;overflow:hidden;"><div id="barError" style="height:100%;background:var(--danger);border-radius:4px;width:0%;transition:width .4s;"></div></div>
+                  <span id="cntError" style="font-size:.84rem;font-weight:700;color:var(--danger);min-width:24px;text-align:right;">–</span>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:.84rem;color:var(--text-dim);">Building</span>
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                  <div style="width:120px;height:7px;background:#eee;border-radius:4px;overflow:hidden;"><div id="barBuild" style="height:100%;background:var(--warning);border-radius:4px;width:0%;transition:width .4s;"></div></div>
+                  <span id="cntBuild" style="font-size:.84rem;font-weight:700;color:var(--warning);min-width:24px;text-align:right;">–</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Storage Summary -->
+          <div class="table-card">
+            <div class="table-toolbar"><strong style="font-size:.88rem;">Storage Summary</strong></div>
+            <div style="padding:1rem 1.2rem;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:.65rem;"><span style="font-size:.84rem;color:var(--text-dim);">Total allocated</span><span id="storTotalGib" style="font-size:.84rem;font-weight:700;">–</span></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:.65rem;"><span style="font-size:.84rem;color:var(--text-dim);">Available volumes</span><span id="storAvail" style="font-size:.84rem;font-weight:700;color:var(--success);">–</span></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:.65rem;"><span style="font-size:.84rem;color:var(--text-dim);">In-use volumes</span><span id="storInUse" style="font-size:.84rem;font-weight:700;">–</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="font-size:.84rem;color:var(--text-dim);">Error volumes</span><span id="storErr" style="font-size:.84rem;font-weight:700;color:var(--danger);">–</span></div>
+            </div>
+          </div>
+
+          <!-- Node Health -->
+          <div class="table-card">
+            <div class="table-toolbar"><strong style="font-size:.88rem;">Node Health</strong></div>
+            <table>
+              <thead><tr><th>Node</th><th>State</th><th>VMs</th><th>vCPU</th><th>RAM</th></tr></thead>
+              <tbody id="dashNodeBody"><tr class="skeleton-row"><td colspan="5"><div class="skeleton"></div></td></tr></tbody>
+            </table>
+          </div>
+
+          <!-- Recent VMs -->
+          <div class="table-card">
+            <div class="table-toolbar"><strong style="font-size:.88rem;">Recent Virtual Machines</strong></div>
+            <table>
+              <thead><tr><th>Name</th><th>Status</th><th>Host</th><th>IPs</th></tr></thead>
+              <tbody id="dashVmBody"><tr class="skeleton-row"><td colspan="4"><div class="skeleton"></div></td></tr></tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+
+
+      <!-- ── ALERTS ── -->
+      <div class="panel" id="panel-alerts">
+        <div class="panel-header">
+          <h2>Alerts</h2>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar" style="padding: 3.5rem 1rem; text-align: center; color: var(--text-muted);">
+            <div style="width: 100%; text-align: center;">
+              <div style="font-size: 2.4rem; margin-bottom: .7rem;">🔔</div>
+              <p style="font-size: .9rem;">No alerts configured — coming soon.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIRTUAL MACHINES ── -->
+      <div class="panel" id="panel-vms">
+        <div class="panel-header">
+          <h2>Virtual Machines</h2>
+          <span class="panel-badge" id="vmCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="act-btn act-start" id="btnCreateVm" style="padding:.4rem .9rem; margin-right:.5rem;">
+              <span class="ri">+</span> Create VM
+            </button>
+            <button class="tbl-refresh" id="vmRefresh">
+              <span class="ri">↻</span> Refresh
+            </button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input type="search" class="search-input" id="vmSearch" placeholder="Search VMs…">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>IP address</th>
+                <th style="text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="vmBody">
+              <tr class="skeleton-row"><td colspan="4"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── NODES ── -->
+      <div class="panel" id="panel-nodes">
+        <div class="panel-header">
+          <h2>Compute Nodes</h2>
+          <span class="panel-badge" id="nodeCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="tbl-refresh" id="globalSshBtn" onclick="openGlobalSshModal()" title="Global SSH Config for all nodes">
+              <span class="ri">⚙</span> Global SSH
+            </button>
+            <button class="tbl-refresh" id="nodeRefresh"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input type="search" class="search-input" id="nodeSearch" placeholder="Search nodes…">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Hostname</th>
+                <th>State</th>
+                <th>Status</th>
+                <th>VMs Running</th>
+                <th>vCPUs Used / Total</th>
+                <th>RAM Used / Total</th>
+                <th>Type</th>
+                <th style="text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="nodeBody">
+              <tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── STORAGE ── -->
+      <div class="panel" id="panel-storage">
+        <div class="panel-header">
+          <h2>Storage Volumes</h2>
+          <span class="panel-badge" id="volCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="tbl-refresh" id="volRefresh"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input type="search" class="search-input" id="volSearch" placeholder="Search volumes…">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Size (GB)</th>
+                <th>Type</th>
+                <th>Bootable</th>
+                <th>Attached To</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="volBody">
+              <tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── PROJECTS ── -->
+      <div class="panel" id="panel-projects">
+        <div class="panel-header">
+          <h2>Projects</h2>
+          <span class="panel-badge" id="projCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="tbl-refresh" id="projRefresh"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input type="search" class="search-input" id="projSearch" placeholder="Search projects…">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>ID</th>
+                <th>Enabled</th>
+                <th>Domain ID</th>
+              </tr>
+            </thead>
+            <tbody id="projBody">
+              <tr class="skeleton-row"><td colspan="4"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── USERS ── -->
+      <div class="panel" id="panel-users">
+        <div class="panel-header">
+          <h2>Users</h2>
+          <span class="panel-badge" id="userCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="tbl-refresh" id="userRefresh"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input type="search" class="search-input" id="userSearch" placeholder="Search users…">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Enabled</th>
+                <th>ID</th>
+                <th>Domain ID</th>
+              </tr>
+            </thead>
+            <tbody id="userBody">
+              <tr class="skeleton-row"><td colspan="4"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── NETWORKS ── -->
+      <div class="panel" id="panel-networks">
+        <div class="panel-header">
+          <h2>Networks</h2>
+          <span class="panel-badge" id="netCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="tbl-refresh" id="netRefresh"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input type="search" class="search-input" id="netSearch" placeholder="Search networks…">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>External</th>
+                <th>Admin State</th>
+                <th>Subnets</th>
+              </tr>
+            </thead>
+            <tbody id="netBody">
+              <tr class="skeleton-row"><td colspan="5"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── IMAGES ── -->
+      <div class="panel" id="panel-images">
+        <div class="panel-header">
+          <h2>Images</h2>
+          <span class="panel-badge" id="imgCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="tbl-refresh" id="imgRefresh"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input type="search" class="search-input" id="imgSearch" placeholder="Search images…">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>OS</th>
+                <th>Size</th>
+                <th>Disk Format</th>
+                <th>Visibility</th>
+              </tr>
+            </thead>
+            <tbody id="imgBody">
+              <tr class="skeleton-row"><td colspan="6"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- toast -->
+<div id="toast"></div>
+
+<!-- ═══════════════ SETTINGS MODAL ═══════════════ -->
+<div id="settingsModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 400px;">
+    <div class="modal-header">
+      <h3>Global Settings</h3>
+      <button class="modal-close" id="closeSettingsModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>LLM Provider</label>
+        <select id="llmProvider">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>API Key</label>
+        <input type="password" id="llmApiKey" placeholder="sk-...">
+      </div>
+      <div class="form-group">
+        <label>Base URL (Optional)</label>
+        <input type="text" id="llmBaseUrl" placeholder="https://api.openai.com/v1">
+      </div>
+      
+      <hr style="border:0; border-top:1px solid var(--border); margin:1.5rem 0;">
+      <h4 style="margin-bottom:1rem; font-size:.85rem; text-transform:uppercase; color:var(--text-dim)">Node Management (SSH)</h4>
+      
+      <div class="form-group">
+        <label>SSH Management Host</label>
+        <input type="text" id="vhiSshHost" placeholder="e.g. 192.168.1.10">
+      </div>
+      <div class="form-group" style="display:grid; grid-template-columns: 1fr 2fr; gap:0.75rem;">
+        <div>
+          <label>SSH User</label>
+          <input type="text" id="vhiSshUser" value="root">
+        </div>
+        <div>
+          <label>SSH Password</label>
+          <input type="password" id="vhiSshPassword" placeholder="••••••••">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="cancelSettingsBtn" style="flex:0; padding: .6rem 1rem;">Cancel</button>
+      <button class="btn btn-primary" id="saveSettingsBtn" style="flex:0; padding: .6rem 1.2rem;">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CREATE VM MODAL ═══════════════ -->
+<div id="createVmModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>Create Virtual Machine</h3>
+      <button class="modal-close" id="closeVmModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>VM Name</label>
+        <input type="text" id="newVmName" placeholder="e.g. web-server-01">
+      </div>
+      <div class="form-group">
+        <label>Image (OS)</label>
+        <select id="newVmImage"><option>Loading...</option></select>
+      </div>
+      <div class="form-group">
+        <label>Flavor (Size)</label>
+        <select id="newVmFlavor"><option>Loading...</option></select>
+      </div>
+      <div class="form-group">
+        <label>Storage Policy (Volume Type)</label>
+        <select id="newVmPolicy"><option>Loading...</option></select>
+      </div>
+      <div class="form-group">
+        <label>Disk Size (GB)</label>
+        <input type="number" id="newVmDiskSize" value="60" min="1">
+      </div>
+      <div class="form-group">
+        <label>Network</label>
+        <select id="newVmNetwork"><option>Loading...</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="cancelVmBtn" style="flex:0; padding: .6rem 1rem;">Cancel</button>
+      <button class="btn btn-primary" id="submitVmBtn" style="flex:0; padding: .6rem 1.2rem;">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ REBOOT NODE MODAL ═══════════════ -->
+<div id="rebootNodeModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 400px;">
+    <div class="modal-header">
+      <h3 style="color:var(--danger)">⚠️ Confirm Node Reboot</h3>
+      <button class="modal-close" onclick="closeRebootModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 1rem; line-height: 1.5;">Are you sure you want to reboot node <strong id="rebootNodeHostname">...</strong>?</p>
+      <p style="font-size: .85rem; color: var(--text-dim);">This action will interrupt all services and VMs running on this physical host. Ensure all critical VMs are migrated or stopped before proceeding.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeRebootModal()" style="flex:0; padding: .6rem 1rem;">Cancel</button>
+      <button class="btn btn-primary" id="confirmRebootBtn" style="flex:0; padding: .6rem 1.2rem; background: var(--danger);">Yes, Reboot Node</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ NODE SSH CONFIG MODAL ═══════════════ -->
+<div id="nodeSshModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 500px;">
+    <div class="modal-header">
+      <h3>SSH Config: <span id="sshModalHostname">...</span></h3>
+      <button class="modal-close" onclick="closeNodeSshModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>SSH Management IP / Host</label>
+        <input type="text" id="nodeSshHost" placeholder="e.g. 192.168.1.10">
+      </div>
+      <div class="form-group">
+        <label>SSH User</label>
+        <input type="text" id="nodeSshUser" value="root">
+      </div>
+      
+      <div class="form-group">
+        <label>Auth Method</label>
+        <select id="nodeSshAuthMethod" onchange="toggleSshAuthFields()">
+          <option value="password">Password</option>
+          <option value="key">Private Key</option>
+        </select>
+      </div>
+
+      <div id="nodeSshPassGroup" class="form-group">
+        <label>SSH Password</label>
+        <input type="password" id="nodeSshPassword" placeholder="••••••••">
+      </div>
+
+      <div id="nodeSshKeyGroup" class="form-group hidden">
+        <label>Private Key</label>
+        <textarea id="nodeSshKey" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..." rows="5" style="font-family:mono; font-size:0.8rem;"></textarea>
+        <label style="margin-top:0.5rem">Passphrase (Optional)</label>
+        <input type="password" id="nodeSshPassphrase" placeholder="Key passphrase">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="testNodeSsh()" style="margin-right:auto;">Test / Help</button>
+      <button class="btn btn-secondary" onclick="closeNodeSshModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNodeSsh()">Save Config</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ SSH TERMINAL MODAL ═══════════════ -->
+<div id="terminalModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 90%; height: 85%; max-width: 1000px; display: flex; flex-direction: column;">
+    <div class="modal-header">
+      <h3>Terminal: <span id="terminalHostname">...</span></h3>
+      <div style="flex:1"></div>
+      <button class="modal-close" onclick="closeTerminal()">✕</button>
+    </div>
+    <div class="modal-body" style="flex:1; background: #000; padding: 0; position: relative; overflow: hidden;">
+      <div id="terminalContainer" style="width: 100%; height: 100%; font-family: 'Courier New', monospace; color: #0f0; padding: 10px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;"></div>
+      <input type="text" id="terminalInput" style="position: absolute; opacity: 0; pointer-events: none;">
+    </div>
+    <div class="modal-footer" style="padding: 0.5rem 1rem; border-top: 1px solid var(--border-color);">
+      <span class="text-muted" style="font-size: 0.8rem;">Type to send commands. Enter to submit.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ EDIT PORT MODAL ═══════════════ -->
+<div id="editPortModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 450px;">
+    <div class="modal-header">
+      <div style="display:flex; flex-direction:column; gap:2px;">
+        <h3 style="margin:0;">Edit Interface</h3>
+        <span id="epNetName" style="font-size:1.1rem; font-weight:700; color:var(--accent-red); margin-top:4px;"></span>
+      </div>
+      <button class="modal-close" onclick="closeEditPortModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label style="font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em;">Interface Name</label>
+        <input type="text" id="epName" placeholder="e.g. eth0" style="font-size:1.1rem; font-weight:600; background:transparent; border:none; border-bottom:2px solid var(--border); border-radius:0; padding:4px 0;">
+      </div>
+
+      <div class="form-group">
+        <label>IP Address (Static/Fixed)</label>
+        <div style="display:flex; gap:0.5rem;">
+          <input type="text" id="epIp" placeholder="e.g. 192.168.1.50" style="flex:1;">
+          <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="document.getElementById('epIp').value=''">Clear (DHCP)</button>
+        </div>
+        <p class="text-dim" style="font-size:0.7rem; margin-top:4px;">Leave empty to use DHCP/Auto assignment.</p>
+      </div>
+
+      <div class="form-group">
+        <label>Security Policies</label>
+        <div class="custom-dropdown" id="epSgDropdownContainer">
+          <div class="dropdown-selected" onclick="toggleSgDropdown(event)">
+            <span id="epSgCount">0 selected</span>
+            <span id="epSgArrow">▼</span>
+          </div>
+          <div id="epSecurityGroups" class="dropdown-list hidden">
+            <!-- Items injected via JS -->
+            <p class="text-dim" style="padding:10px;">Loading policies...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" style="display:flex; align-items:center; gap:0.5rem; margin-top:1rem;">
+        <input type="checkbox" id="epPortSecurity" style="width:auto;">
+        <label for="epPortSecurity" style="margin:0;">Enable Port Security (Anti-Spoofing)</label>
+      </div>
+      <p id="epSpoofWarning" class="text-dim" style="font-size:0.7rem; color:var(--warning); display:none;">⚠️ Disabling port security allows this interface to send/receive traffic with any IP.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeEditPortModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePortChanges()">Save Interface</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ AI CHAT DRAWER ═══════════════ -->
+<div id="chatDrawer" role="dialog" aria-label="AI Chat">
+  <div class="chat-header">
+    <span style="font-size:1.2rem">🤖</span>
+    <h3>AI Assistant</h3>
+    <span class="chat-sub">Powered by vz-bot</span>
+    <button class="chat-close" id="chatClose" title="Close">✕</button>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="msg msg-ai">👋 Hello! I'm your VHI AI assistant. Ask me anything about your infrastructure — I have context about your VMs, nodes, and cluster.</div>
+  </div>
+  <div class="chat-input-wrap">
+    <textarea id="chatInput" placeholder="Ask about your infrastructure…" rows="1"></textarea>
+    <button id="chatSend" title="Send">➤</button>
+  </div>
+</div>
+
+<!-- ═══════════════ VM DETAILS DRAWER ═══════════════ -->
+<div id="vmDrawer" class="info-drawer">
+  <div class="drawer-header">
+    <div>
+      <h2 id="vmDetName" style="font-size:1.25rem; font-weight:700;">VM Details</h2>
+    </div>
+    <button class="chat-close" onclick="closeVmDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="vmDetBody">
+    <!-- Content injected via JS -->
+  </div>
+  <div class="modal-footer" style="padding: 1rem 1.5rem; background: var(--bg-sidebar);">
+    <button class="btn btn-secondary" onclick="closeVmDrawer()">Close</button>
+    <button id="vmDetSaveBtn" class="btn btn-primary" onclick="saveVmChanges()" disabled>Save Changes</button>
+  </div>
+</div>
+
+<!-- ═══════════════ JAVASCRIPT ═══════════════ -->
+<script>
+'use strict';
+
+// ── session state ─────────────────────────────────────────────────────────
+let session = null; // { baseUrl, username, project, userDomain, projectDomain }
+let allSecurityGroups = [];
+let currentEditingPortId = null;
+
+// ── utility ───────────────────────────────────────────────────────────────
+
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show toast-' + type;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+function statusBadge(status = '') {
+  const s = status.toLowerCase();
+  let cls = 'badge-default';
+  if (['active','up','running','available','in-use'].includes(s)) cls = 'badge-active';
+  else if (['error','failed','down'].includes(s)) cls = 'badge-error';
+  else if (['build','migrating','resize'].includes(s)) cls = 'badge-build';
+  else if (['shutoff','stopped'].includes(s)) cls = 'badge-shutoff';
+  return `<span class="badge ${cls}">${status || '–'}</span>`;
+}
+
+function fmtBytes(bytes) {
+  if (!bytes) return '–';
+  const gb = bytes / 1073741824;
+  return gb >= 1 ? gb.toFixed(1) + ' GB' : (bytes / 1048576).toFixed(0) + ' MB';
+}
+
+function fmtDate(iso) {
+  if (!iso) return '–';
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function pct(used, total) {
+  if (!total) return 0;
+  return Math.min(100, Math.round(used / total * 100));
+}
+
+function barHtml(usedPct) {
+  const cls = usedPct > 85 ? 'bar-crit' : usedPct > 65 ? 'bar-warn' : 'bar-ok';
+  return `<div class="bar-wrap"><div class="bar-fill ${cls}" style="width:${usedPct}%"></div></div> ${usedPct}%`;
+}
+
+function skeletonRows(cols, n = 3) {
+  return Array.from({ length: n }).map(() =>
+    `<tr class="skeleton-row"><td colspan="${cols}"><div class="skeleton"></div></td></tr>`
+  ).join('');
+}
+
+function emptyState(icon, msg) {
+  return `<tr><td colspan="99"><div class="empty-state"><span class="es-icon">${icon}</span><p>${msg}</p></div></td></tr>`;
+}
+
+function filterRows(rows, query) {
+  if (!query) return rows;
+  const q = query.toLowerCase();
+  return rows.filter(r => r.toLowerCase().includes(q));
+}
+
+// ── session headers ───────────────────────────────────────────────────────
+
+function authHeaders() {
+  if (!session) return {};
+  return {
+    'Content-Type': 'application/json',
+    'X-VHI-Base-URL':    session.baseUrl,
+    'X-VHI-User':        session.username,
+    'X-VHI-Password':    session.password,
+    'X-VHI-Project':     session.project,
+    'X-VHI-Project-ID':  session.projectId || '',
+    'X-VHI-Domain':      session.userDomain,
+    'X-VHI-SSH-Host':     localStorage.getItem('vhiSshHost') || '',
+    'X-VHI-SSH-User':     localStorage.getItem('vhiSshUser') || 'root',
+    'X-VHI-SSH-Password': localStorage.getItem('vhiSshPassword') || '',
+  };
+}
+
+// ── API calls ─────────────────────────────────────────────────────────────
+
+async function apiGet(path) {
+  const r = await fetch(path, { headers: authHeaders() });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(path, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+async function apiPatch(path, body) {
+  const r = await fetch(path, {
+    method: 'PATCH',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+async function apiDelete(path) {
+  const r = await fetch(path, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  if (!r.ok && r.status !== 404) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `HTTP ${r.status}`);
+  }
+  return r.json().catch(() => ({ ok: true }));
+}
+
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────
+
+// Restore saved theme on load
+const currentTheme = localStorage.getItem('vhi_theme') || 'light';
+document.documentElement.setAttribute('data-theme', currentTheme);
+
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('vhi_theme', newTheme);
+});
+
+
+
+document.getElementById('advToggle').addEventListener('click', () => {
+  const f = document.getElementById('advFields');
+  const a = document.getElementById('advArrow');
+  f.classList.toggle('open');
+  a.textContent = f.classList.contains('open') ? '▼' : '▶';
+});
+
+document.getElementById('connectBtn').addEventListener('click', doLogin);
+document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+document.getElementById('discoverBtn').addEventListener('click', async () => {
+  let hostStr = document.getElementById('loginHost').value.trim().replace(/https?:\/\//, '');
+  let host = hostStr;
+  if (hostStr.includes(']')) {
+    host = hostStr.split(']')[0] + ']';
+  } else if (hostStr.includes(':')) {
+    host = hostStr.split(':')[0];
+  } else {
+    host = hostStr.split('/')[0];
+  }
+  if (!host) { setLoginStatus('Enter cluster address first', 'error'); return; }
+  setLoginStatus('Discovering…', '');
+  try {
+    const r = await fetch(`https://${host}:5000/v3`, { method: 'GET' });
+    setLoginStatus(`✓ Keystone reachable (HTTP ${r.status})`, 'success');
+  } catch (e) {
+    setLoginStatus(`✗ Cannot reach ${host}:5000 — check address`, 'error');
+  }
+});
+
+function setLoginStatus(msg, type) {
+  const el = document.getElementById('loginStatus');
+  el.textContent = msg;
+  el.className = 'login-status' + (type ? ' ' + type : '');
+}
+
+async function doLogin() {
+  const host    = document.getElementById('loginHost').value.trim();
+  const user    = document.getElementById('loginUser').value.trim();
+  const pass    = document.getElementById('loginPass').value;
+  const uDomain = document.getElementById('loginUserDomain').value.trim() || 'Default';
+  const pDomain = document.getElementById('loginProjDomain').value.trim() || 'Default';
+  const project = document.getElementById('loginProject').value.trim() || 'admin';
+
+  if (!host || !user || !pass) {
+    setLoginStatus('Please fill in all required fields', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('connectBtn');
+  btn.disabled = true; btn.textContent = 'Connecting…';
+  setLoginStatus('Authenticating…', '');
+
+  try {
+    const data = await apiPost('/api/vhi/auth', {
+      baseUrl: host, username: user, password: pass,
+      userDomain: uDomain, projectDomain: pDomain, project,
+    });
+
+    if (!data.ok) throw new Error(data.error || 'Authentication failed');
+
+    session = {
+      baseUrl:      data.baseUrl,
+      username:     data.username,
+      password:     pass,         // kept in JS memory only
+      project:      data.project,
+      projectId:    data.projectId || '',
+      userDomain:   data.userDomain,
+      projectDomain: data.projectDomain,
+    };
+
+    // show app
+    const clusterHost = host.replace(/https?:\/\//, '').split(/[:/]/)[0];
+    document.getElementById('loginOverlay').classList.add('hidden');
+    document.getElementById('appShell').classList.add('visible');
+    document.getElementById('clusterName').textContent = clusterHost;
+    document.getElementById('clusterDot').style.background = 'var(--success)';
+
+    loadAll();
+  } catch (err) {
+    setLoginStatus(err.message || 'Connection failed', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Connect';
+    // Clear credentials populated by multi-cluster dashboard redirect
+    localStorage.removeItem('vhiBaseUrl');
+    localStorage.removeItem('vhiUser');
+    localStorage.removeItem('vhiPassword');
+    localStorage.removeItem('vhiProject');
+  }
+}
+
+// ── AUTO CONNECT (FROM CLUSTERS PAGE) ─────────────────────────────────────
+const fwdBaseUrl = localStorage.getItem('vhiBaseUrl');
+const fwdUser = localStorage.getItem('vhiUser');
+const fwdPass = localStorage.getItem('vhiPassword');
+const fwdProj = localStorage.getItem('vhiProject');
+
+if (fwdBaseUrl && fwdUser && fwdPass) {
+  document.getElementById('loginHost').value = fwdBaseUrl;
+  document.getElementById('loginUser').value = fwdUser;
+  document.getElementById('loginPass').value = fwdPass;
+  if (fwdProj) document.getElementById('loginProject').value = fwdProj;
+  
+  // Auto-connect
+  doLogin();
+}
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  session = null;
+  document.getElementById('appShell').classList.remove('visible');
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('loginPass').value = '';
+  setLoginStatus('', '');
+  // reset panels
+  ['vmBody','nodeBody','volBody','netBody','imgBody','overviewVmBody'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = skeletonRows(7);
+  });
+  ['vmBadge','nodeBadge','volBadge','netBadge','imgBadge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '–';
+  });
+  ['statVms','statRunning','statNodes','statVols','statNets','statImgs'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '–';
+  });
+});
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    const panelId = 'panel-' + item.dataset.panel;
+    const panel = document.getElementById(panelId);
+    if (panel) panel.classList.add('active');
+  });
+});
+
+// ── REFRESH BUTTONS ───────────────────────────────────────────────────────
+
+function setRefreshing(btnId, on) {
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.toggle('spinning', on);
+}
+
+document.getElementById('vmRefresh').addEventListener('click', loadVMs);
+document.getElementById('nodeRefresh').addEventListener('click', loadNodes);
+document.getElementById('volRefresh').addEventListener('click', loadVolumes);
+document.getElementById('netRefresh').addEventListener('click', loadNetworks);
+document.getElementById('imgRefresh').addEventListener('click', loadImages);
+
+// ── SEARCH INPUTS ─────────────────────────────────────────────────────────
+
+function hookSearch(inputId, renderFn) {
+  const el = document.getElementById(inputId);
+  if (el) el.addEventListener('input', () => renderFn(el.value));
+}
+
+// ── DATA STORES ───────────────────────────────────────────────────────────
+let _vms = [], _nodes = [], _vols = [], _nets = [], _subnets = [], _imgs = [], _flavors = [], _volTypes = [], _projs = [], _users = [], _sgs = [];
+
+// ── LOAD ALL ──────────────────────────────────────────────────────────────
+
+async function loadSecurityGroups() {
+  try {
+    const data = await apiGet('/api/vhi/security-groups');
+    allSecurityGroups = data.security_groups || [];
+    _sgs = [...allSecurityGroups];
+  } catch (err) {
+    console.warn('Failed to load security groups:', err.message);
+  }
+}
+
+function loadAll() {
+  loadVMs();
+  loadNodes();
+  loadVolumes();
+  loadNetworks();
+  loadImages();
+  loadFlavors();
+  loadVolumeTypes();
+  loadProjects();
+  loadUsers();
+  loadSecurityGroups();
+}
+
+async function loadVolumeTypes() {
+  try {
+    const data = await apiGet('/api/vhi/volume-types');
+    _volTypes = data.volume_types || [];
+  } catch(e) { console.error('Failed to load volume types:', e); }
+}
+
+async function loadFlavors() {
+  try {
+    const data = await apiGet('/api/vhi/flavors');
+    _flavors = data.flavors || [];
+    _flavors.sort((a,b) => a.vcpus - b.vcpus || a.ram - b.ram);
+  } catch(e) { console.error('Failed to load flavors:', e); }
+}
+
+// ── CREATE VM MODAL ───────────────────────────────────────────────────────
+
+const vmModal = document.getElementById('createVmModal');
+const vmMName = document.getElementById('newVmName');
+const vmMImage = document.getElementById('newVmImage');
+const vmMFlavor = document.getElementById('newVmFlavor');
+const vmMNetwork = document.getElementById('newVmNetwork');
+const vmMPolicy = document.getElementById('newVmPolicy');
+const vmMDiskSize = document.getElementById('newVmDiskSize');
+const vmMSubmit = document.getElementById('submitVmBtn');
+
+function openVmModal() {
+  vmMName.value = '';
+  vmMImage.innerHTML = '<option value="">Select Image...</option>' + 
+    _imgs.map(i => `<option value="${i.id}">${i.name || i.id} (${fmtBytes(i.size)})</option>`).join('');
+  
+  vmMFlavor.innerHTML = '<option value="">Select Flavor...</option>' + 
+    _flavors.map(f => `<option value="${f.id}">${f.name} (${f.vcpus} vCPU, ${fmtBytes(f.ram * 1024 * 1024)} RAM)</option>`).join('');
+  
+  vmMPolicy.innerHTML = '<option value="">Select Storage Policy...</option>' + 
+    _volTypes.map(vt => `<option value="${vt.name}">${vt.name}</option>`).join('');
+  
+  vmMNetwork.innerHTML = '<option value="">Select Network...</option>' + 
+    _nets.map(n => `<option value="${n.id}">${n.name || n.id}</option>`).join('');
+  
+  vmMDiskSize.value = 60;
+  
+  vmModal.classList.remove('hidden');
+  vmMName.focus();
+}
+
+function closeVmModal() {
+  vmModal.classList.add('hidden');
+}
+
+async function submitVmForm() {
+  const name = vmMName.value.trim();
+  const imageRef = vmMImage.value;
+  const flavorRef = vmMFlavor.value;
+  const networkUuid = vmMNetwork.value;
+  const volumeType = vmMPolicy.value;
+  const diskSize = parseInt(vmMDiskSize.value, 10);
+
+  if (!name || !imageRef || !flavorRef || !networkUuid || !volumeType || !diskSize) {
+    return toast('Please fill out all fields', 'warn');
+  }
+
+  vmMSubmit.disabled = true;
+  vmMSubmit.textContent = 'Creating...';
+
+  try {
+    const payload = {
+      name,
+      flavorRef,
+      networks: [{ uuid: networkUuid }],
+      min_count: 1,
+      max_count: 1,
+      block_device_mapping_v2: [{
+        boot_index: 0,
+        uuid: imageRef,
+        source_type: 'image',
+        destination_type: 'volume',
+        volume_size: diskSize,
+        volume_type: volumeType,
+        delete_on_termination: true
+      }]
+    };
+
+    const res = await fetch('/api/vhi/servers', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(await res.text());
+
+    toast(`VM "${name}" is being created`, 'ok');
+    closeVmModal();
+    loadVMs(); // refresh list
+  } catch (err) {
+    toast('Creation failed: ' + err.message, 'err');
+  } finally {
+    vmMSubmit.disabled = false;
+    vmMSubmit.textContent = 'Create';
+  }
+}
+
+document.getElementById('btnCreateVm').addEventListener('click', openVmModal);
+document.getElementById('closeVmModal').addEventListener('click', closeVmModal);
+document.getElementById('cancelVmBtn').addEventListener('click', closeVmModal);
+document.getElementById('submitVmBtn').addEventListener('click', submitVmForm);
+
+
+// ── VMs ───────────────────────────────────────────────────────────────────
+
+async function loadVMs() {
+  setRefreshing('vmRefresh', true);
+  document.getElementById('vmBody').innerHTML = skeletonRows(7);
+  try {
+    const data = await apiGet('/api/vhi/servers');
+    _vms = data.servers || [];
+    renderVMs('');
+    hookSearch('vmSearch', renderVMs);
+    document.getElementById('vmBadge').textContent = _vms.length;
+    document.getElementById('vmCount').textContent = `${_vms.length} VMs`;
+    // overview
+    document.getElementById('statVms').textContent = _vms.length;
+    document.getElementById('statRunning').textContent = _vms.filter(v => v.status === 'ACTIVE').length;
+
+    // Dashboard: VM Breakdown and Recent VMs
+    let act=0, stop=0, err=0, bld=0;
+    _vms.forEach(v => {
+      const s = (v.status || '').toUpperCase();
+      if (s==='ACTIVE') act++;
+      else if (s==='SHUTOFF' || s==='STOPPED') stop++;
+      else if (s==='ERROR') err++;
+      else if (s==='BUILD' || s==='BUILDING') bld++;
+    });
+    const tot = _vms.length || 1;
+    document.getElementById('cntActive').textContent = act;
+    document.getElementById('barActive').style.width = (act/tot*100) + '%';
+    document.getElementById('cntStopped').textContent = stop;
+    document.getElementById('barStopped').style.width = (stop/tot*100) + '%';
+    document.getElementById('cntError').textContent = err;
+    document.getElementById('barError').style.width = (err/tot*100) + '%';
+    document.getElementById('cntBuild').textContent = bld;
+    document.getElementById('barBuild').style.width = (bld/tot*100) + '%';
+
+    const recentVmsHtml = _vms.slice(0, 5).map(vm => {
+      const host = vm['OS-EXT-SRV-ATTR:host'] || vm.hostId?.slice(0,10) || '–';
+      const ips = getIps(vm).join(', ') || '–';
+      return `<tr><td><strong>${vm.name || '–'}</strong></td><td>${statusBadge(vm.status)}</td><td class="mono text-dim">${host}</td><td class="mono">${ips}</td></tr>`;
+    }).join('');
+    document.getElementById('dashVmBody').innerHTML = recentVmsHtml || '<tr><td colspan="4" class="text-dim text-center" style="padding:1rem;">No VMs found</td></tr>';
+
+    updateOverviewTs();
+  } catch (err) {
+    document.getElementById('vmBody').innerHTML = emptyState('⚠️', 'Could not load VMs: ' + err.message);
+    toast('VMs: ' + err.message, 'err');
+  } finally {
+    setRefreshing('vmRefresh', false);
+  }
+}
+
+function getIps(server) {
+  const ips = [];
+  const networks = server.addresses || {};
+  for (const net of Object.values(networks)) {
+    for (const addr of net) ips.push(addr.addr);
+  }
+  return ips;
+}
+
+function renderVMs(query) {
+  const tbody = document.getElementById('vmBody');
+  const rows = _vms.map(vm => {
+    const ips = getIps(vm).join(', ') || '–';
+    const host = vm['OS-EXT-SRV-ATTR:host'] || vm.hostId?.slice(0,10) || '–';
+    const taskState = vm['OS-EXT-STS:task_state'] || '';
+    
+    return `<tr>
+      <td><a href="javascript:void(0)" onclick="openVmDetails('${vm.id}')" style="color:var(--text); text-decoration:none;"><strong>${vm.name || '–'}</strong></a><br><span class="mono text-dim" style="font-size:.75rem">${vm.id.slice(0,8)}…</span></td>
+      <td>${statusBadge(vm.status)}${taskState ? `<br><span class="text-muted" style="font-size:.75rem">${taskState}</span>` : ''}</td>
+      <td class="mono">${ips}</td>
+      <td style="text-align: right;">
+        <button class="act-btn act-start" onclick="vmAction('${vm.id}','start')">▶ Start</button>
+        <button class="act-btn act-stop" onclick="vmAction('${vm.id}','stop')">■ Stop</button>
+        <button class="act-btn act-reboot" onclick="vmAction('${vm.id}','reboot')">↻ Reboot</button>
+        <button class="act-btn" style="background:var(--accent-blue);color:#fff;" onclick="vmConsole('${vm.id}')">🖧 Console</button>
+      </td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🖥', 'No VMs found');
+}
+
+
+
+async function vmAction(id, action) {
+  toast(`Sending ${action}…`, 'inf');
+  try {
+    await apiPost(`/api/vhi/servers/${id}/action`, { action });
+    toast(`${action} sent successfully`, 'ok');
+    setTimeout(loadVMs, 1500);
+  } catch (err) {
+    toast(`${action} failed: ${err.message}`, 'err');
+  }
+}
+
+async function vmConsole(id) {
+  toast(`Requesting console URL…`, 'inf');
+  try {
+    const res = await apiPost(`/api/vhi/servers/${id}/action`, { action: 'console' });
+    if (res.url) {
+      window.open(res.url, '_blank', 'width=800,height=600');
+      toast('Console opened', 'ok');
+    } else {
+      throw new Error('No console URL returned');
+    }
+  } catch(err) {
+    toast(`Console failed: ${err.message}`, 'err');
+  }
+}
+
+// ── VM DETAILS DRAWER ────────────────────────────────────────────────────────
+
+let currentVmDetails = null;
+let allFlavors = [];
+let allNetworks = [];
+let allVolumesFull = [];
+let allVolumesAvail = [];
+let allVolumeTypes = [];
+let currentVmInterfaces = [];
+
+async function openVmDetails(id) {
+  toast('Loading VM details...', 'inf');
+  document.getElementById('vmDrawer').classList.add('open');
+  document.getElementById('vmDetBody').innerHTML = skeletonRows(5);
+  
+  try {
+    const [vmData, flavors, nets, volumes, interfaces, vTypes] = await Promise.all([
+      apiGet(`/api/vhi/servers/${id}`),
+      apiGet('/api/vhi/flavors'),
+      apiGet('/api/vhi/networks'),
+      apiGet('/api/vhi/volumes'),
+      apiGet(`/api/vhi/servers/${id}/interfaces`),
+      apiGet('/api/vhi/volume-types')
+    ]);
+    
+    currentVmDetails = vmData.server;
+    allFlavors = flavors.flavors || flavors;
+    allNetworks = nets.networks || nets;
+    allVolumesFull = volumes.volumes || volumes;
+    allVolumesAvail = allVolumesFull.filter(v => v.status === 'available');
+    currentVmInterfaces = interfaces.interfaces || interfaces;
+    allVolumeTypes = vTypes.volume_types || vTypes;
+    
+    renderVmDetails();
+  } catch (err) {
+    document.getElementById('vmDetBody').innerHTML = `
+      <div style="padding:2rem; text-align:center;">
+        <span style="font-size:3rem;">⚠️</span>
+        <p style="margin-top:1rem; color:var(--text-dim);">Error loading details: ${err.message}</p>
+        <button class="btn btn-secondary" onclick="openVmDetails('${id}')" style="margin-top:1rem;">Retry</button>
+      </div>
+    `;
+  }
+}
+
+function closeVmDrawer() {
+  document.getElementById('vmDrawer').classList.remove('open');
+  currentVmDetails = null;
+}
+
+function renderVmDetails() {
+  const vm = currentVmDetails;
+  if (!vm) return;
+  
+  document.getElementById('vmDetName').textContent = vm.name;
+  
+  const flavor = allFlavors.find(f => f.id === vm.flavor?.id || f.id === vm.flavor) || vm.flavor || {};
+  const status = (vm.status || '').toUpperCase();
+  
+  // Storage
+  const volumesAttached = vm['os-extended-volumes:volumes_attached'] || [];
+  
+  let html = `
+    <div class="drawer-section">
+      <h4>Basic Info</h4>
+      <div class="detail-grid">
+        <div class="detail-label">Name</div>
+        <div class="detail-val"><input type="text" id="editVmName" value="${vm.name || ''}" oninput="checkVmChanges()" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px;"></div>
+        
+        <div class="detail-label">Status</div>
+        <div class="detail-val">${statusBadge(vm.status)}</div>
+        
+        <div class="detail-label">Created</div>
+        <div class="detail-val text-dim">${new Date(vm.created).toLocaleString()}</div>
+
+        <div class="detail-label">Host</div>
+        <div class="detail-val mono">${vm['OS-EXT-SRV-ATTR:host'] || '–'}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Build & Flavor</h4>
+      <div class="detail-grid">
+        <div class="detail-label">Flavor</div>
+        <div class="detail-val">
+          <select id="editVmFlavor" onchange="checkVmChanges()" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px;">
+            ${allFlavors.map(f => `<option value="${f.id}" ${f.id === (vm.flavor?.id || vm.flavor) ? 'selected' : ''}>${f.name} (${f.vcpus} CPU, ${f.ram/1024} GB)</option>`).join('')}
+          </select>
+        </div>
+        <div class="detail-label">VCPUs</div>
+        <div class="detail-val">${flavor.vcpus || '–'}</div>
+        <div class="detail-label">RAM</div>
+        <div class="detail-val">${flavor.ram ? (flavor.ram/1024).toFixed(1) + ' GB' : '–'}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Networking</h4>
+      <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom:1rem;">
+        ${currentVmInterfaces.map(iface => {
+          const net = allNetworks.find(n => n.id === iface.net_id);
+          const netName = net ? (net.name || net.id.slice(0,8)) : iface.net_id.slice(0,8);
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px; background:var(--bg-dark); border-radius:6px; border:1px solid var(--border);">
+              <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                <span style="font-size:0.75rem; font-weight:600; color:var(--text-dim);">${netName}</span>
+                <span class="mono" style="font-size:0.85rem;">${iface.fixed_ips.map(ip => ip.ip_address).join(', ')}</span>
+                ${iface.name ? `<span class="text-dim" style="font-size:0.7rem;">(${iface.name})</span>` : ''}
+              </div>
+              <div style="display:flex; gap:0.25rem;">
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem;" onclick="editNetPort('${iface.port_id}')">Edit</button>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem; color:var(--error);" onclick="detachNet('${iface.port_id}')">Detach</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+        ${currentVmInterfaces.length === 0 ? '<p class="text-dim" style="font-size:0.85rem;">No interfaces attached.</p>' : ''}
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <select id="attachNetId" style="flex:1; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.85rem;">
+          <option value="">Select network to attach...</option>
+          ${allNetworks.map(n => `<option value="${n.id}">${n.name || n.id.slice(0,8)}</option>`).join('')}
+        </select>
+        <button class="btn btn-primary" style="padding:4px 12px; font-size:0.85rem;" onclick="attachNet()">Attach</button>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Storage</h4>
+      <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom:1rem;">
+        ${volumesAttached.map(va => {
+          const fullVol = allVolumesFull.find(v => v.id === va.id);
+          const name = fullVol ? (fullVol.name || fullVol.id.slice(0,8)) : va.id.slice(0,8);
+          const size = fullVol ? `${fullVol.size} GB` : '–';
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px; background:var(--bg-dark); border-radius:6px; border:1px solid var(--border);">
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                <span class="mono" style="font-size:0.85rem; font-weight:600; color:var(--text);">${name}</span>
+                <span class="text-dim" style="font-size:0.7rem;">Size: ${size}</span>
+              </div>
+              <div style="display:flex; gap:0.25rem;">
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem;" onclick="renameVol('${va.id}', '${name}')">Rename</button>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem;" onclick="resizeVol('${va.id}', ${fullVol ? fullVol.size : 0})">Resize</button>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem; color:var(--error);" onclick="detachVol('${va.id}')">Detach</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+        ${volumesAttached.length === 0 ? '<p class="text-dim" style="font-size:0.85rem;">No volumes attached.</p>' : ''}
+      </div>
+      
+      <div style="display:flex; flex-direction:column; gap:0.5rem; padding-top:1rem; border-top:1px solid var(--border);">
+        <p style="font-size:0.75rem; font-weight:600; color:var(--text-dim); margin-bottom:0.25rem;">Attach Existing Volume</p>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <select id="attachVolId" style="flex:1; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.85rem;">
+            <option value="">Select volume to attach...</option>
+            ${allVolumesAvail.map(v => `<option value="${v.id}">${v.name || v.id.slice(0,8)} (${v.size}GB)</option>`).join('')}
+          </select>
+          <button class="btn btn-primary" style="padding:4px 12px; font-size:0.85rem;" onclick="attachVol()">Attach</button>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1.5rem; padding:0.75rem; background:rgba(255,255,255,0.03); border-radius:8px; border:1px dashed var(--border);">
+        <p style="font-size:0.75rem; font-weight:600; color:var(--text-dim); margin-bottom:0.25rem;">Create New Volume</p>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+          <div style="grid-column: span 2;">
+            <input type="text" id="newVolName" placeholder="Volume Name" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.85rem;">
+          </div>
+          <div>
+            <label style="display:block; font-size:0.65rem; color:var(--text-dim); margin-bottom:2px;">Size in GB</label>
+            <input type="number" id="newVolSize" placeholder="Size GB" value="10" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.85rem;">
+          </div>
+          <div>
+            <label style="display:block; font-size:0.65rem; color:var(--text-dim); margin-bottom:2px;">Policy</label>
+            <select id="newVolType" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.85rem;">
+              ${allVolumeTypes.map(t => `<option value="${t.name}">${t.name}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%; margin-top:0.5rem; font-size:0.85rem;" onclick="createVolOnly()">Create Storage</button>
+      </div>
+    </div>
+  `;
+
+  if (status === 'VERIFY_RESIZE') {
+    html += `
+      <div class="drawer-section" style="background:rgba(243,156,18,0.1); padding:1rem; border-radius:8px; border:1px solid rgba(243,156,18,0.3);">
+        <h4 style="color:#e67e22; border-bottom-color:rgba(243,156,18,0.3);">Action Required: Resize</h4>
+        <p style="font-size:0.85rem; margin-bottom:1rem;">Your resize operation is complete. Please confirm or revert the changes.</p>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-primary" style="background:var(--success); font-size:0.8rem;" onclick="vmActionDetailed('confirmResize')">Confirm Resize</button>
+          <button class="btn btn-secondary" style="font-size:0.8rem;" onclick="vmActionDetailed('revertResize')">Revert</button>
+        </div>
+      </div>
+    `;
+  }
+
+  document.getElementById('vmDetBody').innerHTML = html;
+  checkVmChanges();
+}
+
+function checkVmChanges() {
+  const name = document.getElementById('editVmName')?.value;
+  const flavor = document.getElementById('editVmFlavor')?.value;
+  const btn = document.getElementById('vmDetSaveBtn');
+  if (!btn) return;
+  
+  const hasNameChange = name !== undefined && name !== currentVmDetails.name;
+  const hasFlavorChange = flavor !== undefined && flavor !== (currentVmDetails.flavor?.id || currentVmDetails.flavor);
+  
+  btn.disabled = !(hasNameChange || hasFlavorChange);
+}
+
+async function saveVmChanges() {
+  const name = document.getElementById('editVmName').value;
+  const flavorId = document.getElementById('editVmFlavor').value;
+  const id = currentVmDetails.id;
+  
+  const originalName = currentVmDetails.name;
+  const originalFlavorId = (currentVmDetails.flavor?.id || currentVmDetails.flavor);
+
+  toast('Saving changes...', 'inf');
+  try {
+    if (name !== originalName) {
+      await apiPost(`/api/vhi/servers/${id}/action`, { action: 'rename', name });
+    }
+    if (flavorId !== originalFlavorId) {
+      await apiPost(`/api/vhi/servers/${id}/action`, { action: 'resize', flavorId });
+      toast('Resize initiated. Please wait...', 'inf');
+    } else {
+      toast('Changes saved', 'ok');
+    }
+    
+    // Refresh
+    await openVmDetails(id);
+    loadVMs();
+  } catch (err) {
+    toast('Save failed: ' + err.message, 'err');
+  }
+}
+
+async function vmActionDetailed(action) {
+  toast(`Sending ${action}...`, 'inf');
+  try {
+    await apiPost(`/api/vhi/servers/${currentVmDetails.id}/action`, { action });
+    toast('Success', 'ok');
+    await openVmDetails(currentVmDetails.id);
+    loadVMs();
+  } catch (err) {
+    toast('Action failed: ' + err.message, 'err');
+  }
+}
+
+async function attachNet() {
+  const netId = document.getElementById('attachNetId').value;
+  if (!netId) return toast('Select a network first', 'warn');
+  
+  toast('Attaching network...', 'inf');
+  try {
+    await apiPost(`/api/vhi/servers/${currentVmDetails.id}/interfaces`, { network_id: netId });
+    toast('Network attached', 'ok');
+    await openVmDetails(currentVmDetails.id);
+  } catch (err) {
+    toast('Attach failed: ' + err.message, 'err');
+  }
+}
+
+async function detachNet(portId) {
+  if (!confirm('Detach this network interface?')) return;
+  toast('Detaching interface...', 'inf');
+  try {
+    await apiDelete(`/api/vhi/servers/${currentVmDetails.id}/interfaces/${portId}`);
+    toast('Interface detached', 'ok');
+    await openVmDetails(currentVmDetails.id);
+  } catch (err) {
+    toast('Detach failed: ' + err.message, 'err');
+  }
+}
+
+async function attachVol() {
+  const volId = document.getElementById('attachVolId').value;
+  if (!volId) return toast('Select a volume first', 'warn');
+  
+  toast('Attaching volume...', 'inf');
+  try {
+    await apiPost(`/api/vhi/servers/${currentVmDetails.id}/volumes`, { volume_id: volId });
+    toast('Volume attached', 'ok');
+    await openVmDetails(currentVmDetails.id);
+  } catch (err) {
+    toast('Attach failed: ' + err.message, 'err');
+  }
+}
+
+async function detachVol(attId) {
+  if (!confirm('Detach this volume?')) return;
+  toast('Detaching volume...', 'inf');
+  try {
+    await apiDelete(`/api/vhi/servers/${currentVmDetails.id}/volumes/${attId}`);
+    toast('Volume detached', 'ok');
+    await openVmDetails(currentVmDetails.id);
+  } catch (err) {
+    toast('Detach failed: ' + err.message, 'err');
+  }
+}
+
+async function resizeVol(volId, currentSize) {
+  const newSizeStr = prompt(`Current size: ${currentSize} GB. Enter new size (GB):`, currentSize + 10);
+  if (newSizeStr === null) return;
+  const newSize = parseInt(newSizeStr);
+  if (isNaN(newSize) || newSize <= currentSize) {
+    return toast(`Invalid size. Must be greater than ${currentSize} GB.`, 'warn');
+  }
+  
+  toast('Resizing volume...', 'inf');
+  try {
+    await apiPost(`/api/vhi/volumes/${volId}/extend`, { new_size: newSize });
+    toast('Resize request accepted', 'ok');
+    // Refresh details after a short delay
+    setTimeout(() => openVmDetails(currentVmDetails.id), 2000);
+  } catch (err) {
+    toast('Resize failed: ' + err.message, 'err');
+  }
+}
+
+async function renameVol(volId, currentName) {
+  const newName = prompt('Enter new volume name:', currentName);
+  if (newName === null || newName === currentName) return;
+  
+  toast('Renaming volume...', 'inf');
+  try {
+    await apiPatch(`/api/vhi/volumes/${volId}`, { name: newName });
+    toast('Volume renamed', 'ok');
+    await openVmDetails(currentVmDetails.id);
+  } catch (err) {
+    toast('Rename failed: ' + err.message, 'err');
+  }
+}
+
+async function editNetPort(portId) {
+  currentEditingPortId = portId;
+  const modal = document.getElementById('editPortModal');
+  const netNameLabel = document.getElementById('epNetName');
+  const nameInput = document.getElementById('epName');
+  const ipInput = document.getElementById('epIp');
+  const sgList = document.getElementById('epSecurityGroups');
+  const sgCount = document.getElementById('epSgCount');
+  const psCheck = document.getElementById('epPortSecurity');
+  const spoofWarn = document.getElementById('epSpoofWarning');
+
+  // Find network name from currentVmInterfaces
+  const iface = currentVmInterfaces.find(i => i.port_id === portId);
+  if (iface) {
+    const net = allNetworks.find(n => n.id === iface.net_id);
+    netNameLabel.textContent = net ? (net.name || net.id.slice(0,8)) : iface.net_id.slice(0,8);
+    if (iface.name) nameInput.value = iface.name;
+  } else {
+    netNameLabel.textContent = '...';
+  }
+
+  modal.classList.remove('hidden');
+
+  // Initial state
+  sgList.innerHTML = '<p class="text-dim" style="padding:10px;">Loading port details...</p>';
+  sgCount.textContent = '0 selected';
+  psCheck.checked = true;
+  spoofWarn.style.display = 'none';
+  document.getElementById('epSecurityGroups').classList.add('hidden');
+
+  try {
+    const data = await apiGet(`/api/vhi/ports/${portId}`);
+    const port = data.port;
+    if (!port) throw new Error('Port not found');
+
+    nameInput.value = port.name || '';
+    ipInput.value = port.fixed_ips && port.fixed_ips.length > 0 ? port.fixed_ips[0].ip_address : '';
+    psCheck.checked = !!port.port_security_enabled;
+    spoofWarn.style.display = psCheck.checked ? 'none' : 'block';
+
+    // Render security group items in dropdown
+    const renderSgs = () => {
+      sgList.innerHTML = allSecurityGroups.map(sg => {
+        const checked = port.security_groups.includes(sg.id);
+        return `
+          <div class="dropdown-item" onclick="toggleSgCheck(event, '${sg.id}')">
+            <input type="checkbox" class="ep-sg-check" value="${sg.id}" id="sg-${sg.id}" ${checked ? 'checked' : ''} onclick="event.stopPropagation()">
+            <label for="sg-${sg.id}">${sg.name || sg.id.slice(0,8)}</label>
+          </div>
+        `;
+      }).join('') || '<p class="text-dim" style="padding:10px;">No policies available.</p>';
+      updateSgCount();
+    };
+
+    renderSgs();
+
+    psCheck.onchange = () => {
+      spoofWarn.style.display = psCheck.checked ? 'none' : 'block';
+    };
+
+  } catch (err) {
+    toast('Failed to load port: ' + err.message, 'error');
+    closeEditPortModal();
+  }
+}
+
+function toggleSgDropdown(e) {
+  e.stopPropagation();
+  const list = document.getElementById('epSecurityGroups');
+  const arrow = document.getElementById('epSgArrow');
+  list.classList.toggle('hidden');
+  arrow.textContent = list.classList.contains('hidden') ? '▼' : '▲';
+}
+
+function toggleSgCheck(e, id) {
+  const checkbox = document.getElementById(`sg-${id}`);
+  if (checkbox) {
+    checkbox.checked = !checkbox.checked;
+    updateSgCount();
+  }
+}
+
+function updateSgCount() {
+  const count = document.querySelectorAll('.ep-sg-check:checked').length;
+  document.getElementById('epSgCount').textContent = `${count} selected`;
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', () => {
+  const list = document.getElementById('epSecurityGroups');
+  if (list && !list.classList.contains('hidden')) {
+    list.classList.add('hidden');
+    document.getElementById('epSgArrow').textContent = '▼';
+  }
+});
+
+async function savePortChanges() {
+  if (!currentEditingPortId) return;
+  const name = document.getElementById('epName').value.trim();
+  const ip = document.getElementById('epIp').value.trim();
+  const portSecurity = document.getElementById('epPortSecurity').checked;
+  const sgChecks = document.querySelectorAll('.ep-sg-check:checked');
+  const securityGroups = Array.from(sgChecks).map(c => c.value);
+
+  const payload = {
+    name: name,
+    port_security_enabled: portSecurity,
+    security_groups: securityGroups
+  };
+
+  if (ip) {
+    payload.fixed_ips = [{ ip_address: ip }];
+  }
+
+  try {
+    toast('Saving interface changes...');
+    await apiPatch(`/api/vhi/servers/any/interfaces/${currentEditingPortId}`, payload);
+    toast('Interface updated successfully');
+    closeEditPortModal();
+    const vmId = document.getElementById('vmDetId').textContent;
+    if (vmId) openVmDetails(vmId);
+  } catch (err) {
+    toast('Update failed: ' + err.message, 'error');
+  }
+}
+
+function closeEditPortModal() {
+  document.getElementById('editPortModal').classList.add('hidden');
+  currentEditingPortId = null;
+}
+
+async function createVolOnly() {
+  const name = document.getElementById('newVolName').value;
+  const size = parseInt(document.getElementById('newVolSize').value);
+  const type = document.getElementById('newVolType').value;
+  
+  if (!name || isNaN(size)) return toast('Name and size are required', 'warn');
+  
+  toast('Creating volume...', 'inf');
+  try {
+    await apiPost('/api/vhi/volumes', { name, size, volume_type: type });
+    toast('Volume creation initiated', 'ok');
+    setTimeout(() => openVmDetails(currentVmDetails.id), 2000);
+  } catch (err) {
+    toast('Create failed: ' + err.message, 'err');
+  }
+}
+
+window.openVmDetails = openVmDetails;
+window.closeVmDrawer = closeVmDrawer;
+window.saveVmChanges = saveVmChanges;
+window.vmActionDetailed = vmActionDetailed;
+window.checkVmChanges = checkVmChanges;
+window.attachNet = attachNet;
+window.detachNet = detachNet;
+window.attachVol = attachVol;
+window.detachVol = detachVol;
+window.editNetPort = editNetPort;
+window.createVolOnly = createVolOnly;
+
+window.vmAction = vmAction;
+window.vmConsole = vmConsole;
+window.toggleSgDropdown = toggleSgDropdown;
+window.toggleSgCheck = toggleSgCheck;
+window.savePortChanges = savePortChanges;
+window.closeEditPortModal = closeEditPortModal;
+window.updateSgCount = updateSgCount;
+window.currentEditingPortId = currentEditingPortId;
+
+// ── NODES ─────────────────────────────────────────────────────────────────
+
+async function loadNodes() {
+  setRefreshing('nodeRefresh', true);
+  document.getElementById('nodeBody').innerHTML = skeletonRows(7);
+  try {
+    const data = await apiGet('/api/vhi/nodes');
+    _nodes = data.nodes || [];
+    renderNodes('');
+    hookSearch('nodeSearch', renderNodes);
+    document.getElementById('nodeBadge').textContent = _nodes.length;
+    document.getElementById('nodeCount').textContent = `${_nodes.length} nodes`;
+    document.getElementById('statNodes').textContent = _nodes.length;
+
+    // Dashboard: Node Health
+    const recentNodesHtml = _nodes.slice(0, 5).map(n => {
+      const cpuUsed = `${n.vcpus_used}/${n.vcpus}`;
+      const ramUsed = `${Math.round((n.memory_mb-n.free_ram_mb)/1024)}/${Math.round(n.memory_mb/1024)}G`;
+      return `<tr><td><strong>${n.hypervisor_hostname || '–'}</strong></td><td>${statusBadge(n.state)}</td><td>${n.running_vms ?? '0'}</td><td class="text-dim">${cpuUsed}</td><td class="text-dim">${ramUsed}</td></tr>`;
+    }).join('');
+    document.getElementById('dashNodeBody').innerHTML = recentNodesHtml || '<tr><td colspan="5" class="text-dim text-center" style="padding:1rem;">No nodes found</td></tr>';
+  } catch (err) {
+    document.getElementById('nodeBody').innerHTML = emptyState('⚠️', 'Could not load nodes: ' + err.message);
+    toast('Nodes: ' + err.message, 'err');
+  } finally {
+    setRefreshing('nodeRefresh', false);
+  }
+}
+
+function renderNodes(query) {
+  const tbody = document.getElementById('nodeBody');
+  const rows = _nodes.map(n => {
+    const cpuPct = pct(n.vcpus_used, n.vcpus);
+    const ramPct = pct(n.memory_mb - n.free_ram_mb, n.memory_mb);
+    return `<tr>
+      <td><strong>${n.hypervisor_hostname || '–'}</strong></td>
+      <td>${statusBadge(n.state)}</td>
+      <td>${statusBadge(n.status)}</td>
+      <td>${n.running_vms ?? '–'}</td>
+      <td>${barHtml(cpuPct)} <span class="text-muted">${n.vcpus_used}/${n.vcpus}</span></td>
+      <td>${barHtml(ramPct)} <span class="text-muted">${Math.round((n.memory_mb-n.free_ram_mb)/1024)}/${Math.round(n.memory_mb/1024)} GB</span></td>
+      <td class="text-dim">${n.hypervisor_type || '–'}</td>
+      <td style="text-align: right; white-space: nowrap;">
+        <button class="act-btn" style="background:var(--accent-blue);color:#fff;" onclick="openSshTerminalDirect('${n.hypervisor_hostname}')">🖥 Console</button>
+      </td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('📦', 'No nodes found');
+}
+
+hookSearch('nodeSearch', q => renderNodes(q));
+
+let nodeToReboot = null;
+function confirmRebootNode(id, hostname) {
+  nodeToReboot = { id, hostname };
+  document.getElementById('rebootNodeHostname').textContent = hostname;
+  document.getElementById('rebootNodeModal').classList.remove('hidden');
+}
+
+function closeRebootModal() {
+  document.getElementById('rebootNodeModal').classList.add('hidden');
+  nodeToReboot = null;
+}
+
+async function doRebootNode() {
+  if (!nodeToReboot) return;
+  const { id, hostname } = nodeToReboot;
+  const btn = document.getElementById('confirmRebootBtn');
+  
+  // Get credentials (node-specific or global fallback)
+  let saved = localStorage.getItem(getNodeSshKey(hostname));
+  if (!saved) saved = localStorage.getItem(getGlobalSshKey());
+
+  let creds = {};
+  if (saved) {
+    try {
+      const config = JSON.parse(saved);
+      creds = {
+        host: config.host || hostname,
+        username: config.username,
+        password: config.authMethod === 'password' ? config.password : undefined,
+        privateKey: config.authMethod === 'key' ? config.privateKey : undefined,
+        passphrase: config.authMethod === 'key' ? config.passphrase : undefined
+      };
+    } catch(e) { console.error('Failed to parse node SSH config', e); }
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Rebooting...';
+  
+  toast(`Initiating reboot for ${hostname}…`, 'inf');
+  try {
+    await apiPost(`/api/vhi/nodes/${hostname}/action`, { action: 'reboot', creds });
+    toast(`Reboot command sent to ${hostname}`, 'ok');
+    closeRebootModal();
+    setTimeout(loadNodes, 3000);
+  } catch (err) {
+    toast(`Reboot failed: ${err.message}`, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Yes, Reboot Node';
+  }
+}
+
+// ── NODE SSH LOGIC ──────────────────────────────────────────────────────────
+let currentSshNode = null;
+let isGlobalSsh = false;
+
+function getGlobalSshKey() {
+  const clusterId = session?.baseUrl || 'default';
+  return `vhi_ssh_global_${clusterId}`;
+}
+
+function getNodeSshKey(hostname) {
+  const clusterId = session?.baseUrl || 'default';
+  return `ssh_node_${clusterId}_${hostname}`;
+}
+
+function openGlobalSshModal() {
+  isGlobalSsh = true;
+  currentSshNode = "CLUSTER_GLOBAL";
+  document.getElementById('sshModalHostname').textContent = "Cluster Global";
+  
+  const saved = localStorage.getItem(getGlobalSshKey());
+  if (saved) {
+    try {
+      const config = JSON.parse(saved);
+      document.getElementById('nodeSshHost').value = config.host || '';
+      document.getElementById('nodeSshUser').value = config.username || 'root';
+      document.getElementById('nodeSshAuthMethod').value = config.authMethod || 'password';
+      document.getElementById('nodeSshPassword').value = config.password || '';
+      document.getElementById('nodeSshKey').value = config.privateKey || '';
+      document.getElementById('nodeSshPassphrase').value = config.passphrase || '';
+    } catch(e) {}
+  } else {
+    // defaults
+    document.getElementById('nodeSshHost').value = '';
+    document.getElementById('nodeSshUser').value = 'root';
+    document.getElementById('nodeSshAuthMethod').value = 'password';
+    document.getElementById('nodeSshPassword').value = '';
+    document.getElementById('nodeSshKey').value = '';
+    document.getElementById('nodeSshPassphrase').value = '';
+  }
+  
+  toggleSshAuthFields();
+  document.getElementById('nodeSshModal').classList.remove('hidden');
+}
+
+function openNodeSshModal(hostname) {
+  isGlobalSsh = false;
+  currentSshNode = hostname;
+  document.getElementById('sshModalHostname').textContent = hostname;
+  
+  const saved = localStorage.getItem(getNodeSshKey(hostname));
+  if (saved) {
+    try {
+      const config = JSON.parse(saved);
+      document.getElementById('nodeSshHost').value = config.host || '';
+      document.getElementById('nodeSshUser').value = config.username || 'root';
+      document.getElementById('nodeSshAuthMethod').value = config.authMethod || 'password';
+      document.getElementById('nodeSshPassword').value = config.password || '';
+      document.getElementById('nodeSshKey').value = config.privateKey || '';
+      document.getElementById('nodeSshPassphrase').value = config.passphrase || '';
+    } catch(e) {}
+  } else {
+    // If no node-specific, try to pre-fill from global
+    const globalSaved = localStorage.getItem(getGlobalSshKey());
+    if (globalSaved) {
+      try {
+        const config = JSON.parse(globalSaved);
+        document.getElementById('nodeSshHost').value = hostname; // use hostname/IP for this node
+        document.getElementById('nodeSshUser').value = config.username || 'root';
+        document.getElementById('nodeSshAuthMethod').value = config.authMethod || 'password';
+        document.getElementById('nodeSshPassword').value = config.password || '';
+        document.getElementById('nodeSshKey').value = config.privateKey || '';
+        document.getElementById('nodeSshPassphrase').value = config.passphrase || '';
+      } catch(e) {}
+    } else {
+      document.getElementById('nodeSshHost').value = hostname;
+      document.getElementById('nodeSshUser').value = 'root';
+      document.getElementById('nodeSshAuthMethod').value = 'password';
+      document.getElementById('nodeSshPassword').value = '';
+      document.getElementById('nodeSshKey').value = '';
+      document.getElementById('nodeSshPassphrase').value = '';
+    }
+  }
+  
+  toggleSshAuthFields();
+  document.getElementById('nodeSshModal').classList.remove('hidden');
+}
+
+function closeNodeSshModal() {
+  document.getElementById('nodeSshModal').classList.add('hidden');
+  currentSshNode = null;
+}
+
+function toggleSshAuthFields() {
+  const method = document.getElementById('nodeSshAuthMethod').value;
+  document.getElementById('nodeSshPassGroup').classList.toggle('hidden', method !== 'password');
+  document.getElementById('nodeSshKeyGroup').classList.toggle('hidden', method !== 'key');
+}
+
+function saveNodeSsh() {
+  if (!currentSshNode) return;
+  const config = {
+    host: document.getElementById('nodeSshHost').value.trim(),
+    username: document.getElementById('nodeSshUser').value.trim(),
+    authMethod: document.getElementById('nodeSshAuthMethod').value,
+    password: document.getElementById('nodeSshPassword').value,
+    privateKey: document.getElementById('nodeSshKey').value,
+    passphrase: document.getElementById('nodeSshPassphrase').value
+  };
+  
+  if (isGlobalSsh) {
+    localStorage.setItem(getGlobalSshKey(), JSON.stringify(config));
+    toast(`Global Cluster SSH config saved`, 'ok');
+  } else {
+    localStorage.setItem(getNodeSshKey(currentSshNode), JSON.stringify(config));
+    toast(`SSH config for ${currentSshNode} saved`, 'ok');
+  }
+  closeNodeSshModal();
+}
+
+async function testNodeSsh() {
+  if (!currentSshNode) return;
+  const config = {
+    host: document.getElementById('nodeSshHost').value.trim(),
+    username: document.getElementById('nodeSshUser').value.trim(),
+    authMethod: document.getElementById('nodeSshAuthMethod').value,
+    password: document.getElementById('nodeSshPassword').value,
+    privateKey: document.getElementById('nodeSshKey').value,
+    passphrase: document.getElementById('nodeSshPassphrase').value
+  };
+  
+  toast('Testing SSH & vinfra help…', 'inf');
+  try {
+    const res = await apiPost(`/api/vhi/nodes/${currentSshNode}/action`, { action: 'help', creds: {
+      host: config.host,
+      username: config.username,
+      password: config.authMethod === 'password' ? config.password : undefined,
+      privateKey: config.authMethod === 'key' ? config.privateKey : undefined,
+      passphrase: config.authMethod === 'key' ? config.passphrase : undefined
+    }});
+    if (res.help) {
+      alert(`vinfra node help output:\n\n${res.help}`);
+    } else {
+      toast('Test successful (no output)', 'ok');
+    }
+  } catch (err) {
+    alert(`Test failed: ${err.message}`);
+  }
+}
+
+window.openGlobalSshModal = openGlobalSshModal;
+window.openNodeSshModal = openNodeSshModal;
+window.closeNodeSshModal = closeNodeSshModal;
+window.toggleSshAuthFields = toggleSshAuthFields;
+window.saveNodeSsh = saveNodeSsh;
+window.testNodeSsh = testNodeSsh;
+document.getElementById('confirmRebootBtn').addEventListener('click', doRebootNode);
+window.confirmRebootNode = confirmRebootNode;
+window.closeRebootModal = closeRebootModal;
+
+
+// ── TERMINAL LOGIC ───────────────────────────────────────────────────────────
+
+let terminalWs = null;
+function openTerminal() {
+  if (!currentSshNode) return;
+  const hostname = currentSshNode;
+  document.getElementById('terminalHostname').textContent = hostname;
+  
+  let saved = localStorage.getItem(getNodeSshKey(hostname));
+  if (!saved) {
+    // fallback to global
+    saved = localStorage.getItem(getGlobalSshKey());
+  }
+
+  if (!saved) {
+    toast('No SSH credentials configured! Use "Global SSH" button.', 'err');
+    return;
+  }
+  
+  const config = JSON.parse(saved);
+  const creds = {
+    host: config.host || hostname, // if global, we still need node IP. If config.host is empty, use current node hostname
+    username: config.username,
+    password: config.authMethod === 'password' ? config.password : undefined,
+    privateKey: config.authMethod === 'key' ? config.privateKey : undefined,
+    passphrase: config.authMethod === 'key' ? config.passphrase : undefined
+  };
+
+  const container = document.getElementById('terminalContainer');
+  container.innerHTML = '<div style="color:var(--accent-blue)">Connecting to SSH...</div>';
+  
+  document.getElementById('terminalModal').classList.remove('hidden');
+  
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  terminalWs = new WebSocket(`${protocol}//${window.location.host}`);
+  
+  terminalWs.onopen = () => {
+    terminalWs.send(JSON.stringify({ type: 'init', creds }));
+    container.innerHTML += '<div style="color:#0f0">Connection established.</div>';
+    document.getElementById('terminalInput').focus();
+  };
+
+  terminalWs.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.type === 'data') {
+      appendTerminalData(msg.data);
+    } else if (msg.type === 'error') {
+      container.innerHTML += `<div style="color:var(--danger)">Error: ${msg.message}</div>`;
+    }
+  };
+
+  terminalWs.onclose = () => {
+    container.innerHTML += '<div style="color:var(--text-dim)">Session closed.</div>';
+    terminalWs = null;
+  };
+}
+
+function appendTerminalData(data) {
+  const container = document.getElementById('terminalContainer');
+  // Simple ANSI cleanup for the demo (we're not using full xterm.js for brevity)
+  const clean = data.replace(/\x1b\[[0-9;]*[mGKHJK]/g, '');
+  const span = document.createElement('span');
+  span.textContent = clean;
+  container.appendChild(span);
+  container.scrollTop = container.scrollHeight;
+}
+
+function closeTerminal() {
+  if (terminalWs) {
+    terminalWs.close();
+    terminalWs = null;
+  }
+  document.getElementById('terminalModal').classList.add('hidden');
+}
+
+// Handle terminal input
+document.addEventListener('keydown', (e) => {
+  if (!terminalWs) return;
+  if (document.getElementById('terminalModal').classList.contains('hidden')) return;
+  
+  // Forward keys to the backend
+  if (e.key === 'Enter') {
+    terminalWs.send(JSON.stringify({ type: 'data', data: '\n' }));
+  } else if (e.key === 'Backspace') {
+    terminalWs.send(JSON.stringify({ type: 'data', data: '\b' }));
+  } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey) {
+    terminalWs.send(JSON.stringify({ type: 'data', data: e.key }));
+  }
+});
+
+window.openTerminal = openTerminal;
+window.closeTerminal = closeTerminal;
+
+function openSshTerminalDirect(hostname) {
+  currentSshNode = hostname;
+  openTerminal();
+}
+window.openSshTerminalDirect = openSshTerminalDirect;
+
+// ── VOLUMES ───────────────────────────────────────────────────────────────
+
+async function loadVolumes() {
+  setRefreshing('volRefresh', true);
+  document.getElementById('volBody').innerHTML = skeletonRows(7);
+  try {
+    const data = await apiGet('/api/vhi/volumes');
+    _vols = data.volumes || [];
+    renderVolumes('');
+    hookSearch('volSearch', renderVolumes);
+    document.getElementById('volBadge').textContent = _vols.length;
+    document.getElementById('volCount').textContent = `${_vols.length} volumes`;
+    document.getElementById('statVols').textContent = _vols.length;
+
+    // Dashboard: Storage Summary
+    let totSize=0, avail=0, inUse=0, err=0;
+    _vols.forEach(v => {
+      totSize += (v.size || 0);
+      const s = (v.status || '').toLowerCase();
+      if (s === 'available') avail++;
+      else if (s === 'in-use') inUse++;
+      else if (s === 'error') err++;
+    });
+    document.getElementById('storTotalGib').textContent = totSize + ' GiB';
+    document.getElementById('storAvail').textContent = avail;
+    document.getElementById('storInUse').textContent = inUse;
+    document.getElementById('storErr').textContent = err;
+  } catch (err) {
+    document.getElementById('volBody').innerHTML = emptyState('⚠️', 'Could not load volumes: ' + err.message);
+    toast('Volumes: ' + err.message, 'err');
+  } finally {
+    setRefreshing('volRefresh', false);
+  }
+}
+
+function renderVolumes(query) {
+  const tbody = document.getElementById('volBody');
+  const rows = _vols.map(v => {
+    const attached = (v.attachments || []).map(a => a.server_id?.slice(0,8)).join(', ') || '–';
+    return `<tr>
+      <td><strong>${v.name || v.id?.slice(0,12) || '–'}</strong><br><span class="mono">${v.id?.slice(0,8)}…</span></td>
+      <td>${statusBadge(v.status)}</td>
+      <td>${v.size ?? '–'}</td>
+      <td class="text-dim">${v.volume_type || '–'}</td>
+      <td>${v.bootable === 'true' || v.bootable === true ? '✓' : '–'}</td>
+      <td class="mono text-dim">${attached}</td>
+      <td class="text-dim">${fmtDate(v.created_at)}</td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('💾', 'No volumes found');
+}
+
+// ── NETWORKS ──────────────────────────────────────────────────────────────
+
+async function loadNetworks() {
+  setRefreshing('netRefresh', true);
+  document.getElementById('netBody').innerHTML = skeletonRows(5);
+  try {
+    const data = await apiGet('/api/vhi/networks');
+    _nets = data.networks || [];
+    _subnets = data.subnets || [];
+    renderNetworks('');
+    hookSearch('netSearch', renderNetworks);
+    document.getElementById('netBadge').textContent = _nets.length;
+    document.getElementById('netCount').textContent = `${_nets.length} networks`;
+    document.getElementById('statNets').textContent = _nets.length;
+  } catch (err) {
+    document.getElementById('netBody').innerHTML = emptyState('⚠️', 'Could not load networks: ' + err.message);
+    toast('Networks: ' + err.message, 'err');
+  } finally {
+    setRefreshing('netRefresh', false);
+  }
+}
+
+function renderNetworks(query) {
+  const tbody = document.getElementById('netBody');
+  const rows = _nets.map(n => {
+    const subs = _subnets
+      .filter(s => (n.subnets || []).includes(s.id))
+      .map(s => s.cidr).join(', ') || '–';
+    return `<tr>
+      <td><strong>${n.name || '–'}</strong><br><span class="mono">${n.id?.slice(0,8)}…</span></td>
+      <td>${statusBadge(n.status)}</td>
+      <td>${n['router:external'] ? '<span class="badge badge-active">External</span>' : '–'}</td>
+      <td>${n.admin_state_up ? '<span class="badge badge-active">Up</span>' : '<span class="badge badge-error">Down</span>'}</td>
+      <td class="mono text-dim">${subs}</td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🌐', 'No networks found');
+}
+
+// ── IMAGES ────────────────────────────────────────────────────────────────
+
+async function loadImages() {
+  setRefreshing('imgRefresh', true);
+  document.getElementById('imgBody').innerHTML = skeletonRows(6);
+  try {
+    const data = await apiGet('/api/vhi/images');
+    _imgs = data.images || [];
+    renderImages('');
+    hookSearch('imgSearch', renderImages);
+    document.getElementById('imgBadge').textContent = _imgs.length;
+    document.getElementById('imgCount').textContent = `${_imgs.length} images`;
+    document.getElementById('statImgs').textContent = _imgs.length;
+  } catch (err) {
+    document.getElementById('imgBody').innerHTML = emptyState('⚠️', 'Could not load images: ' + err.message);
+    toast('Images: ' + err.message, 'err');
+  } finally {
+    setRefreshing('imgRefresh', false);
+  }
+}
+
+function renderImages(query) {
+  const tbody = document.getElementById('imgBody');
+  const rows = _imgs.map(img => {
+    const os = img.os_distro || img['os-distro'] || '–';
+    return `<tr>
+      <td><strong>${img.name || '–'}</strong></td>
+      <td>${statusBadge(img.status)}</td>
+      <td class="text-dim">${os}</td>
+      <td class="text-dim">${fmtBytes(img.size)}</td>
+      <td class="text-dim">${img.disk_format || '–'}</td>
+      <td>${img.visibility === 'public' ? '<span class="badge badge-active">Public</span>' : '<span class="badge badge-default">Private</span>'}</td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🗂', 'No images found');
+}
+
+// ── PROJECTS ──────────────────────────────────────────────────────────────
+
+async function loadProjects() {
+  setRefreshing('projRefresh', true);
+  document.getElementById('projBody').innerHTML = skeletonRows(4);
+  try {
+    const data = await apiGet('/api/vhi/projects');
+    _projs = data.projects || [];
+    renderProjects('');
+    hookSearch('projSearch', renderProjects);
+    document.getElementById('projBadge').textContent = _projs.length;
+    document.getElementById('projCount').textContent = `${_projs.length} projects`;
+  } catch (err) {
+    document.getElementById('projBody').innerHTML = emptyState('⚠️', 'Could not load projects: ' + err.message);
+    toast('Projects: ' + err.message, 'err');
+  } finally {
+    setRefreshing('projRefresh', false);
+  }
+}
+
+function renderProjects(query) {
+  const tbody = document.getElementById('projBody');
+  const rows = (_projs || []).map(p => {
+    return `<tr>
+      <td><strong>${p.name || '–'}</strong></td>
+      <td class="mono">${p.id}</td>
+      <td>${p.enabled ? '<span class="badge badge-active">True</span>' : '<span class="badge badge-default">False</span>'}</td>
+      <td class="mono text-dim">${p.domain_id || '–'}</td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🏢', 'No projects found');
+}
+
+document.getElementById('projRefresh').addEventListener('click', loadProjects);
+
+// ── USERS ─────────────────────────────────────────────────────────────────
+
+async function loadUsers() {
+  setRefreshing('userRefresh', true);
+  document.getElementById('userBody').innerHTML = skeletonRows(4);
+  try {
+    const data = await apiGet('/api/vhi/users');
+    _users = data.users || [];
+    renderUsers('');
+    hookSearch('userSearch', renderUsers);
+    document.getElementById('userBadge').textContent = _users.length;
+    document.getElementById('userCount').textContent = `${_users.length} users`;
+  } catch (err) {
+    document.getElementById('userBody').innerHTML = emptyState('⚠️', 'Could not load users: ' + err.message);
+    toast('Users: ' + err.message, 'err');
+  } finally {
+    setRefreshing('userRefresh', false);
+  }
+}
+
+function renderUsers(query) {
+  const tbody = document.getElementById('userBody');
+  const rows = (_users || []).map(u => {
+    return `<tr>
+      <td><strong>${u.name || '–'}</strong></td>
+      <td>${u.enabled ? '<span class="badge badge-active">True</span>' : '<span class="badge badge-default">False</span>'}</td>
+      <td class="mono">${u.id}</td>
+      <td class="mono text-dim">${u.domain_id || '–'}</td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('👥', 'No users found');
+}
+
+document.getElementById('userRefresh').addEventListener('click', loadUsers);
+
+// ── OVERVIEW TIMESTAMP ────────────────────────────────────────────────────
+function updateOverviewTs() {
+  const el = document.getElementById('overviewTs');
+  if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ── SETTINGS MODAL ────────────────────────────────────────────────────────
+
+const settingsModal = document.getElementById('settingsModal');
+const llmProviderInput = document.getElementById('llmProvider');
+const llmApiKeyInput = document.getElementById('llmApiKey');
+const llmBaseUrlInput = document.getElementById('llmBaseUrl');
+const vhiSshHostInput = document.getElementById('vhiSshHost');
+const vhiSshUserInput = document.getElementById('vhiSshUser');
+const vhiSshPasswordInput = document.getElementById('vhiSshPassword');
+
+function openSettingsModal() {
+  llmProviderInput.value = localStorage.getItem('llmProvider') || 'anthropic';
+  llmApiKeyInput.value = localStorage.getItem('llmApiKey') || '';
+  llmBaseUrlInput.value = localStorage.getItem('llmBaseUrl') || '';
+  vhiSshHostInput.value = localStorage.getItem('vhiSshHost') || '';
+  vhiSshUserInput.value = localStorage.getItem('vhiSshUser') || 'root';
+  vhiSshPasswordInput.value = localStorage.getItem('vhiSshPassword') || '';
+  settingsModal.classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+  settingsModal.classList.add('hidden');
+}
+
+function updateConnectionStatus() {
+  const hasKey = !!localStorage.getItem('llmApiKey');
+  const hasProvider = !!localStorage.getItem('llmProvider');
+  const isConnected = hasKey && hasProvider;
+  
+  const settingsBtn = document.getElementById('settingsToggle');
+  const chatBtn = document.getElementById('chatToggle');
+  
+  if (settingsBtn && chatBtn) {
+    if (isConnected) {
+      settingsBtn.classList.add('connected');
+      chatBtn.classList.add('connected');
+    } else {
+      settingsBtn.classList.remove('connected');
+      chatBtn.classList.remove('connected');
+    }
+  }
+}
+
+// Initial connection check
+updateConnectionStatus();
+
+document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+  localStorage.setItem('llmProvider', llmProviderInput.value);
+  localStorage.setItem('llmApiKey', llmApiKeyInput.value);
+  localStorage.setItem('llmBaseUrl', llmBaseUrlInput.value);
+  localStorage.setItem('vhiSshHost', vhiSshHostInput.value.trim());
+  localStorage.setItem('vhiSshUser', vhiSshUserInput.value.trim());
+  localStorage.setItem('vhiSshPassword', vhiSshPasswordInput.value);
+  toast('Settings saved locally', 'ok');
+  updateConnectionStatus();
+  closeSettingsModal();
+});
+
+document.getElementById('settingsToggle').addEventListener('click', openSettingsModal);
+document.getElementById('closeSettingsModal').addEventListener('click', closeSettingsModal);
+document.getElementById('cancelSettingsBtn').addEventListener('click', closeSettingsModal);
+
+// ── AI CHAT DRAWER ────────────────────────────────────────────────────────
+
+const chatDrawer  = document.getElementById('chatDrawer');
+const chatToggle  = document.getElementById('chatToggle');
+const chatClose   = document.getElementById('chatClose');
+const chatMsgs    = document.getElementById('chatMessages');
+const chatInput   = document.getElementById('chatInput');
+const chatSendBtn = document.getElementById('chatSend');
+
+let chatOpen = false;
+let chatHistory = []; // [{role,content}]
+
+function setChatOpen(open) {
+  chatOpen = open;
+  chatDrawer.classList.toggle('open', open);
+  chatToggle.classList.toggle('open', open);
+  chatToggle.title = open ? 'Close AI Chat' : 'Open AI Chat';
+  if (open) {
+    setTimeout(() => chatInput.focus(), 280);
+  }
+}
+
+chatToggle.addEventListener('click', () => setChatOpen(!chatOpen));
+chatClose.addEventListener('click',  () => setChatOpen(false));
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && chatOpen) setChatOpen(false);
+});
+
+// auto-grow textarea
+chatInput.addEventListener('input', () => {
+  chatInput.style.height = '42px';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 130) + 'px';
+});
+
+chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
+});
+chatSendBtn.addEventListener('click', sendChat);
+
+function appendMsg(role, text, cls = '') {
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'msg-user' : 'msg-ai') + (cls ? ' ' + cls : '');
+  div.textContent = text;
+  chatMsgs.appendChild(div);
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  return div;
+}
+
+function buildSystemContext() {
+  const vmSummary = _vms.length
+    ? `${_vms.length} VMs (${_vms.filter(v => v.status === 'ACTIVE').length} running)`
+    : 'no VMs loaded';
+  const nodeSummary = _nodes.length ? `${_nodes.length} compute nodes` : 'no nodes loaded';
+  const cluster = session?.baseUrl || 'unknown';
+  return `You are an AI assistant for Virtuozzo Hybrid Infrastructure (VHI/OpenStack).
+Current cluster: ${cluster}
+VMs: ${vmSummary}
+Nodes: ${nodeSummary}
+Volumes: ${_vols.length || 0} | Networks: ${_nets.length || 0} | Images: ${_imgs.length || 0}
+Answer concisely. Use markdown sparingly. If asked to perform an action, explain what you'd do.`;
+}
+
+async function sendChat() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+
+  chatInput.value = '';
+  chatInput.style.height = '42px';
+  chatSendBtn.disabled = true;
+
+  appendMsg('user', text);
+  chatHistory.push({ role: 'user', content: text });
+
+  const thinkingEl = appendMsg('assistant', 'Thinking…', 'thinking');
+
+  try {
+    const payload = {
+      message: text,
+      conversationId: 'web-session',
+      llmProvider: localStorage.getItem('llmProvider') || undefined,
+      apiKey: localStorage.getItem('llmApiKey') || undefined,
+      llmBaseUrl: localStorage.getItem('llmBaseUrl') || undefined,
+      vhiBaseUrl: typeof session !== 'undefined' ? session?.baseUrl : undefined,
+      vhiUser: typeof session !== 'undefined' ? session?.username : undefined,
+      vhiPassword: typeof session !== 'undefined' ? session?.password : undefined,
+      vhiProject: typeof session !== 'undefined' ? session?.project : undefined,
+    };
+
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await r.json().catch(() => ({}));
+
+    if (!r.ok) {
+      document.getElementById('settingsToggle')?.classList.remove('connected');
+      document.getElementById('chatToggle')?.classList.remove('connected');
+      throw new Error(data.error || `HTTP ${r.status}`);
+    }
+
+    const reply = data.reply || 'No response from AI agent.';
+    thinkingEl.classList.remove('thinking');
+    thinkingEl.textContent = reply;
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+
+    chatHistory.push({ role: 'assistant', content: reply });
+
+  } catch (err) {
+    thinkingEl.classList.remove('thinking');
+    thinkingEl.textContent = '⚠ ' + (err.message || 'Request failed');
+  } finally {
+    chatSendBtn.disabled = false;
+    chatInput.focus();
+  }
+}
+
+</script>
+</body>
+</html>

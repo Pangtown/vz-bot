@@ -7,6 +7,7 @@ import * as storage from './storage.js';
 import * as network from './network.js';
 import * as image from './image.js';
 import * as health from './health.js';
+import * as vinfra from './vinfra.js';
 
 const TOOLS = {
   // VM
@@ -41,6 +42,9 @@ const TOOLS = {
 
   // Health
   run_health_check: health.runHealthCheck,
+
+  // Vinfra CLI
+  execute_vinfra_cli: vinfra.vinfraCli.execute,
 };
 
 const ALLOWED_WITHOUT_CONFIRM = new Set([

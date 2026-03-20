@@ -309,6 +309,7 @@
         <option value="anthropic">Claude (Anthropic)</option>
         <option value="gemini">Gemini (Google)</option>
         <option value="openai">OpenAI / Local</option>
+        <option value="perplexity">Perplexity</option>
       </select>
       <input type="text" id="llmBaseUrl" class="llm-api-key" placeholder="Base URL (e.g. http://localhost:11434/v1)"
         autocomplete="off" style="display: none;" />
@@ -340,17 +341,45 @@
   </div>
 
   <div id="settingsOverlay" class="login-overlay hidden">
-    <div class="login-box">
-      <h2>VHI Settings</h2>
-      <p>Configure your Virtualization Infrastructure credentials, overriding the <code>.env</code> file.</p>
-      <input type="text" id="vhiBaseUrlInput" placeholder="Base URL (e.g. https://172.16...)" />
-      <input type="text" id="vhiUserInput" placeholder="Username" />
-      <input type="password" id="vhiPasswordInput" placeholder="Password" />
-      <input type="text" id="vhiProjectInput" placeholder="Project name (e.g. admin)" />
-      <p style="font-size: 0.8rem; color: #fca5a5; margin-top: 5px; margin-bottom: 10px;">Note: Project Name should
-        usually match your username (e.g. admin). "Default" is often incorrect.</p>
-      <button id="saveSettingsBtn">Save Settings</button>
-      <button id="clearSettingsBtn" style="background: #374151; margin-top: 0.5rem;">Clear Overrides</button>
+    <div class="login-box" style="width:380px; text-align: left;">
+      <h2 style="margin-top:0; text-align: center;">VHI API Settings</h2>
+      <p style="font-size:13px; color:#9ca3af; margin-bottom:15px; text-align: center;">Override the <code>.env</code>
+        file credentials for this session.</p>
+
+      <div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">API Base URL</label>
+        <input type="text" id="vhiBaseUrlInput" class="llm-api-key" placeholder="https://..." autocomplete="off" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">API Username</label>
+        <input type="text" id="vhiUserInput" class="llm-api-key" placeholder="e.g. admin" autocomplete="off" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">API Password</label>
+        <input type="password" id="vhiPasswordInput" class="llm-api-key" placeholder="••••••••" autocomplete="off" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">API Project Name</label>
+        <input type="text" id="vhiProjectInput" class="llm-api-key" placeholder="Project name (e.g. admin)"
+          autocomplete="off" />
+        <p style="font-size: 0.8rem; color: #fca5a5; margin-top: -5px; margin-bottom: 15px;">Note: Should match your
+          username (e.g. admin). "Default" is often incorrect.</p>
+
+        <hr style="border: 0; border-top: 1px solid #3d424d; margin: 15px 0;" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">Node SSH Host (for vinfra)</label>
+        <input type="text" id="vhiSshHostInput" class="llm-api-key" placeholder="e.g. 172.16.218.7"
+          autocomplete="off" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">Node SSH User</label>
+        <input type="text" id="vhiSshUserInput" class="llm-api-key" placeholder="e.g. root" autocomplete="off" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">Node SSH Password</label>
+        <input type="password" id="vhiSshPasswordInput" class="llm-api-key" placeholder="••••••••" autocomplete="off" />
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:20px;">
+        <button type="button" id="saveSettingsBtn" class="llm-test-btn" style="flex:1;">Save locally</button>
+        <button type="button" id="clearSettingsBtn" class="llm-test-btn"
+          style="background:#ef4444; flex:1;">Clear</button>
+      </div>
     </div>
   </div>
 
@@ -406,6 +435,9 @@
       document.getElementById('vhiUserInput').value = localStorage.getItem('vhiUser') || '';
       document.getElementById('vhiPasswordInput').value = localStorage.getItem('vhiPassword') || '';
       document.getElementById('vhiProjectInput').value = localStorage.getItem('vhiProject') || '';
+      document.getElementById('vhiSshHostInput').value = localStorage.getItem('vhiSshHost') || '';
+      document.getElementById('vhiSshUserInput').value = localStorage.getItem('vhiSshUser') || '';
+      document.getElementById('vhiSshPasswordInput').value = localStorage.getItem('vhiSshPassword') || '';
 
       const savedBaseUrl = localStorage.getItem('llmBaseUrl');
       if (savedBaseUrl) llmBaseUrl.value = savedBaseUrl;
@@ -416,10 +448,18 @@
       const user = document.getElementById('vhiUserInput').value.trim();
       const pass = document.getElementById('vhiPasswordInput').value.trim();
       const proj = document.getElementById('vhiProjectInput').value.trim();
+      const sshHost = document.getElementById('vhiSshHostInput').value.trim();
+      const sshUser = document.getElementById('vhiSshUserInput').value.trim();
+      const sshPass = document.getElementById('vhiSshPasswordInput').value.trim();
+
       if (url) localStorage.setItem('vhiBaseUrl', url); else localStorage.removeItem('vhiBaseUrl');
       if (user) localStorage.setItem('vhiUser', user); else localStorage.removeItem('vhiUser');
       if (pass) localStorage.setItem('vhiPassword', pass); else localStorage.removeItem('vhiPassword');
       if (proj) localStorage.setItem('vhiProject', proj); else localStorage.removeItem('vhiProject');
+      if (sshHost) localStorage.setItem('vhiSshHost', sshHost); else localStorage.removeItem('vhiSshHost');
+      if (sshUser) localStorage.setItem('vhiSshUser', sshUser); else localStorage.removeItem('vhiSshUser');
+      if (sshPass) localStorage.setItem('vhiSshPassword', sshPass); else localStorage.removeItem('vhiSshPassword');
+
       document.getElementById('settingsOverlay').classList.add('hidden');
     });
 
@@ -428,6 +468,9 @@
       localStorage.removeItem('vhiUser');
       localStorage.removeItem('vhiPassword');
       localStorage.removeItem('vhiProject');
+      localStorage.removeItem('vhiSshHost');
+      localStorage.removeItem('vhiSshUser');
+      localStorage.removeItem('vhiSshPassword');
       loadSettings();
       document.getElementById('settingsOverlay').classList.add('hidden');
     });
@@ -525,6 +568,10 @@
         const vhiUser = localStorage.getItem('vhiUser');
         const vhiProject = localStorage.getItem('vhiProject');
         const vhiPassword = localStorage.getItem('vhiPassword');
+        const vhiSshHost = localStorage.getItem('vhiSshHost');
+        const vhiSshUser = localStorage.getItem('vhiSshUser');
+        const vhiSshPassword = localStorage.getItem('vhiSshPassword');
+
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -538,6 +585,9 @@
             vhiUser,
             vhiProject,
             vhiPassword,
+            vhiSshHost,
+            vhiSshUser,
+            vhiSshPassword,
             webPassword
           })
         });

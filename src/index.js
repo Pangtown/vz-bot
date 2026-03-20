@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
 import * as scheduler from './gateway/scheduler.js';
 import { runWithContext } from './gateway/context.js';
+import { handleVhiApi } from './gateway/vhi-api.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 18789;
@@ -24,6 +25,20 @@ async function getChatPage() {
   return chatPageHtml;
 }
 
+let vhiPageHtml = null;
+async function getVhiPage() {
+  if (vhiPageHtml) return vhiPageHtml;
+  vhiPageHtml = await readFile(join(__dirname, '..', 'public', 'vhi.html'), 'utf8');
+  return vhiPageHtml;
+}
+
+let clustersPageHtml = null;
+async function getClustersPage() {
+  if (clustersPageHtml) return clustersPageHtml;
+  clustersPageHtml = await readFile(join(__dirname, '..', 'public', 'clusters.html'), 'utf8');
+  return clustersPageHtml;
+}
+
 const app = async (req, res) => {
   const url = req.url || '/';
   const method = req.method || 'GET';
@@ -32,6 +47,11 @@ const app = async (req, res) => {
   }
   if (method === 'POST' && (url === '/api/llm/test' || url === '/api/llm/test/')) {
     return handleLlmTest(req, res);
+  }
+  // VHI dashboard API — handles all /api/vhi/* routes
+  if (url.startsWith('/api/vhi')) {
+    const handled = await handleVhiApi(req, res);
+    if (handled) return;
   }
   if (method === 'GET' && (url === '/api/health' || url === '/api/health/')) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -48,7 +68,18 @@ const app = async (req, res) => {
     }));
     return;
   }
-  if (method === 'GET' && (url === '/' || url === '/chat' || url === '/index.html')) {
+  if (method === 'GET' && (url === '/' || url === '/vhi' || url === '/vhi/' || url === '/vhi.html' || url === '/index.html')) {
+    try {
+      const html = await getVhiPage();
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error loading VHI dashboard page.');
+    }
+    return;
+  }
+  if (method === 'GET' && (url === '/chat' || url === '/chat/')) {
     try {
       const html = await getChatPage();
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -56,6 +87,17 @@ const app = async (req, res) => {
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Error loading chat page.');
+    }
+    return;
+  }
+  if (method === 'GET' && (url === '/clusters' || url === '/clusters/' || url === '/clusters.html')) {
+    try {
+      const html = await getClustersPage();
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error loading clusters page.');
     }
     return;
   }
@@ -125,6 +167,9 @@ async function handlePostChat(req, res) {
   const vhiUser = payload?.vhiUser || null;
   const vhiPassword = payload?.vhiPassword || null;
   const vhiProject = payload?.vhiProject || null;
+  const vhiSshHost = payload?.vhiSshHost || null;
+  const vhiSshUser = payload?.vhiSshUser || null;
+  const vhiSshPassword = payload?.vhiSshPassword || null;
 
   if (!message || typeof message !== 'string') {
     res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -135,7 +180,7 @@ async function handlePostChat(req, res) {
     const { createRouter } = await import('./gateway/router.js');
     const router = createRouter(() => { });
     const reply = await runWithContext({
-      vhiBaseUrl, vhiUser, vhiPassword, vhiProject
+      vhiBaseUrl, vhiUser, vhiPassword, vhiProject, vhiSshHost, vhiSshUser, vhiSshPassword
     }, () => router.handleIncoming(conversationId, message, { llmProvider, apiKey, baseUrl: llmBaseUrl }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ reply, conversationId }));
@@ -145,7 +190,47 @@ async function handlePostChat(req, res) {
   }
 }
 
-createServer((req, res) => app(req, res).catch(() => { })).listen(PORT, () => {
+const server = createServer((req, res) => app(req, res).catch(() => { }));
+
+// ── WebSocket SSH Bridge ───────────────────────────────────────────────────
+import { WebSocketServer } from 'ws';
+import { openSshShell } from './vhi/vinfra.js';
+
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws) => {
+  let shell = null;
+  
+  ws.on('message', (msg) => {
+    try {
+      const data = JSON.parse(msg);
+      
+      // Initialize shell on 'init' message
+      if (data.type === 'init') {
+        const { creds } = data;
+        shell = openSshShell(creds, 
+          (out) => ws.send(JSON.stringify({ type: 'data', data: out.toString() })),
+          (err) => {
+            ws.send(JSON.stringify({ type: 'error', message: err ? err.message : 'Session closed' }));
+            ws.close();
+          }
+        );
+      } else if (data.type === 'data') {
+        if (shell) shell.write(data.data);
+      } else if (data.type === 'resize') {
+        if (shell) shell.resize(data.cols, data.rows);
+      }
+    } catch (e) {
+      console.error('WS Error:', e);
+    }
+  });
+
+  ws.on('close', () => {
+    if (shell) shell.close();
+  });
+});
+
+server.listen(PORT, () => {
   const url = 'http://localhost:' + PORT;
   console.log('VZ Bot listening on ' + url);
   console.log('Open this URL in your browser for the chat page (text box to type messages):');

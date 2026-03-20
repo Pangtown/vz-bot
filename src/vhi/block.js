@@ -10,15 +10,20 @@ const getBaseUrl = () => {
   return base.replace(/\/$/, '');
 };
 
-function blockUrl(path = '') {
+async function blockUrl(path = '') {
   const base = getBaseUrl();
   const port = process.env.VHI_BLOCK_PORT || 8776;
+  const client = await getClient();
+  const projectId = client.projectId;
+  if (projectId) {
+    return `${base}:${port}/v3/${projectId}/volumes${path}`;
+  }
   return `${base}:${port}/v3/volumes${path}`;
 }
 
 export async function listVolumes() {
   const client = await getClient();
-  const res = await client.fetch(blockUrl('/detail'));
+  const res = await client.fetch(await blockUrl('/detail'));
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`VHI Block listVolumes failed (${res.status}): ${text.slice(0, 300)}`);
@@ -27,9 +32,20 @@ export async function listVolumes() {
   return data.volumes || [];
 }
 
+export async function listVolumeTypes() {
+  const client = await getClient();
+  const res = await client.fetch(await blockUrl('/types'));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Block listVolumeTypes failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.volume_types || [];
+}
+
 export async function getVolume(volumeId) {
   const client = await getClient();
-  const res = await client.fetch(blockUrl(`/${volumeId}`));
+  const res = await client.fetch(await blockUrl(`/${volumeId}`));
   if (!res.ok) {
     if (res.status === 404) return null;
     const text = await res.text();
@@ -41,7 +57,7 @@ export async function getVolume(volumeId) {
 
 export async function createVolume(options = {}) {
   const client = await getClient();
-  const res = await client.fetch(blockUrl(''), {
+  const res = await client.fetch(await blockUrl(''), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ volume: options }),
@@ -54,9 +70,38 @@ export async function createVolume(options = {}) {
   return data.volume || null;
 }
 
+export async function extendVolume(volumeId, newSize) {
+  const client = await getClient();
+  const res = await client.fetch(await blockUrl(`/${volumeId}/action`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 'os-extend': { new_size: newSize } }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Block extendVolume failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
+export async function updateVolume(volumeId, options = {}) {
+  const client = await getClient();
+  const res = await client.fetch(await blockUrl(`/${volumeId}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ volume: options }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Block updateVolume failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.volume || null;
+}
+
 export async function deleteVolume(volumeId) {
   const client = await getClient();
-  const res = await client.fetch(blockUrl(`/${volumeId}`), { method: 'DELETE' });
+  const res = await client.fetch(await blockUrl(`/${volumeId}`), { method: 'DELETE' });
   if (!res.ok && res.status !== 404) {
     const text = await res.text();
     throw new Error(`VHI Block deleteVolume failed (${res.status}): ${text.slice(0, 300)}`);
@@ -64,9 +109,14 @@ export async function deleteVolume(volumeId) {
   return true;
 }
 
-function computeUrl(path = '') {
+async function computeUrl(path = '') {
   const base = getBaseUrl();
   const port = process.env.VHI_COMPUTE_PORT || 8774;
+  const client = await getClient();
+  const projectId = client.projectId;
+  if (projectId) {
+    return `${base}:${port}/v2.1/${projectId}${path}`;
+  }
   return `${base}:${port}/v2.1${path}`;
 }
 
@@ -75,7 +125,7 @@ export async function attachVolume(serverId, volumeId, device) {
   const body = { volumeAttachment: { volumeId } };
   if (device) body.volumeAttachment.device = device;
 
-  const res = await client.fetch(computeUrl(`/servers/${serverId}/os-volume_attachments`), {
+  const res = await client.fetch(await computeUrl(`/servers/${serverId}/os-volume_attachments`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -90,7 +140,7 @@ export async function attachVolume(serverId, volumeId, device) {
 
 export async function detachVolume(serverId, attachmentId) {
   const client = await getClient();
-  const res = await client.fetch(computeUrl(`/servers/${serverId}/os-volume_attachments/${attachmentId}`), {
+  const res = await client.fetch(await computeUrl(`/servers/${serverId}/os-volume_attachments/${attachmentId}`), {
     method: 'DELETE'
   });
   if (!res.ok && res.status !== 404) {

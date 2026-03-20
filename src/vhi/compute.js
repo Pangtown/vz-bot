@@ -10,9 +10,15 @@ const getBaseUrl = () => {
   return base.replace(/\/$/, '');
 };
 
-function computeUrl(path = '') {
+async function computeUrl(path = '') {
   const base = getBaseUrl();
   const port = process.env.VHI_COMPUTE_PORT || 8774;
+  const client = await getClient();
+  const projectId = client.projectId;
+  
+  if (projectId) {
+    return `${base}:${port}/v2.1/${projectId}${path}`;
+  }
   return `${base}:${port}/v2.1${path}`;
 }
 
@@ -23,10 +29,15 @@ export async function listServers(options = {}) {
   const params = new URLSearchParams();
   if (status) params.set('status', status);
   if (limit) params.set('limit', String(limit));
-  const qs = params.toString();
-  if (qs) path += `?${qs}`;
+  
+  // As an admin, we want to see all VMs across all projects/domains.
+  // We include both all_projects (modern) and all_tenants (legacy) for maximum compatibility.
+  params.set('all_projects', 'true');
+  params.set('all_tenants', 'true');
 
-  const res = await client.fetch(computeUrl(path));
+  const url = await computeUrl(path);
+  const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
+  const res = await client.fetch(fullUrl);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`VHI Compute listServers failed (${res.status}): ${text.slice(0, 300)}`);
@@ -37,7 +48,7 @@ export async function listServers(options = {}) {
 
 export async function getServer(serverId) {
   const client = await getClient();
-  const res = await client.fetch(computeUrl(`/servers/${serverId}`));
+  const res = await client.fetch(await computeUrl(`/servers/${serverId}`));
   if (!res.ok) {
     if (res.status === 404) return null;
     const text = await res.text();
@@ -49,7 +60,7 @@ export async function getServer(serverId) {
 
 export async function serverAction(serverId, action, body = {}) {
   const client = await getClient();
-  const res = await client.fetch(computeUrl(`/servers/${serverId}/action`), {
+  const res = await client.fetch(await computeUrl(`/servers/${serverId}/action`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ [action]: body }),
@@ -75,7 +86,7 @@ export async function rebootServer(serverId, type = 'SOFT') {
 
 export async function deleteServer(serverId) {
   const client = await getClient();
-  const res = await client.fetch(computeUrl(`/servers/${serverId}`), { method: 'DELETE' });
+  const res = await client.fetch(await computeUrl(`/servers/${serverId}`), { method: 'DELETE' });
   if (!res.ok && res.status !== 404) {
     const text = await res.text();
     throw new Error(`VHI Compute deleteServer failed (${res.status}): ${text.slice(0, 300)}`);
@@ -85,9 +96,12 @@ export async function deleteServer(serverId) {
 
 export async function createServer(options = {}) {
   const client = await getClient();
-  const res = await client.fetch(computeUrl('/servers'), {
+  const res = await client.fetch(await computeUrl('/servers'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Openstack-Api-Version': 'compute 2.67' // Required for volume_type in block_device_mapping_v2
+    },
     body: JSON.stringify({ server: options }),
   });
   if (!res.ok) {
@@ -96,4 +110,106 @@ export async function createServer(options = {}) {
   }
   const data = await res.json();
   return data.server || null;
+}
+
+export async function getVncConsole(serverId) {
+  const client = await getClient();
+  const url = await computeUrl(`/servers/${serverId}/remote-consoles`);
+  console.log(`[DEBUG] Attempting VNC Console for ${serverId} at ${url}`);
+
+  const payload = {
+    remote_console: {
+      protocol: 'vnc',
+      type: 'novnc'
+    }
+  };
+
+  const res = await client.fetch(url, {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'OpenStack-API-Version': 'compute 2.87'
+    },
+    body: JSON.stringify(payload)
+  });
+  
+  if (res.ok) {
+    const data = await res.json();
+    let consoleUrl = data.remote_console?.url || null;
+    
+    // If the base URL uses a domain name (not an IP), ensure the console URL uses it too.
+    // This avoids certificate common name mismatch errors (e.g., NET::ERR_CERT_COMMON_NAME_INVALID).
+    if (consoleUrl) {
+      try {
+        const base = getBaseUrl();
+        const baseUri = new URL(base);
+        const baseHostname = baseUri.hostname;
+        
+        // Regex to check if hostname is NOT an IP address
+        const isIp = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(baseHostname);
+        
+        if (!isIp) {
+          console.log(`[DEBUG] Overriding VNC IP with hostname: ${baseHostname}`);
+          // Replace the IP segment of the URL (e.g., https://208.98.41.133:6080/...) with hostname
+          consoleUrl = consoleUrl.replace(/https?:\/\/[^:/]+(:[0-9]+)/, `${baseUri.protocol}//${baseHostname}$1`);
+        }
+      } catch (err) {
+        console.error('[DEBUG] Failed to override VNC URL hostname:', err.message);
+      }
+    }
+    
+    return consoleUrl;
+  }
+  
+  const textErr = await res.text();
+  throw new Error(`VNC Console negotiation failed (${res.status}): ${textErr.slice(0, 200)}`);
+}
+
+export async function listFlavors() {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl('/flavors/detail'));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute listFlavors failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.flavors || [];
+}
+
+export async function listInterfaces(serverId) {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl(`/servers/${serverId}/os-interface`));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute listInterfaces failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.interfaceAttachments || [];
+}
+
+export async function attachInterface(serverId, networkId) {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl(`/servers/${serverId}/os-interface`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ interfaceAttachment: { net_id: networkId } }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute attachInterface failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.interfaceAttachment || null;
+}
+
+export async function detachInterface(serverId, portId) {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl(`/servers/${serverId}/os-interface/${portId}`), {
+    method: 'DELETE',
+  });
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text();
+    throw new Error(`VHI Compute detachInterface failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
 }

@@ -28,17 +28,19 @@ export async function getClient() {
   if (cached && !isExpiringSoon(cached.expiresAt)) {
     return {
       token: cached.token,
+      projectId: cached.projectId,
       async fetch(url, opts = {}) {
         const headers = { ...opts.headers, 'X-Auth-Token': cached.token };
         return fetch(url, { ...opts, headers });
       },
     };
   }
-  const { token, expiresAt } = await getToken();
-  cached = { token, expiresAt };
+  const { token, expiresAt, projectId } = await getToken();
+  cached = { token, expiresAt, projectId };
   cache.set(key, cached);
   return {
     token,
+    projectId,
     async fetch(url, opts = {}) {
       const headers = { ...opts.headers, 'X-Auth-Token': token };
       return fetch(url, { ...opts, headers });

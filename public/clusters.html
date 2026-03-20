@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VI Manager – Multi-Cluster Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── BASE & TOKENS ─────────────────────────────────────── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg-base: #0a0b10;
+      --bg-glass: rgba(18, 20, 30, 0.6);
+      --bg-card: rgba(22, 25, 36, 0.8);
+      --border: rgba(255, 255, 255, 0.08);
+      --accent: #e3000f;
+      --accent-glow: rgba(227, 0, 15, 0.3);
+      --accent-blue: #3b82f6;
+      --text: #f1f5f9;
+      --text-dim: #94a3b8;
+      --text-muted: #64748b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      --radius: 16px;
+      --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --font: 'Outfit', system-ui, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg-base);
+      background-image: 
+        radial-gradient(circle at 15% 50%, rgba(227, 0, 15, 0.08), transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.08), transparent 25%);
+      background-attachment: fixed;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* ── SCROLLBAR ──────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    /* ── HEADER ─────────────────────────────────────────────── */
+    .header {
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      background: rgba(10, 11, 16, 0.8);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    
+    .logo {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .logo span { color: var(--accent); }
+    .logo svg { width: 24px; height: 24px; color: var(--accent); }
+    
+    .spacer { flex: 1; }
+    
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+    
+    .btn {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: var(--transition);
+      border: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+    .btn-outline {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .btn-primary:hover {
+      background: #f50e1d;
+      box-shadow: 0 0 30px rgba(227, 0, 15, 0.5);
+      transform: translateY(-1px);
+    }
+
+    /* ── MAIN LAYOUT ────────────────────────────────────────── */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      flex: 1;
+    }
+    
+    .page-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .page-sub {
+      color: var(--text-dim);
+      font-size: 1.1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    /* ── CLUSTER GRID ───────────────────────────────────────── */
+    .cluster-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 1.5rem;
+    }
+
+    /* ── CLUSTER CARD (GLASSMORPHISM) ───────────────────────── */
+    .cluster-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition);
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow);
+    }
+    
+    .cluster-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-blue));
+      opacity: 0.5;
+      transition: opacity var(--transition);
+    }
+    
+    .cluster-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45);
+    }
+    .cluster-card:hover::before { opacity: 1; }
+
+    .c-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 2rem;
+    }
+    
+    .c-info {
+      display: flex;
+      flex-direction: column;
+    }
+    .c-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .c-host {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 0.2rem;
+      font-family: monospace;
+    }
+
+    .status-badge {
+      padding: 0.3rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    
+    .pulse-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+    }
+    
+    .status-online {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+    .status-online .pulse-dot { background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulse 2s infinite; }
+    
+    .status-offline {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+    }
+    .status-offline .pulse-dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+    
+    .status-loading {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      color: var(--warning);
+    }
+    .status-loading .pulse-dot { background: var(--warning); animation: pulse 1s infinite alternate; }
+
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    
+    .metric {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      padding: 1rem;
+      border: 1px solid rgba(255,255,255,0.03);
+      text-align: center;
+    }
+    .m-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.4rem;
+    }
+    .m-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    
+    .c-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: auto;
+    }
+    .c-actions .btn {
+      flex: 1;
+      justify-content: center;
+      padding: 0.7rem;
+    }
+    
+    .delete-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 42px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: 0.2s;
+    }
+    .delete-btn:hover {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger);
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    /* ── ADD CARD ───────────────────────────────────────────── */
+    .add-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 2px dashed rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      cursor: pointer;
+      transition: var(--transition);
+      min-height: 280px;
+      text-align: center;
+    }
+    .add-card:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .add-icon {
+      font-size: 2.5rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      transition: color var(--transition), transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .add-card:hover .add-icon {
+      color: var(--accent);
+      transform: scale(1.1) rotate(90deg);
+    }
+    .add-text {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: var(--text-dim);
+    }
+
+    /* ── MODALS (GLASS) ─────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: auto; }
+    
+    .modal-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      width: 460px; max-width: 95vw;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      transform: translateY(20px) scale(0.95);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      display: flex; flex-direction: column;
+    }
+    .modal-overlay.open .modal-card { transform: translateY(0) scale(1); }
+    
+    .modal-header {
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-header h3 { font-size: 1.3rem; font-weight: 600; }
+    .modal-close {
+      background: none; border: none; color: var(--text-dim);
+      font-size: 1.4rem; cursor: pointer; transition: 0.2s;
+    }
+    .modal-close:hover { color: var(--text); }
+    
+    .modal-body {
+      padding: 2rem;
+      overflow-y: auto;
+      max-height: 70vh;
+    }
+    
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+    .form-group label {
+      display: block; font-size: 0.8rem; font-weight: 500;
+      color: var(--text-dim); margin-bottom: 0.5rem;
+    }
+    .form-control {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.95rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    .form-control:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(227, 0, 15, 0.2);
+    }
+    .form-control::placeholder { color: rgba(255,255,255,0.2); }
+    
+    .modal-footer {
+      padding: 1.5rem 2rem;
+      border-top: 1px solid var(--border);
+      display: flex; gap: 1rem; justify-content: flex-end;
+      background: rgba(0,0,0,0.2);
+    }
+
+    /* ── TOAST ──────────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 2rem; right: 2rem;
+      background: rgba(22, 25, 36, 0.95);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      border-radius: 12px; padding: 1rem 1.5rem;
+      font-size: 0.95rem; font-weight: 500;
+      box-shadow: var(--shadow); z-index: 10000;
+      opacity: 0; transform: translateY(16px);
+      transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      display: flex; align-items: center; gap: 0.75rem;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    #toast.toast-ok { border-left: 4px solid var(--success); }
+    #toast.toast-err { border-left: 4px solid var(--danger); }
+    #toast.toast-inf { border-left: 4px solid var(--accent-blue); }
+
+    /* Utilities */
+    .skeleton-text {
+      height: 24px; width: 60px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+      background-size: 200% 100%;
+      animation: skeletonLoading 1.5s infinite;
+      border-radius: 4px;
+      display: inline-block;
+      margin: 0 auto;
+    }
+    @keyframes skeletonLoading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+      </svg>
+      VI Manager <span>Clusters</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="nav-links">
+      <a href="/vhi" class="btn btn-outline" title="Single Cluster View">Single Dashboard</a>
+      <a href="/chat" class="btn btn-outline" title="Launch Bot">AI Chat</a>
+    </div>
+  </header>
+
+  <!-- CONTENT -->
+  <main class="container">
+    <h1 class="page-title">Infrastructure Overview</h1>
+    <p class="page-sub">Manage and monitor multiple Virtuozzo Hybrid Infrastructure clusters globally.</p>
+    
+    <div class="cluster-grid" id="clusterGrid">
+      <!-- Clusters injected here via JS -->
+      
+      <div class="add-card" onclick="openAddModal()">
+        <span class="add-icon">+</span>
+        <span class="add-text">Add Cluster</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- ADD CLUSTER MODAL -->
+  <div class="modal-overlay" id="addClusterModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Connect New Cluster</h3>
+        <button class="modal-close" onclick="closeAddModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Cluster Address (IP / Hostname)</label>
+          <input type="text" id="addHost" class="form-control" placeholder="e.g. 192.168.1.10">
+        </div>
+        <div class="form-group">
+          <label>Project Name</label>
+          <input type="text" id="addProject" class="form-control" placeholder="e.g. admin" value="admin">
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="addUser" class="form-control" placeholder="e.g. admin">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="addPass" class="form-control" placeholder="••••••••">
+        </div>
+        <div style="display: flex; gap: 1rem;">
+          <div class="form-group" style="flex:1;">
+            <label>User Domain</label>
+            <input type="text" id="addUDomain" class="form-control" value="Default">
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>Project Domain</label>
+            <input type="text" id="addPDomain" class="form-control" value="Default">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAddModal()" style="flex:1;">Cancel</button>
+        <button class="btn btn-primary" id="saveClusterBtn" onclick="addCluster()" style="flex:1; justify-content:center;">Connect Cluster</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast"></div>
+
+  <!-- SCRIPTS -->
+  <script>
+    // App State
+    const STORAGE_KEY = 'vhi_multi_clusters';
+    let clusters = [];
+
+    // Load from LocalStorage
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) clusters = JSON.parse(stored);
+    } catch(e) { console.error('Failed parsing clusters', e); }
+
+    const clusterGrid = document.getElementById('clusterGrid');
+    const toastEl = document.getElementById('toast');
+
+    // UI Utilities
+    function showToast(msg, type = 'ok') {
+      toastEl.innerHTML = (type === 'ok' ? '✓ ' : type === 'err' ? '⚠ ' : 'ℹ ') + msg;
+      toastEl.className = 'show toast-' + type;
+      clearTimeout(toastEl._t);
+      toastEl._t = setTimeout(() => toastEl.className = '', 3500);
+    }
+
+    function openAddModal() {
+      document.getElementById('addClusterModal').classList.add('open');
+      document.getElementById('addHost').focus();
+    }
+    
+    function closeAddModal() {
+      document.getElementById('addClusterModal').classList.remove('open');
+      // keep values for retry flexibility
+    }
+
+    function saveClusters() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clusters));
+    }
+
+    // Connect & Add
+    async function addCluster() {
+      const host = document.getElementById('addHost').value.trim();
+      const user = document.getElementById('addUser').value.trim();
+      const pass = document.getElementById('addPass').value;
+      const proj = document.getElementById('addProject').value.trim() || 'admin';
+      const uDom = document.getElementById('addUDomain').value.trim() || 'Default';
+      const pDom = document.getElementById('addPDomain').value.trim() || 'Default';
+
+      if (!host || !user || !pass) return showToast('Address, user and password required.', 'err');
+
+      const btn = document.getElementById('saveClusterBtn');
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+
+      let baseUrl = host.replace(/https?:\/\//, '').split('/')[0];
+
+      try {
+        const res = await fetch('/api/vhi/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            baseUrl, username: user, password: pass, project: proj,
+            userDomain: uDom, projectDomain: pDom
+          })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        // Ensure uniqueness by host + project
+        const id = `${baseUrl}_${proj}`;
+        if (clusters.some(c => c.id === id)) {
+          throw new Error('This cluster/project combination is already added.');
+        }
+
+        clusters.push({
+          id,
+          baseUrl: data.baseUrl,
+          originalHost: host,
+          username: user,
+          password: pass, // saved in plaintext locally for multi-cluster seamless polling
+          project: proj,
+          userDomain: uDom,
+          projectDomain: pDom,
+          projectId: data.projectId || ''
+        });
+
+        saveClusters();
+        showToast('Cluster connected successfully!', 'ok');
+        closeAddModal();
+        
+        // Reset form
+        document.getElementById('addHost').value = '';
+        document.getElementById('addUser').value = '';
+        document.getElementById('addPass').value = '';
+        
+        renderGrid();
+      } catch (err) {
+        showToast(err.message, 'err');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Connect Cluster';
+      }
+    }
+
+    function removeCluster(id) {
+      if (!confirm('Are you sure you want to remove this cluster?')) return;
+      clusters = clusters.filter(c => c.id !== id);
+      saveClusters();
+      renderGrid();
+    }
+
+    function launchClusterParams(id) {
+      // Find cluster, save globally as the active vhi.html session, and redirect
+      const c = clusters.find(x => x.id === id);
+      if (!c) return;
+      
+      // Attempt login instantly via vhi.html by passing credentials to it via local storage
+      // Note: vhi.html natively holds credentials in JS memory per page load,
+      // but we can hack it by opening an automated flow, or redirect to vhi.html and we modify vhi.html so it checks this.
+      // Easiest seamless transition: we just redirect and tell them to login for deeper management, OR
+      // we can do a background trick, but for now we will just pop over to the page. 
+      // VHI dash relies on direct credentials. A future enhancement could share tokens.
+      
+      // Instead of deep integration for the redirect, we will configure the localStorage inputs for them:
+      localStorage.setItem('vhiBaseUrl', c.baseUrl);
+      localStorage.setItem('vhiUser', c.username);
+      localStorage.setItem('vhiPassword', c.password);
+      localStorage.setItem('vhiProject', c.project);
+      
+      // Since vhi.html doesn't auto-read passwords on login overlay, they just have to click "Connect".
+      window.location.href = '/vhi';
+    }
+
+    // Draw Grid
+    function renderGrid() {
+      // Clear all except Add button
+      Array.from(clusterGrid.children).forEach(el => {
+        if (!el.classList.contains('add-card')) el.remove();
+      });
+
+      // Render cards
+      clusters.forEach((c) => {
+        const displayHost = c.baseUrl.replace(/^https?:\/\//, '');
+        const card = document.createElement('div');
+        card.className = 'cluster-card';
+        card.id = `card-${c.id}`;
+        card.innerHTML = `
+          <div class="c-header">
+            <div class="c-info">
+              <div class="c-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-blue)">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                </svg>
+                ${c.project.toUpperCase()} Cluster
+              </div>
+              <div class="c-host">${displayHost}</div>
+            </div>
+            <div class="status-badge status-loading" id="badge-${c.id}">
+              <div class="pulse-dot"></div> Polling...
+            </div>
+          </div>
+          
+          <div class="metrics-grid">
+            <div class="metric">
+              <div class="m-label">VMs</div>
+              <div class="m-value" id="vms-${c.id}"><span class="skeleton-text"></span></div>
+            </div>
+            <div class="metric">
+              <div class="m-label">Nodes</div>
+              <div class="m-value" id="nodes-${c.id}"><span class="skeleton-text"></span></div>
+            </div>
+            <div class="metric">
+              <div class="m-label">Volumes</div>
+              <div class="m-value" id="vols-${c.id}"><span class="skeleton-text"></span></div>
+            </div>
+          </div>
+          
+          <div class="c-actions">
+            <button class="btn btn-primary" onclick="launchClusterParams('${c.id}')">Manage Cluster</button>
+            <button class="delete-btn" onclick="removeCluster('${c.id}')" title="Remove Cluster">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        `;
+        clusterGrid.insertBefore(card, clusterGrid.lastElementChild); // Insert before Add button
+        
+        // Start polling for this cluster
+        pollCluster(c);
+      });
+    }
+
+    async function fetchClusterMetric(c, path) {
+      const hdrs = {
+        'Content-Type': 'application/json',
+        'X-VHI-Base-URL': c.baseUrl,
+        'X-VHI-User': c.username,
+        'X-VHI-Password': c.password,
+        'X-VHI-Project': c.project,
+        'X-VHI-Project-ID': c.projectId || '',
+        'X-VHI-Domain': c.userDomain || 'Default'
+      };
+      
+      const res = await fetch(path, { headers: hdrs });
+      if (!res.ok) throw new Error('API Sync Error');
+      return await res.json();
+    }
+
+    async function pollCluster(c) {
+      const badge = document.getElementById(`badge-${c.id}`);
+      const vmsEl = document.getElementById(`vms-${c.id}`);
+      const nodesEl = document.getElementById(`nodes-${c.id}`);
+      const volsEl = document.getElementById(`vols-${c.id}`);
+
+      try {
+        // Fetch VMs
+        const [vmsData, nodesData, volsData] = await Promise.all([
+          fetchClusterMetric(c, '/api/vhi/servers'),
+          fetchClusterMetric(c, '/api/vhi/nodes'),
+          fetchClusterMetric(c, '/api/vhi/volumes')
+        ]);
+        
+        const vmCount = (vmsData.servers || []).length;
+        const nodeCount = (nodesData.nodes || []).length;
+        const volCount = (volsData.volumes || []).length;
+
+        vmsEl.innerHTML = vmCount;
+        nodesEl.innerHTML = nodeCount;
+        volsEl.innerHTML = volCount;
+
+        badge.className = 'status-badge status-online';
+        badge.innerHTML = '<div class="pulse-dot"></div> Online';
+      } catch (err) {
+        console.error(`Poll error for ${c.baseUrl}:`, err);
+        badge.className = 'status-badge status-offline';
+        badge.innerHTML = '<div class="pulse-dot"></div> Unreachable';
+        
+        vmsEl.innerHTML = '–';
+        nodesEl.innerHTML = '–';
+        volsEl.innerHTML = '–';
+      }
+    }
+
+    // Initialize layout
+    renderGrid();
+
+    // Auto-refresh every 60s
+    setInterval(() => {
+      clusters.forEach(c => pollCluster(c));
+    }, 60000);
+
+  </script>
+</body>
+</html>

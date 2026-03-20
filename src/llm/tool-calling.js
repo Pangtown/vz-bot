@@ -59,17 +59,33 @@ export function getToolDefinitions() {
     {
       name: 'run_health_check',
       description: 'Run infrastructure health check: list VMs and their status, optionally compare to thresholds.',
-      input_schema: { type: 'object', properties: {} },
+      input_schema: { type: 'object', properties: { verbose: { type: 'boolean', description: 'Enable verbose output' } } },
+    },
+    {
+      name: 'list_images',
+      description: 'List images (OS templates) in VHI.',
+      input_schema: { type: 'object', properties: { limit: { type: 'number', description: 'Max items' } } },
+    },
+    {
+      name: 'get_image',
+      description: 'Get details of a single image by ID.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          image_id: { type: 'string', description: 'Image ID' },
+        },
+        required: ['image_id'],
+      },
     },
     {
       name: 'list_volumes',
       description: 'List block storage volumes in VHI.',
-      input_schema: { type: 'object', properties: {} },
+      input_schema: { type: 'object', properties: { limit: { type: 'number', description: 'Max items' } } },
     },
     {
       name: 'list_networks',
       description: 'List networks in VHI.',
-      input_schema: { type: 'object', properties: {} },
+      input_schema: { type: 'object', properties: { limit: { type: 'number', description: 'Max items' } } },
     },
     {
       name: 'create_vm',
@@ -114,6 +130,23 @@ export function getToolDefinitions() {
           admin_state_up: { type: 'boolean', description: 'Whether admin state is up', default: true }
         },
         required: ['name']
+      }
+    },
+    {
+      name: 'execute_vinfra_cli',
+      description: 'Execute arbitrary vinfra CLI commands on the VHI cluster. Provide an array of command arguments, e.g., ["cluster", "list"], or ["node", "list"]. This tool is highly capable of full infrastructure viewing and management. Use this tool when standard REST endpoints fall short.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          args: {
+            type: 'array',
+            items: {
+              type: 'string'
+            },
+            description: 'Array of strings representing the vinfra command arguments. Omit the "vinfra" prefix and omit the format flags (like -f json) as those are handled automatically.'
+          }
+        },
+        required: ['args']
       }
     }
   ];

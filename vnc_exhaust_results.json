@@ -1,0 +1,128 @@
+[
+  {
+    "version": "2.1",
+    "header": "OpenStack-API-Version",
+    "value": "compute 2.1",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.1",
+    "header": "X-OpenStack-Nova-API-Version",
+    "value": "2.1",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.6",
+    "header": "OpenStack-API-Version",
+    "value": "compute 2.6",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.6",
+    "header": "X-OpenStack-Nova-API-Version",
+    "value": "2.6",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.25",
+    "header": "OpenStack-API-Version",
+    "value": "compute 2.25",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.25",
+    "header": "X-OpenStack-Nova-API-Version",
+    "value": "2.25",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.38",
+    "header": "OpenStack-API-Version",
+    "value": "compute 2.38",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.38",
+    "header": "X-OpenStack-Nova-API-Version",
+    "value": "2.38",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.53",
+    "header": "OpenStack-API-Version",
+    "value": "compute 2.53",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.53",
+    "header": "X-OpenStack-Nova-API-Version",
+    "value": "2.53",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.67",
+    "header": "OpenStack-API-Version",
+    "value": "compute 2.67",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.67",
+    "header": "X-OpenStack-Nova-API-Version",
+    "value": "2.67",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.72",
+    "header": "OpenStack-API-Version",
+    "value": "compute 2.72",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.72",
+    "header": "X-OpenStack-Nova-API-Version",
+    "value": "2.72",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.87",
+    "header": "OpenStack-API-Version",
+    "value": "compute 2.87",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.87",
+    "header": "X-OpenStack-Nova-API-Version",
+    "value": "2.87",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.90",
+    "header": "OpenStack-API-Version",
+    "value": "compute 2.90",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  },
+  {
+    "version": "2.90",
+    "header": "X-OpenStack-Nova-API-Version",
+    "value": "2.90",
+    "status": 400,
+    "response": "{\"badRequest\": {\"code\": 400, \"message\": \"There is no such action: remote-console\"}}"
+  }
+]

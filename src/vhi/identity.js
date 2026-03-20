@@ -17,7 +17,7 @@ export async function getToken() {
   const user = getContextValue('vhiUser', 'VHI_USER');
   const password = getContextValue('vhiPassword', 'VHI_PASSWORD');
   const projectName = getContextValue('vhiProject', 'VHI_PROJECT_NAME') || 'admin';
-  const domainName = process.env.VHI_DOMAIN_NAME || 'Default';
+  const domainName = getContextValue('vhiDomain', 'VHI_DOMAIN_NAME') || 'Default';
 
   if (!user || !password) {
     throw new Error('VHI_USER and VHI_PASSWORD must be set in environment');
@@ -64,16 +64,42 @@ export async function getToken() {
   if (!token) throw new Error('VHI Identity did not return x-subject-token');
 
   let expiresAt = null;
+  let projectId = null;
   try {
     const data = await res.json();
     expiresAt = data.token?.expires_at || null;
+    projectId = data.token?.project?.id || null;
   } catch (_) { }
 
-  return { token, expiresAt };
+  return { token, expiresAt, projectId };
 }
 
 export function getIdentityUrl(path = '') {
   const base = getBaseUrl();
   const port = process.env.VHI_IDENTITY_PORT || 5000;
   return `${base}:${port}/v3${path}`;
+}
+
+export async function listProjects() {
+  const { getClient } = await import('./client.js');
+  const client = await getClient();
+  const res = await client.fetch(getIdentityUrl('/projects'));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Identity listProjects failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.projects || [];
+}
+
+export async function listUsers() {
+  const { getClient } = await import('./client.js');
+  const client = await getClient();
+  const res = await client.fetch(getIdentityUrl('/users'));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Identity listUsers failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.users || [];
 }

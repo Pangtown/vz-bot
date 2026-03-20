@@ -38,6 +38,42 @@ export async function listPorts() {
   return data.ports || [];
 }
 
+export async function getPort(portId) {
+  const client = await getClient();
+  const res = await client.fetch(networkUrl(`/ports/${portId}`));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Network getPort failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.port || null;
+}
+
+export async function updatePort(portId, options = {}) {
+  const client = await getClient();
+  const res = await client.fetch(networkUrl(`/ports/${portId}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ port: options }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Network updatePort failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.port || null;
+}
+
+export async function deletePort(portId) {
+  const client = await getClient();
+  const res = await client.fetch(networkUrl(`/ports/${portId}`), { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text();
+    throw new Error(`VHI Network deletePort failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
 export async function createNetwork(options = {}) {
   const client = await getClient();
   const res = await client.fetch(networkUrl('/networks'), {
@@ -115,4 +151,15 @@ export async function deleteSubnet(subnetId) {
     throw new Error(`VHI Network deleteSubnet failed (${res.status}): ${text.slice(0, 300)}`);
   }
   return true;
+}
+
+export async function listSecurityGroups() {
+  const client = await getClient();
+  const res = await client.fetch(networkUrl('/security-groups'));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Network listSecurityGroups failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.security_groups || [];
 }
