@@ -38,16 +38,21 @@ export async function handleTurn(conversationId, userMessage, options = {}) {
 
     const toolResults = [];
     for (const call of res.toolCalls) {
+      console.log(`[TOOL_LOOP] Evaluating tool call: ${call.name}`);
       const allowed = tools.isAllowed(call.name);
+      console.log(`[TOOL_LOOP] Allowed? ${allowed}`);
       if (!allowed) {
         toolResults.push({ type: 'tool_result', tool_use_id: call.id, content: 'Error: action not allowed by policy.' });
         continue;
       }
       try {
+        console.log(`[TOOL_LOOP] Running tool: ${call.name} with args`, call.args);
         const result = await tools.run(call.name, call.args);
         const content = typeof result === 'string' ? result : JSON.stringify(result);
+        console.log(`[TOOL_LOOP] Success result sent to LLM.`);
         toolResults.push({ type: 'tool_result', tool_use_id: call.id, content });
       } catch (err) {
+        console.error(`[TOOL_LOOP] Tool Error:`, err.message);
         toolResults.push({ type: 'tool_result', tool_use_id: call.id, content: `Error: ${err.message}` });
       }
     }

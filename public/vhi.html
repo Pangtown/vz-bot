@@ -494,17 +494,32 @@
     .badge-default { background: var(--bg-light); color: var(--text-dim); border: 1px solid var(--border); }
 
     /* action buttons */
+    .row-actions { display: flex; gap: .4rem; justify-content: flex-end; }
     .act-btn {
-      padding: .28rem .62rem; border-radius: 6px; border: none;
-      font: inherit; font-size: .76rem; font-weight: 600;
-      cursor: pointer; transition: background var(--transition), color var(--transition);
+      display: inline-flex; align-items: center; gap: .3rem;
+      padding: .32rem .4rem; border-radius: 4px; border: 1px solid var(--border);
+      background: var(--bg-content); color: var(--text-dim);
+      font-size: .7rem; font-weight: 700; text-transform: uppercase; cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+      width: 82px; justify-content: center; overflow: hidden; text-overflow: ellipsis;
     }
-    .act-start  { background: rgba(39,174,96,.1); color: #27ae60; border: 1px solid rgba(39,174,96,.2); }
-    .act-start:hover  { background: #27ae60; color: #fff; border-color: #27ae60; }
-    .act-stop   { background: rgba(227,0,15,.08); color: var(--accent); border: 1px solid rgba(227,0,15,.2); }
-    .act-stop:hover   { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .act-reboot { background: rgba(243,156,18,.1); color: #e67e22; border: 1px solid rgba(243,156,18,.2); }
-    .act-reboot:hover { background: #e67e22; color: #fff; border-color: #e67e22; }
+    .act-btn:hover:not(:disabled) { background: var(--bg-light); color: var(--text); border-color: var(--text-dim); }
+    .act-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .act-btn .ri { font-size: .8rem; flex-shrink: 0; }
+
+    .act-start    { background: rgba(39,174,96,.12) !important; color: #27ae60 !important; border-color: rgba(39,174,96,.3) !important; }
+    .act-start:hover { background: #27ae60 !important; color: #fff !important; }
+    .act-stop     { background: rgba(227,0,15,.1) !important; color: var(--accent) !important; border-color: rgba(227,0,15,.2) !important; }
+    .act-stop:hover  { background: var(--accent) !important; color: #fff !important; }
+    .act-reboot   { background: rgba(243,156,18,.12) !important; color: #e67e22 !important; border-color: rgba(243,156,18,.25) !important; }
+    .act-reboot:hover { background: #e67e22 !important; color: #fff !important; }
+    .act-console  { background: rgba(52,152,219,.12) !important; color: #3498db !important; border-color: rgba(52,152,219,.25) !important; }
+    .act-console:hover { background: #3498db !important; color: #fff !important; }
+    .act-danger   { background: rgba(227,0,15,.1) !important; color: var(--accent) !important; border-color: rgba(227,0,15,.2) !important; }
+    .act-danger:hover { background: var(--accent) !important; color: #fff !important; }
+    .act-primary  { background: rgba(52,152,219,.12) !important; color: #3498db !important; border-color: rgba(52,152,219,.25) !important; }
+    .act-primary:hover { background: #3498db !important; color: #fff !important; }
 
     /* text action buttons */
     .txt-btn {
@@ -515,6 +530,8 @@
     }
     .txt-btn:hover:not(:disabled) { background: rgba(0,0,0,0.05) !important; color: var(--text); }
     .txt-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .spinning { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
     /* empty state */
     .empty-state {
@@ -816,6 +833,10 @@
         <span class="nav-icon">🔔</span>
         <span class="nav-label">Alerts</span>
       </div>
+      <div class="nav-item" data-panel="audit">
+        <span class="nav-icon">📜</span>
+        <span class="nav-label">Audit Log</span>
+      </div>
       <div class="nav-item" data-panel="chat">
         <span class="nav-icon">🤖</span>
         <span class="nav-label">AI Assistant</span>
@@ -889,7 +910,33 @@
           <div class="stat-card"><div class="stat-label">Nodes</div><div class="stat-value" id="statNodes">–</div><div class="stat-sub">hypervisors</div></div>
           <div class="stat-card"><div class="stat-label">Volumes</div><div class="stat-value" id="statVols">–</div><div class="stat-sub">block storage</div></div>
           <div class="stat-card"><div class="stat-label">Networks</div><div class="stat-value" id="statNets">–</div><div class="stat-sub">tenant networks</div></div>
-          <div class="stat-card"><div class="stat-label">Images</div><div class="stat-value" id="statImgs">–</div><div class="stat-sub">templates</div></div>
+          <div class="stat-card"><div class="stat-label">Health Poll</div><div class="stat-value" id="statHealth" style="font-size: 1.5rem;">–</div><div class="stat-sub" id="statHealthTime">last status</div></div>
+          <div class="stat-card" style="grid-column: span 3; display: flex; flex-direction: column; position: relative;">
+            <div style="text-align:center; padding-bottom:.5rem; border-bottom:1px solid var(--border); margin-bottom:.5rem;">
+              <div class="stat-label" style="margin:0;">Billing Metering Service</div>
+              <div class="stat-sub" id="billingTime" style="margin:0; font-size:.65rem; margin-top:.2rem;">–</div>
+              <button class="txt-btn" id="billRefreshBtn" onclick="refreshBilling()" style="position:absolute; top:12px; right:45px; font-size:1.1rem; padding:4px !important;" title="Refresh Billing Data">🔄</button>
+              <button class="txt-btn" onclick="openExportModal()" style="position:absolute; top:12px; right:15px; font-size:1.1rem; padding:4px !important;" title="Export Billing Data">📥</button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:.4rem; flex:1; justify-content:center;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="stat-label" style="margin:0; letter-spacing:1px; line-height:1;">vCPU</span>
+                <span id="billCpu" style="font-size:1.1rem; font-weight:700; line-height:1;">–</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="stat-label" style="margin:0; letter-spacing:1px; line-height:1;">RAM</span>
+                <span id="billRam" style="font-size:1.1rem; font-weight:700; line-height:1;">–</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="stat-label" style="margin:0; letter-spacing:1px; line-height:1;">Storage</span>
+                <span id="billStorage" style="font-size:1.1rem; font-weight:700; line-height:1;">–</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="stat-label" style="margin:0; letter-spacing:1px; line-height:1;">Network</span>
+                <span id="billNet" style="font-size:1.1rem; font-weight:700; color:var(--accent); line-height:1;">–</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Cluster Info Grid -->
@@ -966,14 +1013,67 @@
       <!-- ── ALERTS ── -->
       <div class="panel" id="panel-alerts">
         <div class="panel-header">
-          <h2>Alerts</h2>
+          <h2>Active Alerts</h2>
+          <div class="panel-actions">
+            <button class="tbl-refresh" id="alertRefresh"><span class="ri">↻</span> Refresh</button>
+          </div>
         </div>
         <div class="table-card">
-          <div class="table-toolbar" style="padding: 3.5rem 1rem; text-align: center; color: var(--text-muted);">
-            <div style="width: 100%; text-align: center;">
-              <div style="font-size: 2.4rem; margin-bottom: .7rem;">🔔</div>
-              <p style="font-size: .9rem;">No alerts configured — coming soon.</p>
-            </div>
+          <div class="table-toolbar">
+            <input type="search" class="search-input" id="alertSearch" placeholder="Search alerts…">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 120px;">Sev</th>
+                <th>Name</th>
+                <th style="width: 150px;">Component</th>
+                <th style="width: 180px;">Time of event</th>
+              </tr>
+            </thead>
+            <tbody id="alertBody">
+              <tr class="skeleton-row"><td colspan="4"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+          <div id="alertPager" style="padding: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--text-dim);">
+              <span id="alertCount">0 alerts</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── AUDIT LOG ── -->
+      <div class="panel" id="panel-audit">
+        <div class="panel-header">
+          <h2>Audit Log</h2>
+          <div class="panel-actions">
+            <button class="tbl-refresh" id="auditRefresh"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input type="search" class="search-input" id="auditSearch" placeholder="Search audit logs…">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 180px;">Date</th>
+                <th style="width: 150px;">Activity</th>
+                <th>Description</th>
+                <th style="width: 120px;">Component</th>
+                <th style="width: 120px;">Changed by</th>
+                <th style="width: 100px;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="auditBody">
+              <tr class="skeleton-row"><td colspan="6"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+          <div id="auditPager" style="padding: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--text-dim);">
+              <span id="auditCount">0 logs</span>
+              <div style="display: flex; gap: 0.5rem;">
+                  <button class="btn btn-secondary btn-sm" id="auditPrev" disabled>Previous</button>
+                  <button class="btn btn-secondary btn-sm" id="auditNext" disabled>Next</button>
+              </div>
           </div>
         </div>
       </div>
@@ -1054,6 +1154,9 @@
           <h2>Storage Volumes</h2>
           <span class="panel-badge" id="volCount">Loading…</span>
           <div class="panel-actions">
+            <button class="act-btn act-start" onclick="openCreateVolModal()" style="padding:.4rem .9rem; margin-right:.5rem;">
+              <span class="ri">+</span> Create
+            </button>
             <button class="tbl-refresh" id="volRefresh"><span class="ri">↻</span> Refresh</button>
           </div>
         </div>
@@ -1064,17 +1167,39 @@
           <table>
             <thead>
               <tr>
-                <th>Name</th>
+                <th style="min-width: 280px; width: 35%;">Name</th>
                 <th>Status</th>
                 <th>Size (GB)</th>
                 <th>Type</th>
                 <th>Bootable</th>
                 <th>Attached To</th>
-                <th>Created</th>
+                <th style="text-align: right; width: 330px;">Actions</th>
               </tr>
             </thead>
             <tbody id="volBody">
               <tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="margin: 2rem 0 1rem 0; font-size: 1.1rem; color: var(--text-dim);">Volume Snapshots</h3>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <input type="search" class="search-input" id="snapSearch" placeholder="Search snapshots…">
+            <button class="tbl-refresh" id="snapRefresh" style="margin-left:auto;"><span class="ri">↻</span> Refresh</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="min-width: 280px; width: 35%;">Name</th>
+                <th>Status</th>
+                <th>Origin Volume</th>
+                <th>Size (GB)</th>
+                <th style="text-align: right; width: 330px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="snapBody">
+              <tr class="skeleton-row"><td colspan="5"><div class="skeleton"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -1374,6 +1499,90 @@
   </div>
 </div>
 
+<!-- ═══════════════ CREATE VOLUME MODAL ═══════════════ -->
+<div id="createVolModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 450px;">
+    <div class="modal-header">
+      <h3>Create New Volume</h3>
+      <button class="modal-close" onclick="closeCreateVolModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Volume Name</label>
+        <input type="text" id="newVolName" placeholder="e.g. data-vol-01">
+      </div>
+      <div class="form-group">
+        <label>Size (GiB)</label>
+        <input type="number" id="newVolSize" value="10" min="1">
+      </div>
+      <div class="form-group">
+        <label>Storage Policy (Type)</label>
+        <select id="newVolType"><option>Loading...</option></select>
+      </div>
+      <div class="form-group">
+        <label>Description (Optional)</label>
+        <input type="text" id="newVolDesc" placeholder="Purpose of this volume">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeCreateVolModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateVol()">Create Volume</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ SNAPSHOT VOLUME MODAL ═══════════════ -->
+<div id="snapshotVolModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 400px;">
+    <div class="modal-header">
+      <h3>Take Volume Snapshot</h3>
+      <button class="modal-close" onclick="closeSnapVolModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-dim);">Taking a snapshot of <strong id="snapVolNameLabel">...</strong></p>
+      <div class="form-group">
+        <label>Snapshot Name</label>
+        <input type="text" id="newSnapName" placeholder="e.g. pre-upgrade-snap">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="newSnapDesc" placeholder="Why are you taking this snapshot?">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeSnapVolModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitSnapVol()">Take Snapshot</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ATTACH VOLUME MODAL ═══════════════ -->
+<div id="attachVolToListModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 400px;">
+    <div class="modal-header">
+      <h3>Attach Volume to VM</h3>
+      <button class="modal-close" onclick="closeAttachVolToListModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-dim);">Attach <strong id="attachVolNameLabel">...</strong> to a server.</p>
+      <div class="form-group">
+        <label>Select Virtual Machine</label>
+        <select id="targetVmForVol"><option>Loading VMs...</option></select>
+      </div>
+      <div class="form-group">
+        <label>Device Name (Optional)</label>
+        <input type="text" id="attachVolDevice" placeholder="e.g. /dev/vdb">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeAttachVolToListModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAttachVolToList()">Attach</button>
+    </div>
+  </div>
+</div>
+  </div>
+</div>
+
 <!-- ═══════════════ SSH TERMINAL MODAL ═══════════════ -->
 <div id="terminalModal" class="modal-overlay hidden">
   <div class="modal-card" style="width: 90%; height: 85%; max-width: 1000px; display: flex; flex-direction: column;">
@@ -1444,6 +1653,79 @@
   </div>
 </div>
 
+<!-- ═══════════════ EXPORT BILLING MODAL ═══════════════ -->
+<div id="exportBillingModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 380px;">
+    <div class="modal-header">
+      <h3>Export Billing Data</h3>
+      <button class="modal-close" onclick="closeExportModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.85rem; color:var(--text-dim); margin-bottom:1.2rem;">Select the date range for your hourly resource consumption report.</p>
+      <div class="form-group">
+        <label>From Date</label>
+        <input type="date" id="exportFrom">
+      </div>
+      <div class="form-group">
+        <label>To Date</label>
+        <input type="date" id="exportTo">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeExportModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="runExport()">Download CSV</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CREATE VOLUME FROM SNAPSHOT MODAL ═══════════════ -->
+<div id="createVolFromSnapModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 450px;">
+    <div class="modal-header">
+      <h3>Create Volume from Snapshot</h3>
+      <button class="modal-close" onclick="document.getElementById('createVolFromSnapModal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-dim);">Source Snapshot: <strong id="snapToVolNameLabel">...</strong></p>
+      <div class="form-group">
+        <label>New Volume Name</label>
+        <input type="text" id="newVolFromSnapName" placeholder="e.g. recovered-data-vol">
+      </div>
+      <div class="form-group">
+        <label>Size (GiB)</label>
+        <input type="number" id="newVolFromSnapSize" value="20" min="1">
+        <p class="text-dim" style="font-size:0.7rem; margin-top:4px;">Must be equal to or larger than the source snapshot size.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('createVolFromSnapModal').classList.add('hidden')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateVolFromSnap()">Create Volume</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CREATE IMAGE FROM SNAPSHOT MODAL ═══════════════ -->
+<div id="createImgFromSnapModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 450px;">
+    <div class="modal-header">
+      <h3>Create Image from Snapshot</h3>
+      <button class="modal-close" onclick="document.getElementById('createImgFromSnapModal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-dim);">Source Snapshot: <strong id="snapToImgNameLabel">...</strong></p>
+      <div class="form-group">
+        <label>Machine Image Name</label>
+        <input type="text" id="newImgFromSnapName" placeholder="e.g. gold-image-v1">
+      </div>
+      <p class="text-dim" style="font-size:0.8rem;">This will create a temporary volume and upload it to the image library. This process may take several minutes.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('createImgFromSnapModal').classList.add('hidden')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateImgFromSnap()">Create Image</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════ AI CHAT DRAWER ═══════════════ -->
 <div id="chatDrawer" role="dialog" aria-label="AI Chat">
   <div class="chat-header">
@@ -1478,6 +1760,23 @@
   </div>
 </div>
 
+<!-- ═══════════════ VOLUME DETAILS DRAWER ═══════════════ -->
+<div id="volDrawer" class="info-drawer">
+  <div class="drawer-header">
+    <div>
+      <h2 id="volDetName" style="font-size:1.25rem; font-weight:700;">Volume Details</h2>
+    </div>
+    <button class="chat-close" onclick="closeVolDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="volDetBody">
+    <!-- Content injected via JS -->
+  </div>
+  <div class="modal-footer" style="padding: 1rem 1.5rem; background: var(--bg-sidebar);">
+    <button class="btn btn-secondary" onclick="closeVolDrawer()">Close</button>
+    <button id="volDetSaveBtn" class="btn btn-primary" onclick="saveVolChanges()" disabled>Save Changes</button>
+  </div>
+</div>
+
 <!-- ═══════════════ JAVASCRIPT ═══════════════ -->
 <script>
 'use strict';
@@ -1485,7 +1784,15 @@
 // ── session state ─────────────────────────────────────────────────────────
 let session = null; // { baseUrl, username, project, userDomain, projectDomain }
 let allSecurityGroups = [];
+let allVolumeTypes = [];
+let allFlavors = [];
+let allNetworks = [];
+let allVolumesFull = [];
+let allVolumesAvail = [];
 let currentEditingPortId = null;
+let currentVolDetails = null;
+let currentVmDetails = null;
+let currentVmInterfaces = [];
 
 // ── utility ───────────────────────────────────────────────────────────────
 
@@ -1548,6 +1855,14 @@ function filterRows(rows, query) {
 
 function authHeaders() {
   if (!session) return {};
+  
+  // Use cluster-scoped SSH config if available
+  let sshConfig = {};
+  try {
+    const saved = localStorage.getItem(getGlobalSshKey());
+    if (saved) sshConfig = JSON.parse(saved);
+  } catch(e) {}
+
   return {
     'Content-Type': 'application/json',
     'X-VHI-Base-URL':    session.baseUrl,
@@ -1556,9 +1871,9 @@ function authHeaders() {
     'X-VHI-Project':     session.project,
     'X-VHI-Project-ID':  session.projectId || '',
     'X-VHI-Domain':      session.userDomain,
-    'X-VHI-SSH-Host':     localStorage.getItem('vhiSshHost') || '',
-    'X-VHI-SSH-User':     localStorage.getItem('vhiSshUser') || 'root',
-    'X-VHI-SSH-Password': localStorage.getItem('vhiSshPassword') || '',
+    'X-VHI-SSH-Host':     sshConfig.host || localStorage.getItem('vhiSshHost') || '',
+    'X-VHI-SSH-User':     sshConfig.username || localStorage.getItem('vhiSshUser') || 'root',
+    'X-VHI-SSH-Password': sshConfig.password || localStorage.getItem('vhiSshPassword') || '',
   };
 }
 
@@ -1783,15 +2098,20 @@ function setRefreshing(btnId, on) {
 
 document.getElementById('vmRefresh').addEventListener('click', loadVMs);
 document.getElementById('nodeRefresh').addEventListener('click', loadNodes);
-document.getElementById('volRefresh').addEventListener('click', loadVolumes);
+document.getElementById('volRefresh').addEventListener('click', () => { loadVolumes(); loadSnapshots(); });
 document.getElementById('netRefresh').addEventListener('click', loadNetworks);
 document.getElementById('imgRefresh').addEventListener('click', loadImages);
+document.getElementById('auditRefresh').addEventListener('click', () => { triggerAuditRefresh(); });
 
 // ── SEARCH INPUTS ─────────────────────────────────────────────────────────
 
 function hookSearch(inputId, renderFn) {
   const el = document.getElementById(inputId);
-  if (el) el.addEventListener('input', () => renderFn(el.value));
+  if (el) {
+    el.addEventListener('input', () => {
+      if (typeof renderFn === 'function') renderFn(el.value);
+    });
+  }
 }
 
 // ── DATA STORES ───────────────────────────────────────────────────────────
@@ -1813,6 +2133,7 @@ function loadAll() {
   loadVMs();
   loadNodes();
   loadVolumes();
+  loadSnapshots();
   loadNetworks();
   loadImages();
   loadFlavors();
@@ -1820,7 +2141,95 @@ function loadAll() {
   loadProjects();
   loadUsers();
   loadSecurityGroups();
+  loadHealthStatus();
+  loadBillingStatus();
+  loadAuditLogs();
+  loadAlerts();
 }
+
+async function loadHealthStatus() {
+  try {
+    const res = await apiGet('/api/vhi/health-status');
+    const b = document.getElementById('statHealth');
+    const tEl = document.getElementById('statHealthTime');
+    if(!b || !tEl) return;
+    
+    if (res.result) {
+      const errs = res.result.summary?.byStatus?.ERROR || 0;
+      if (errs > 0) {
+         b.textContent = errs + ' ERR';
+         b.style.color = 'var(--danger)';
+      } else {
+         b.textContent = 'OK';
+         b.style.color = 'var(--success)';
+      }
+    }
+    if (res.time) {
+      const d = new Date(res.time);
+      const tt = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      tEl.textContent = `Today at ${tt}`;
+    } else {
+      tEl.textContent = 'pending poll';
+    }
+  } catch(e) {
+    console.error('Failed to load health status', e);
+  }
+}
+
+async function loadBillingStatus() {
+  try {
+    const res = await apiGet('/api/vhi/billing-status');
+    const tb = document.getElementById('billingTime');
+    if (!tb) return;
+
+    if (res.result) {
+      document.getElementById('billCpu').textContent = res.result.vCpu || 0;
+      document.getElementById('billRam').textContent = typeof res.result.ramGb === 'number' ? res.result.ramGb.toFixed(1) + ' GB' : res.result.ramGb || 0;
+      document.getElementById('billStorage').textContent = typeof res.result.storageGb === 'number' ? res.result.storageGb.toFixed(1) + ' GB' : res.result.storageGb || 0;
+      document.getElementById('billNet').textContent = res.result.networkTraffic || '0 GB';
+    } else {
+      document.getElementById('billCpu').textContent = 'WAIT';
+      document.getElementById('billRam').textContent = 'WAIT';
+      document.getElementById('billStorage').textContent = 'WAIT';
+      document.getElementById('billNet').textContent = 'WAIT';
+    }
+
+    if (res.time) {
+      const d = new Date(res.time);
+      const tt = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      tb.textContent = `Updated ${tt}`;
+    } else {
+      tb.textContent = 'pending poll';
+    }
+  } catch(e) {
+    console.error('Failed to load billing status', e);
+  }
+}
+
+async function refreshBilling() {
+  const btn = document.getElementById('billRefreshBtn');
+  if (btn) btn.classList.add('spinning');
+  try {
+    toast('Refreshing billing metrics...');
+    const res = await apiPost('/api/vhi/billing-refresh', {});
+    if (res.ok) {
+      toast('Billing refreshed successfully');
+      loadBillingStatus();
+    }
+  } catch (e) {
+    toast('Refresh failed: ' + e.message, 'err');
+    console.error(e);
+  } finally {
+    if (btn) btn.classList.remove('spinning');
+  }
+}
+
+setInterval(() => {
+  if (session) {
+    loadHealthStatus();
+    loadBillingStatus();
+  }
+}, 15000);
 
 async function loadVolumeTypes() {
   try {
@@ -1928,6 +2337,146 @@ document.getElementById('closeVmModal').addEventListener('click', closeVmModal);
 document.getElementById('cancelVmBtn').addEventListener('click', closeVmModal);
 document.getElementById('submitVmBtn').addEventListener('click', submitVmForm);
 
+// ── AUDIT LOGS ────────────────────────────────────────────────────────────
+
+let auditLimit = 50;
+let auditOffset = 0;
+let auditQuery = '';
+
+async function loadAuditLogs() {
+  setRefreshing('auditRefresh', true);
+  try {
+    const url = `/api/vhi/audit-logs?limit=${auditLimit}&offset=${auditOffset}&q=${encodeURIComponent(auditQuery)}`;
+    const data = await apiGet(url);
+    const logs = data.logs || [];
+    renderAuditLogs(logs);
+    
+    document.getElementById('auditCount').textContent = `${logs.length} logs shown`;
+    document.getElementById('auditNext').disabled = logs.length < auditLimit;
+    document.getElementById('auditPrev').disabled = auditOffset === 0;
+  } catch (err) {
+    document.getElementById('auditBody').innerHTML = emptyState('⚠️', 'Could not load audit logs: ' + err.message);
+  } finally {
+    setRefreshing('auditRefresh', false);
+  }
+}
+
+function renderAuditLogs(logs) {
+  const tbody = document.getElementById('auditBody');
+  if (!logs.length) {
+    tbody.innerHTML = emptyState('📜', 'No audit logs found');
+    return;
+  }
+  
+  tbody.innerHTML = logs.map(log => {
+    return `<tr>
+      <td class="mono text-dim" style="font-size:0.8rem;">${new Date(log.timestamp).toLocaleString()}</td>
+      <td><strong>${log.action || '–'}</strong></td>
+      <td class="text-dim" style="font-size:0.85rem;">${log.description || '–'}</td>
+      <td class="text-dim">${log.component || '–'}</td>
+      <td><span class="badge badge-default">${log.user || 'system'}</span></td>
+      <td>${statusBadge(log.result || log.status)}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function triggerAuditRefresh() {
+    toast('Refreshing audit logs...', 'inf');
+    setRefreshing('auditRefresh', true);
+    try {
+        await apiPost('/api/vhi/audit-refresh', {});
+        toast('Audit logs updated', 'ok');
+        auditOffset = 0;
+        loadAuditLogs();
+    } catch (err) {
+        toast('Refresh failed: ' + err.message, 'err');
+    } finally {
+        setRefreshing('auditRefresh', false);
+    }
+}
+
+hookSearch('auditSearch', (val) => {
+    auditQuery = val;
+    auditOffset = 0;
+    loadAuditLogs();
+});
+
+document.getElementById('auditNext').addEventListener('click', () => {
+    auditOffset += auditLimit;
+    loadAuditLogs();
+});
+document.getElementById('auditPrev').addEventListener('click', () => {
+    auditOffset = Math.max(0, auditOffset - auditLimit);
+    loadAuditLogs();
+});
+
+
+
+// ── ALERTS ────────────────────────────────────────────────────────────────
+
+async function loadAlerts() {
+  if (typeof setRefreshing === 'function') setRefreshing('alertRefresh', true);
+  try {
+    const data = await apiGet('/api/vhi/alerts');
+    const alerts = data.alerts || [];
+    renderAlerts(alerts);
+    const countEl = document.getElementById('alertCount');
+    if (countEl) countEl.textContent = `${alerts.length} total alerts`;
+  } catch (err) {
+    const body = document.getElementById('alertBody');
+    if (body) body.innerHTML = emptyState('⚠️', 'Could not load alerts: ' + err.message);
+  } finally {
+    if (typeof setRefreshing === 'function') setRefreshing('alertRefresh', false);
+  }
+}
+
+function renderAlerts(alerts) {
+  const tbody = document.getElementById('alertBody');
+  if (!tbody) return;
+  
+  const searchInput = document.getElementById('alertSearch');
+  const query = searchInput ? searchInput.value.toLowerCase() : '';
+  
+  const filtered = alerts.filter(a => {
+    return !query || 
+      (a.name||'').toLowerCase().includes(query) || 
+      (a.component||'').toLowerCase().includes(query) || 
+      (a.description||'').toLowerCase().includes(query) ||
+      (a.severity||'').toLowerCase().includes(query);
+  });
+
+  if (!filtered.length) {
+    tbody.innerHTML = emptyState('🔔', 'No active alerts found');
+    return;
+  }
+  
+  tbody.innerHTML = filtered.map(a => {
+    const sev = (a.severity || 'info').toLowerCase();
+    const badgeClass = sev === 'critical' || sev === 'error' ? 'badge-error' : 
+                      sev === 'warning' ? 'badge-warn' : 'badge-info';
+    
+    return `<tr>
+      <td><span class="badge ${badgeClass}">${sev.toUpperCase()}</span></td>
+      <td>
+        <div style="font-weight:600;">${a.name || '–'}</div>
+        <div class="text-dim" style="font-size:0.8rem; margin-top:2px;">${a.description || ''}</div>
+      </td>
+      <td class="text-dim">${a.component || '–'}</td>
+      <td class="mono text-dim" style="font-size:0.8rem;">${new Date(a.timestamp).toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('alertRefresh')?.addEventListener('click', async () => {
+    toast('Refreshing alerts...', 'inf');
+    try {
+        await apiPost('/api/vhi/alerts-refresh', {});
+        loadAlerts();
+    } catch (e) { toast('Refresh failed: ' + e.message, 'err'); }
+});
+
+hookSearch('alertSearch', () => loadAlerts());
+
 
 // ── VMs ───────────────────────────────────────────────────────────────────
 
@@ -2004,7 +2553,8 @@ function renderVMs(query) {
         <button class="act-btn act-start" onclick="vmAction('${vm.id}','start')">▶ Start</button>
         <button class="act-btn act-stop" onclick="vmAction('${vm.id}','stop')">■ Stop</button>
         <button class="act-btn act-reboot" onclick="vmAction('${vm.id}','reboot')">↻ Reboot</button>
-        <button class="act-btn" style="background:var(--accent-blue);color:#fff;" onclick="vmConsole('${vm.id}')">🖧 Console</button>
+        <button class="act-btn act-console" onclick="vmConsole('${vm.id}')">🖧 Console</button>
+        <button class="act-btn act-danger" onclick="deleteVM('${vm.id}')">✖ Delete</button>
       </td>
     </tr>`;
   });
@@ -2019,9 +2569,25 @@ async function vmAction(id, action) {
   try {
     await apiPost(`/api/vhi/servers/${id}/action`, { action });
     toast(`${action} sent successfully`, 'ok');
-    setTimeout(loadVMs, 1500);
+        setTimeout(loadVMs, 1500);
   } catch (err) {
     toast(`${action} failed: ${err.message}`, 'err');
+  }
+}
+
+async function deleteVM(id) {
+  if (!confirm('Are you absolutely sure you want to delete this VM?')) return;
+  toast('Deleting VM...', 'inf');
+  try {
+    const res = await fetch(`/api/vhi/servers/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    if (!res.ok) throw new Error(await res.text());
+    toast('VM deleted successfully', 'ok');
+    setTimeout(() => { closeVmDrawer(); loadVMs(); }, 1500);
+  } catch (err) {
+    toast(`Delete failed: ${err.message}`, 'err');
   }
 }
 
@@ -2030,7 +2596,11 @@ async function vmConsole(id) {
   try {
     const res = await apiPost(`/api/vhi/servers/${id}/action`, { action: 'console' });
     if (res.url) {
-      window.open(res.url, '_blank', 'width=800,height=600');
+      let u = res.url;
+      if (u.includes('vnc_auto.html')) {
+        u = u.replace('vnc_auto.html', 'vnc.html');
+      }
+      window.open(u, '_blank', 'width=1000,height=800');
       toast('Console opened', 'ok');
     } else {
       throw new Error('No console URL returned');
@@ -2042,13 +2612,7 @@ async function vmConsole(id) {
 
 // ── VM DETAILS DRAWER ────────────────────────────────────────────────────────
 
-let currentVmDetails = null;
-let allFlavors = [];
-let allNetworks = [];
-let allVolumesFull = [];
-let allVolumesAvail = [];
-let allVolumeTypes = [];
-let currentVmInterfaces = [];
+// ── VM DETAILS DRAWER ────────────────────────────────────────────────────────
 
 async function openVmDetails(id) {
   toast('Loading VM details...', 'inf');
@@ -2666,22 +3230,33 @@ function getNodeSshKey(hostname) {
   return `ssh_node_${clusterId}_${hostname}`;
 }
 
-function openGlobalSshModal() {
+async function openGlobalSshModal() {
   isGlobalSsh = true;
   currentSshNode = "CLUSTER_GLOBAL";
   document.getElementById('sshModalHostname').textContent = "Cluster Global";
   
-  const saved = localStorage.getItem(getGlobalSshKey());
-  if (saved) {
-    try {
-      const config = JSON.parse(saved);
-      document.getElementById('nodeSshHost').value = config.host || '';
-      document.getElementById('nodeSshUser').value = config.username || 'root';
-      document.getElementById('nodeSshAuthMethod').value = config.authMethod || 'password';
-      document.getElementById('nodeSshPassword').value = config.password || '';
-      document.getElementById('nodeSshKey').value = config.privateKey || '';
-      document.getElementById('nodeSshPassphrase').value = config.passphrase || '';
-    } catch(e) {}
+  let config = {};
+  // 1. Try server-side first
+  try {
+    const res = await fetch('/api/vhi/settings/ssh');
+    if (res.ok) config = await res.json();
+  } catch (e) { console.warn('Failed to fetch server-side SSH settings', e); }
+
+  // 2. Fallback/Merge with local storage (for migration or if server is empty)
+  if (!config.host) {
+    const localSaved = localStorage.getItem(getGlobalSshKey());
+    if (localSaved) {
+      try { config = JSON.parse(localSaved); } catch(e) {}
+    }
+  }
+
+  if (config.host || config.username) {
+    document.getElementById('nodeSshHost').value = config.host || '';
+    document.getElementById('nodeSshUser').value = config.username || 'root';
+    document.getElementById('nodeSshAuthMethod').value = config.authMethod || 'password';
+    document.getElementById('nodeSshPassword').value = config.password || '';
+    document.getElementById('nodeSshKey').value = config.privateKey || '';
+    document.getElementById('nodeSshPassphrase').value = config.passphrase || '';
   } else {
     // defaults
     document.getElementById('nodeSshHost').value = '';
@@ -2750,7 +3325,7 @@ function toggleSshAuthFields() {
   document.getElementById('nodeSshKeyGroup').classList.toggle('hidden', method !== 'key');
 }
 
-function saveNodeSsh() {
+async function saveNodeSsh() {
   if (!currentSshNode) return;
   const config = {
     host: document.getElementById('nodeSshHost').value.trim(),
@@ -2762,6 +3337,18 @@ function saveNodeSsh() {
   };
   
   if (isGlobalSsh) {
+    // Save to server
+    try {
+      await fetch('/api/vhi/settings/ssh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+    } catch (e) {
+      console.error('Failed to save SSH settings to server', e);
+      toast('Failed to save to server, saved locally only', 'warn');
+    }
+    // Also keep in localStorage for immediate frontend use/fallback
     localStorage.setItem(getGlobalSshKey(), JSON.stringify(config));
     toast(`Global Cluster SSH config saved`, 'ok');
   } else {
@@ -2948,21 +3535,435 @@ async function loadVolumes() {
 
 function renderVolumes(query) {
   const tbody = document.getElementById('volBody');
-  const rows = _vols.map(v => {
-    const attached = (v.attachments || []).map(a => a.server_id?.slice(0,8)).join(', ') || '–';
+  const items = query ? _vols.filter(v => (v.name||'').toLowerCase().includes(query.toLowerCase()) || v.id.includes(query)) : _vols;
+  
+  tbody.innerHTML = items.map(v => {
+    const attached = (v.attachments || []).map(a => `<span class="badge" title="${a.server_id}">${a.server_id?.slice(0,8)}</span>`).join(' ') || '<span class="text-dim">—</span>';
+    const isAvailable = (v.status || '').toLowerCase() === 'available';
+    const isInUse = (v.status || '').toLowerCase() === 'in-use';
+
     return `<tr>
-      <td><strong>${v.name || v.id?.slice(0,12) || '–'}</strong><br><span class="mono">${v.id?.slice(0,8)}…</span></td>
+      <td style="word-break: break-all; min-width: 280px;">
+        <a href="javascript:void(0)" onclick="openVolDetails('${v.id}')" style="color:var(--text); text-decoration:none;">
+          <div style="font-weight:600; color:var(--text);">${v.name || '—'}</div>
+        </a>
+        <div class="mono" style="font-size:0.75rem; color:var(--text-dim);">${v.id?.slice(0,8)}...</div>
+      </td>
       <td>${statusBadge(v.status)}</td>
-      <td>${v.size ?? '–'}</td>
-      <td class="text-dim">${v.volume_type || '–'}</td>
-      <td>${v.bootable === 'true' || v.bootable === true ? '✓' : '–'}</td>
+      <td>${v.size ?? '–'} GB</td>
+      <td class="text-dim" style="font-size:0.85rem;">${v.volume_type || '—'}</td>
+      <td>${v.bootable === 'true' || v.bootable === true ? '<span style="color:var(--accent)">Yes</span>' : 'No'}</td>
       <td class="mono text-dim">${attached}</td>
-      <td class="text-dim">${fmtDate(v.created_at)}</td>
+      <td style="text-align: right; white-space: nowrap; width: 330px;">
+        <div class="row-actions">
+           ${isAvailable ? `<button class="act-btn act-start" onclick="openAttachVolToList('${v.id}', '${v.name}')"><span class="ri">🔗</span> Attach</button>` : ''}
+           ${isInUse ? `<button class="act-btn act-stop" onclick="quickDetachVol('${v.id}')"><span class="ri">🔓</span> Detach</button>` : ''}
+           <button class="act-btn act-console" onclick="openSnapVolModal('${v.id}', '${v.name}')"><span class="ri">📸</span> Snapshot</button>
+           <button class="act-btn act-danger" onclick="quickDeleteVol('${v.id}', '${v.name}')"><span class="ri">🗑️</span> Delete</button>
+        </div>
+      </td>
     </tr>`;
-  });
-  const filtered = filterRows(rows, query);
-  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('💾', 'No volumes found');
+  }).join('') || emptyState('💾', 'No volumes found');
 }
+
+// ── SNAPSHOTS ──
+
+let _snaps = [];
+
+async function loadSnapshots() {
+  setRefreshing('snapRefresh', true);
+  try {
+    const data = await apiGet('/api/vhi/snapshots');
+    _snaps = data.snapshots || [];
+    renderSnapshots('');
+    hookSearch('snapSearch', renderSnapshots);
+  } catch (err) {
+    document.getElementById('snapBody').innerHTML = emptyState('📸', 'Could not load snapshots: ' + err.message);
+  } finally {
+    setRefreshing('snapRefresh', false);
+  }
+}
+
+function renderSnapshots(query) {
+  const tbody = document.getElementById('snapBody');
+  const items = query ? _snaps.filter(s => (s.name||'').toLowerCase().includes(query.toLowerCase())) : _snaps;
+  
+  tbody.innerHTML = items.map(s => {
+    const isAvailable = (s.status || '').toLowerCase() === 'available';
+    return `<tr>
+      <td style="word-break: break-all; min-width: 280px;">
+        <div style="font-weight:600; color:var(--text);">${s.name || '—'}</div>
+        <div class="mono" style="font-size:0.75rem; color:var(--text-dim);">${s.id?.slice(0,8)}...</div>
+      </td>
+      <td>${statusBadge(s.status)}</td>
+      <td class="mono text-dim" style="font-size:0.85rem;" title="${s.volume_id}">${s.volume_id?.slice(0,8)}...</td>
+      <td>${s.size ?? '–'} GB</td>
+      <td style="text-align: right; white-space: nowrap; width: 330px;">
+        <div class="row-actions">
+           ${isAvailable ? `
+             <button class="act-btn act-start" onclick="revertSnapshotUI('${s.id}', '${s.name}', '${s.volume_id}')"><span class="ri">🔄</span> Revert</button>
+             <button class="act-btn act-primary" onclick="openCreateVolFromSnap('${s.id}', '${s.name}', ${s.size})"><span class="ri">💾</span> Vol</button>
+             <button class="act-btn act-console" onclick="openCreateImgFromSnap('${s.id}', '${s.name}', ${s.size})"><span class="ri">🖼️</span> Img</button>
+           ` : ''}
+           <button class="act-btn act-danger" onclick="quickDeleteSnap('${s.id}', '${s.name}')"><span class="ri">🗑️</span> Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') || emptyState('📸', 'No snapshots found');
+}
+
+async function quickDeleteSnap(id, name) {
+  if (!confirm(`Permanently delete snapshot "${name || id}"?`)) return;
+  try {
+    toast('Deleting snapshot...', 'info');
+    await apiDelete(`/api/vhi/snapshots/${id}`);
+    toast('Snapshot deleted', 'ok');
+    loadSnapshots();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+window.quickDeleteSnap = quickDeleteSnap;
+
+async function revertSnapshotUI(id, name, volId) {
+  if (!confirm(`Warning: This will revert the volume ${volId} to the state of snapshot "${name}". All changes made since the snapshot was taken will be lost. Proceed?`)) return;
+  try {
+    toast('Reverting to snapshot...', 'info');
+    await apiPost(`/api/vhi/snapshots/${id}/action`, { action: 'revert', volume_id: volId });
+    toast('Revert triggered successfully', 'ok');
+    loadSnapshots();
+    loadVolumes();
+  } catch (err) {
+    toast('Revert failed: ' + err.message, 'err');
+  }
+}
+window.revertSnapshotUI = revertSnapshotUI;
+
+function openCreateVolFromSnap(id, name, size) {
+  currentVolId = id; // Store snapshot ID
+  document.getElementById('snapToVolNameLabel').textContent = name || id;
+  document.getElementById('newVolFromSnapName').value = 'vol-from-' + (name || id).slice(0, 15);
+  document.getElementById('newVolFromSnapSize').value = size || 20;
+  document.getElementById('createVolFromSnapModal').classList.remove('hidden');
+}
+window.openCreateVolFromSnap = openCreateVolFromSnap;
+
+function openCreateImgFromSnap(id, name, size) {
+  currentVolId = id; // Store snapshot ID
+  document.getElementById('snapToImgNameLabel').textContent = name || id;
+  document.getElementById('newImgFromSnapName').value = 'img-from-' + (name || id).slice(0, 15);
+  document.getElementById('createImgFromSnapModal').classList.remove('hidden');
+}
+window.openCreateImgFromSnap = openCreateImgFromSnap;
+
+async function submitCreateVolFromSnap() {
+  const name = document.getElementById('newVolFromSnapName').value;
+  const size = parseInt(document.getElementById('newVolFromSnapSize').value);
+  if (!name || isNaN(size)) return toast('Name and size required', 'err');
+  
+  try {
+    toast('Creating volume from snapshot...', 'info');
+    await apiPost('/api/vhi/volumes', {
+      name,
+      size,
+      snapshot_id: currentVolId
+    });
+    toast('Volume creation triggered', 'ok');
+    document.getElementById('createVolFromSnapModal').classList.add('hidden');
+    loadVolumes();
+  } catch (err) {
+    toast('Failed: ' + err.message, 'err');
+  }
+}
+window.submitCreateVolFromSnap = submitCreateVolFromSnap;
+
+async function submitCreateImgFromSnap() {
+  const name = document.getElementById('newImgFromSnapName').value;
+  if (!name) return toast('Image name required', 'err');
+  
+  try {
+    toast('Initiating image creation workflow...', 'info');
+    await apiPost(`/api/vhi/snapshots/${currentVolId}/action`, {
+      action: 'create_image',
+      name
+    });
+    toast('Image creation process started', 'ok');
+    document.getElementById('createImgFromSnapModal').classList.add('hidden');
+    // It might take a while, images list will eventually update
+  } catch (err) {
+    toast('Failed: ' + err.message, 'err');
+  }
+}
+window.submitCreateImgFromSnap = submitCreateImgFromSnap;
+
+// ── VOLUME ACTIONS ──
+
+let currentVolId = null;
+
+function openCreateVolModal() {
+  currentVolId = null;
+  document.getElementById('newVolName').value = '';
+  document.getElementById('newVolSize').value = '10';
+  document.getElementById('newVolDesc').value = '';
+  
+  // Populate types
+  const sel = document.getElementById('newVolType');
+  sel.innerHTML = _volTypes.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+  
+  document.getElementById('createVolModal').classList.remove('hidden');
+}
+window.openCreateVolModal = openCreateVolModal;
+
+function closeCreateVolModal() {
+  document.getElementById('createVolModal').classList.add('hidden');
+}
+window.closeCreateVolModal = closeCreateVolModal;
+
+async function submitCreateVol() {
+  const name = document.getElementById('newVolName').value;
+  const size = parseInt(document.getElementById('newVolSize').value);
+  const type = document.getElementById('newVolType').value;
+  const description = document.getElementById('newVolDesc').value;
+
+  if (!name || isNaN(size)) return toast('Name and size are required', 'err');
+  
+  try {
+    toast('Creating volume...', 'info');
+    await apiPost('/api/vhi/volumes', { name, size, volume_type: type, description });
+    toast('Volume created successfully', 'ok');
+    closeCreateVolModal();
+    loadVolumes();
+  } catch (err) {
+    toast('Create volume failed: ' + err.message, 'err');
+  }
+}
+window.submitCreateVol = submitCreateVol;
+
+function openSnapVolModal(id, name) {
+  currentVolId = id;
+  document.getElementById('snapVolNameLabel').textContent = name || id;
+  document.getElementById('newSnapName').value = (name || id).slice(0, 20) + '-snap';
+  document.getElementById('newSnapDesc').value = '';
+  document.getElementById('snapshotVolModal').classList.remove('hidden');
+}
+window.openSnapVolModal = openSnapVolModal;
+
+function closeSnapVolModal() {
+  document.getElementById('snapshotVolModal').classList.add('hidden');
+}
+window.closeSnapVolModal = closeSnapVolModal;
+
+async function submitSnapVol() {
+  const name = document.getElementById('newSnapName').value;
+  const description = document.getElementById('newSnapDesc').value;
+  if (!name) return toast('Snapshot name required', 'err');
+
+  try {
+    toast('Taking snapshot...', 'info');
+    await apiPost('/api/vhi/snapshots', { volume_id: currentVolId, name, description });
+    toast('Snapshot task initiated', 'ok');
+    closeSnapVolModal();
+  } catch (err) {
+    toast('Snapshot failed: ' + err.message, 'err');
+  }
+}
+window.submitSnapVol = submitSnapVol;
+
+function openAttachVolToList(id, name) {
+  currentVolId = id;
+  document.getElementById('attachVolNameLabel').textContent = name || id;
+  const sel = document.getElementById('targetVmForVol');
+  sel.innerHTML = _vms.map(vm => `<option value="${vm.id}">${vm.name} (${vm.status})</option>`).join('');
+  document.getElementById('attachVolToListModal').classList.remove('hidden');
+}
+window.openAttachVolToList = openAttachVolToList;
+
+function closeAttachVolToListModal() {
+  document.getElementById('attachVolToListModal').classList.add('hidden');
+}
+window.closeAttachVolToListModal = closeAttachVolToListModal;
+
+async function submitAttachVolToList() {
+  const serverId = document.getElementById('targetVmForVol').value;
+  const device = document.getElementById('attachVolDevice').value;
+  try {
+    toast('Attaching volume...', 'info');
+    await apiPost(`/api/vhi/servers/${serverId}/volumes`, { volume_id: currentVolId, device });
+    toast('Volume attached successfully', 'ok');
+    closeAttachVolToListModal();
+    loadVolumes();
+  } catch (err) {
+    toast('Attach failed: ' + err.message, 'err');
+  }
+}
+window.submitAttachVolToList = submitAttachVolToList;
+
+async function openVolDetails(id) {
+  toast('Loading volume details...', 'inf');
+  document.getElementById('volDrawer').classList.add('open');
+  document.getElementById('volDetBody').innerHTML = skeletonRows(5);
+  
+  try {
+    const [volData, vTypes] = await Promise.all([
+      apiGet(`/api/vhi/volumes/${id}`),
+      apiGet('/api/vhi/volume-types')
+    ]);
+    
+    currentVolDetails = volData.volume;
+    allVolumeTypes = vTypes.volume_types || vTypes;
+    
+    renderVolDetails();
+  } catch (err) {
+    document.getElementById('volDetBody').innerHTML = `
+      <div style="padding:2rem; text-align:center;">
+        <span style="font-size:3rem;">⚠️</span>
+        <p style="margin-top:1rem; color:var(--text-dim);">Error loading details: ${err.message}</p>
+        <button class="btn btn-secondary" onclick="openVolDetails('${id}')" style="margin-top:1rem;">Retry</button>
+      </div>
+    `;
+  }
+}
+window.openVolDetails = openVolDetails;
+
+function closeVolDrawer() {
+  document.getElementById('volDrawer').classList.remove('open');
+  currentVolDetails = null;
+}
+window.closeVolDrawer = closeVolDrawer;
+
+function renderVolDetails() {
+  const vol = currentVolDetails;
+  if (!vol) return;
+  
+  document.getElementById('volDetName').textContent = vol.name || vol.id;
+  
+  const status = (vol.status || '').toUpperCase();
+  const attached = (vol.attachments || []).map(a => `<span class="badge" title="${a.server_id}">${a.server_id?.slice(0,8)}</span>`).join(' ') || '<span class="text-dim">—</span>';
+
+  let html = `
+    <div class="drawer-section">
+      <h4>Basic Info</h4>
+      <div class="detail-grid">
+        <div class="detail-label">Name</div>
+        <div class="detail-val"><input type="text" id="editVolName" value="${vol.name || ''}" oninput="checkVolChanges()" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px;"></div>
+        
+        <div class="detail-label">Status</div>
+        <div class="detail-val">${statusBadge(vol.status)}</div>
+        
+        <div class="detail-label">Created</div>
+        <div class="detail-val text-dim">${fmtDate(vol.created_at)}</div>
+
+        <div class="detail-label">ID</div>
+        <div class="detail-val mono" style="font-size:0.75rem;">${vol.id}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Properties</h4>
+      <div class="detail-grid">
+        <div class="detail-label">Type</div>
+        <div class="detail-val">
+          <select id="editVolType" onchange="checkVolChanges()" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px;">
+            ${allVolumeTypes.map(t => `<option value="${t.name}" ${t.name === vol.volume_type ? 'selected' : ''}>${t.name}</option>`).join('')}
+          </select>
+        </div>
+        
+        <div class="detail-label">Size</div>
+        <div class="detail-val">
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <input type="number" id="editVolSize" value="${vol.size}" min="${vol.size}" oninput="checkVolChanges()" style="width:80px; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px;">
+            <span class="text-dim">GB</span>
+          </div>
+          <p class="text-dim" style="font-size:0.7rem; margin-top:4px;">Only expansion is supported.</p>
+        </div>
+
+        <div class="detail-label">Bootable</div>
+        <div class="detail-val">${vol.bootable === 'true' || vol.bootable === true ? 'Yes' : 'No'}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Attachments</h4>
+      <div style="padding:8px; background:var(--bg-dark); border-radius:6px; border:1px solid var(--border);">
+        <div class="mono" style="font-size:0.85rem;">${attached}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Actions</h4>
+      <div style="display:flex; gap:0.5rem;">
+        <button class="btn btn-secondary" style="flex:1;" onclick="openSnapVolModal('${vol.id}', '${vol.name}')">📸 Snapshot</button>
+        <button class="btn btn-secondary" style="flex:1; color:var(--error);" onclick="quickDeleteVol('${vol.id}', '${vol.name}')">🗑️ Delete</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('volDetBody').innerHTML = html;
+  checkVolChanges();
+}
+
+function checkVolChanges() {
+  const name = document.getElementById('editVolName')?.value;
+  const size = parseInt(document.getElementById('editVolSize')?.value);
+  const type = document.getElementById('editVolType')?.value;
+  const btn = document.getElementById('volDetSaveBtn');
+  if (!btn) return;
+  
+  const hasNameChange = name !== undefined && name !== currentVolDetails.name;
+  const hasSizeChange = !isNaN(size) && size > currentVolDetails.size;
+  const hasTypeChange = type !== undefined && type !== currentVolDetails.volume_type;
+  
+  btn.disabled = !(hasNameChange || hasSizeChange || hasTypeChange);
+}
+window.checkVolChanges = checkVolChanges;
+
+async function saveVolChanges() {
+  const name = document.getElementById('editVolName').value;
+  const size = parseInt(document.getElementById('editVolSize').value);
+  const type = document.getElementById('editVolType').value;
+  const id = currentVolDetails.id;
+  
+  const originalName = currentVolDetails.name;
+  const originalSize = currentVolDetails.size;
+  const originalType = currentVolDetails.volume_type;
+
+  toast('Saving changes...', 'inf');
+  try {
+    if (name !== originalName) {
+      await apiPatch(`/api/vhi/volumes/${id}`, { name });
+      toast('Volume renamed', 'ok');
+    }
+    if (size > originalSize) {
+      await apiPost(`/api/vhi/volumes/${id}/extend`, { new_size: size });
+      toast('Volume expand initiated', 'inf');
+    }
+    if (type !== originalType) {
+      await apiPost(`/api/vhi/volumes/${id}/retype`, { new_type: type });
+      toast('Volume retype initiated', 'inf');
+    }
+    
+    // Refresh
+    await openVolDetails(id);
+    loadVolumes();
+  } catch (err) {
+    toast('Save failed: ' + err.message, 'err');
+  }
+}
+window.saveVolChanges = saveVolChanges;
+
+async function quickDeleteVol(id, name) {
+  if (!confirm(`Are you sure you want to permanently DELETE volume "${name || id}"? This cannot be undone.`)) return;
+  try {
+    toast('Deleting volume...', 'info');
+    await apiDelete(`/api/vhi/volumes/${id}`);
+    toast('Volume deleted', 'ok');
+    closeVolDrawer();
+    loadVolumes();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+window.quickDeleteVol = quickDeleteVol;
 
 // ── NETWORKS ──────────────────────────────────────────────────────────────
 
@@ -3016,7 +4017,9 @@ async function loadImages() {
     hookSearch('imgSearch', renderImages);
     document.getElementById('imgBadge').textContent = _imgs.length;
     document.getElementById('imgCount').textContent = `${_imgs.length} images`;
-    document.getElementById('statImgs').textContent = _imgs.length;
+    
+    const statImgsEl = document.getElementById('statImgs');
+    if (statImgsEl) statImgsEl.textContent = _imgs.length;
   } catch (err) {
     document.getElementById('imgBody').innerHTML = emptyState('⚠️', 'Could not load images: ' + err.message);
     toast('Images: ' + err.message, 'err');
@@ -3134,9 +4137,20 @@ function openSettingsModal() {
   llmProviderInput.value = localStorage.getItem('llmProvider') || 'anthropic';
   llmApiKeyInput.value = localStorage.getItem('llmApiKey') || '';
   llmBaseUrlInput.value = localStorage.getItem('llmBaseUrl') || '';
-  vhiSshHostInput.value = localStorage.getItem('vhiSshHost') || '';
-  vhiSshUserInput.value = localStorage.getItem('vhiSshUser') || 'root';
-  vhiSshPasswordInput.value = localStorage.getItem('vhiSshPassword') || '';
+  
+  // Try to load cluster-scoped SSH settings first
+  let sshConfig = {};
+  if (session) {
+    try {
+      const saved = localStorage.getItem(getGlobalSshKey());
+      if (saved) sshConfig = JSON.parse(saved);
+    } catch(e) {}
+  }
+  
+  vhiSshHostInput.value = sshConfig.host || localStorage.getItem('vhiSshHost') || '';
+  vhiSshUserInput.value = sshConfig.username || localStorage.getItem('vhiSshUser') || 'root';
+  vhiSshPasswordInput.value = sshConfig.password || localStorage.getItem('vhiSshPassword') || '';
+  
   settingsModal.classList.remove('hidden');
 }
 
@@ -3166,14 +4180,34 @@ function updateConnectionStatus() {
 // Initial connection check
 updateConnectionStatus();
 
-document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
   localStorage.setItem('llmProvider', llmProviderInput.value);
   localStorage.setItem('llmApiKey', llmApiKeyInput.value);
   localStorage.setItem('llmBaseUrl', llmBaseUrlInput.value);
-  localStorage.setItem('vhiSshHost', vhiSshHostInput.value.trim());
-  localStorage.setItem('vhiSshUser', vhiSshUserInput.value.trim());
-  localStorage.setItem('vhiSshPassword', vhiSshPasswordInput.value);
-  toast('Settings saved locally', 'ok');
+  
+  const sshConfig = {
+    host: vhiSshHostInput.value.trim(),
+    username: vhiSshUserInput.value.trim(),
+    password: vhiSshPasswordInput.value,
+    authMethod: 'password' // default for global settings modal
+  };
+
+  // Save cluster-scoped if session active
+  if (session) {
+    localStorage.setItem(getGlobalSshKey(), JSON.stringify(sshConfig));
+    try {
+      await apiPost('/api/vhi/settings/ssh', sshConfig);
+    } catch(e) {
+      console.warn('Failed to save SSH settings to server', e);
+    }
+  } else {
+    // legacy fallback
+    localStorage.setItem('vhiSshHost', sshConfig.host);
+    localStorage.setItem('vhiSshUser', sshConfig.username);
+    localStorage.setItem('vhiSshPassword', sshConfig.password);
+  }
+
+  toast('Settings saved successfully', 'ok');
   updateConnectionStatus();
   closeSettingsModal();
 });
@@ -3320,6 +4354,9 @@ async function sendChat() {
       vhiUser: typeof session !== 'undefined' ? session?.username : undefined,
       vhiPassword: typeof session !== 'undefined' ? session?.password : undefined,
       vhiProject: typeof session !== 'undefined' ? session?.project : undefined,
+      vhiSshHost: (() => { try { return JSON.parse(localStorage.getItem(getGlobalSshKey())).host; } catch(e) { return undefined; } })(),
+      vhiSshUser: (() => { try { return JSON.parse(localStorage.getItem(getGlobalSshKey())).username; } catch(e) { return undefined; } })(),
+      vhiSshPassword: (() => { try { return JSON.parse(localStorage.getItem(getGlobalSshKey())).password; } catch(e) { return undefined; } })(),
     };
 
     const r = await fetch('/api/chat', {
@@ -3359,6 +4396,62 @@ async function sendChat() {
     } else {
       chatInput.focus();
     }
+  }
+}
+
+// ── Billing Export ────────────────────────────────────────────────────────
+
+function openExportModal() {
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  document.getElementById('exportFrom').value = yesterday.toISOString().split('T')[0];
+  document.getElementById('exportTo').value = now.toISOString().split('T')[0];
+  document.getElementById('exportBillingModal').classList.remove('hidden');
+}
+
+function closeExportModal() {
+  document.getElementById('exportBillingModal').classList.add('hidden');
+}
+
+async function runExport() {
+  const from = document.getElementById('exportFrom').value;
+  const to = document.getElementById('exportTo').value;
+  
+  if (!from || !to) return toast('Please select both dates', 'inf');
+  
+  const fromIso = new Date(from + 'T00:00:00').toISOString();
+  // To date should include the whole day
+  const toIso = new Date(to + 'T23:59:59').toISOString();
+  
+  try {
+    const url = `/api/vhi/billing-export?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`;
+    
+    // Use a hidden anchor to trigger download
+    const link = document.createElement('a');
+    link.href = url;
+    // We need to add auth headers if the endpoint requires them, 
+    // but browser download (a.href) doesn't support headers easily.
+    // However, our backend check credentials via headers.
+    // So we'll fetch it first and create a blob.
+    
+    toast('Generating CSV...', 'inf');
+    const res = await fetch(url, { headers: authHeaders() });
+    if (!res.ok) throw new Error('Export failed');
+    
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `billing-export-${from}-to-${to}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(downloadUrl);
+    document.body.removeChild(a);
+    
+    toast('Download started', 'ok');
+    closeExportModal();
+  } catch (err) {
+    toast('Export error: ' + err.message, 'err');
   }
 }
 

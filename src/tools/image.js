@@ -13,11 +13,11 @@ export async function listImages(args = {}) {
     return {
         count: images.length,
         images: images.map(i => ({
-            id: i.id,
             name: i.name,
             status: i.status,
             size: i.size,
             created_at: i.created_at,
+            id: i.id,
         })),
     };
 }

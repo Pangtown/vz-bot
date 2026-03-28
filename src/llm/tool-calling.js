@@ -17,11 +17,11 @@ export function getToolDefinitions() {
     },
     {
       name: 'get_vm',
-      description: 'Get details of a single VM by ID.',
+      description: 'Get details of a single VM by Name or ID.',
       input_schema: {
         type: 'object',
         properties: {
-          server_id: { type: 'string', description: 'Server/VM ID' },
+          server_id: { type: 'string', description: 'Server/VM Name or ID' },
         },
         required: ['server_id'],
       },
@@ -32,7 +32,7 @@ export function getToolDefinitions() {
       input_schema: {
         type: 'object',
         properties: {
-          server_id: { type: 'string', description: 'Server/VM ID' },
+          server_id: { type: 'string', description: 'Server/VM Name or ID' },
           type: { type: 'string', enum: ['SOFT', 'HARD'], default: 'SOFT' },
         },
         required: ['server_id'],
@@ -43,7 +43,7 @@ export function getToolDefinitions() {
       description: 'Start a stopped VM.',
       input_schema: {
         type: 'object',
-        properties: { server_id: { type: 'string' } },
+        properties: { server_id: { type: 'string', description: 'Server/VM Name or ID' } },
         required: ['server_id'],
       },
     },
@@ -52,7 +52,7 @@ export function getToolDefinitions() {
       description: 'Stop a running VM.',
       input_schema: {
         type: 'object',
-        properties: { server_id: { type: 'string' } },
+        properties: { server_id: { type: 'string', description: 'Server/VM Name or ID' } },
         required: ['server_id'],
       },
     },
@@ -68,11 +68,11 @@ export function getToolDefinitions() {
     },
     {
       name: 'get_image',
-      description: 'Get details of a single image by ID.',
+      description: 'Get details of a single image by Name or ID.',
       input_schema: {
         type: 'object',
         properties: {
-          image_id: { type: 'string', description: 'Image ID' },
+          image_id: { type: 'string', description: 'Image Name or ID' },
         },
         required: ['image_id'],
       },
@@ -81,6 +81,17 @@ export function getToolDefinitions() {
       name: 'list_volumes',
       description: 'List block storage volumes in VHI.',
       input_schema: { type: 'object', properties: { limit: { type: 'number', description: 'Max items' } } },
+    },
+    {
+      name: 'get_volume',
+      description: 'Get details of a single volume by Name or ID.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          volume_id: { type: 'string', description: 'Volume Name or ID' },
+        },
+        required: ['volume_id'],
+      },
     },
     {
       name: 'list_volume_types',
@@ -93,26 +104,31 @@ export function getToolDefinitions() {
       input_schema: { type: 'object', properties: { limit: { type: 'number', description: 'Max items' } } },
     },
     {
+      name: 'list_flavors',
+      description: 'List available compute flavors (sizes) in VHI.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
       name: 'create_vm',
-      description: 'Create a new VM in VHI. You can optionally specify boot disk size and storage policy.',
+      description: 'Create a new VM in VHI. You can specify names for image, flavor, and networks.',
       input_schema: {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'Name of the VM' },
-          imageRef: { type: 'string', description: 'Image ID to use' },
-          flavorRef: { type: 'string', description: 'Flavor/Size ID to use' },
-          volume_size: { type: 'number', description: 'Boot disk size in GB (optional, defaults to 50 if policy is set)' },
-          volume_type: { type: 'string', description: 'Storage policy name for the boot disk (optional)' },
+          imageRef: { type: 'string', description: 'Image Name or ID to use' },
+          flavorRef: { type: 'string', description: 'Flavor Name or ID to use' },
+          volume_size: { type: 'number', description: 'Boot disk size in GB (optional, defaults to 50)' },
+          volume_type: { type: 'string', description: 'Storage policy name or ID for the boot disk. THIS IS REQUIRED.' },
           networks: {
             type: 'array',
             items: {
               type: 'object',
-              properties: { uuid: { type: 'string', description: 'Network UUID' } }
+              properties: { uuid: { type: 'string', description: 'Network Name or ID' } }
             },
             description: 'List of networks to connect to (optional)'
           }
         },
-        required: ['name', 'imageRef', 'flavorRef'],
+        required: ['name', 'imageRef', 'flavorRef', 'volume_type'],
       },
     },
     {
@@ -123,10 +139,45 @@ export function getToolDefinitions() {
         properties: {
           name: { type: 'string', description: 'Name of the volume' },
           size: { type: 'number', description: 'Size of the volume in GB' },
-          volume_type: { type: 'string', description: 'Storage policy name (e.g., "standard")' },
+          volume_type: { type: 'string', description: 'Storage policy name or ID (e.g., "standard")' },
           description: { type: 'string', description: 'Optional volume description' }
         },
         required: ['name', 'size']
+      }
+    },
+    {
+      name: 'delete_vm',
+      description: 'Delete a VM by Name or ID.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          server_id: { type: 'string', description: 'Server/VM Name or ID' },
+        },
+        required: ['server_id'],
+      },
+    },
+    {
+      name: 'delete_volume',
+      description: 'Delete a volume by Name or ID.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          volume_id: { type: 'string', description: 'Volume Name or ID' },
+        },
+        required: ['volume_id'],
+      },
+    },
+    {
+      name: 'attach_volume',
+      description: 'Attach a volume to a VM.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          server_id: { type: 'string', description: 'Server Name or ID' },
+          volume_id: { type: 'string', description: 'Volume Name or ID' },
+          device: { type: 'string', description: 'Device name, e.g., /dev/vdb (optional)' }
+        },
+        required: ['server_id', 'volume_id']
       }
     },
     {

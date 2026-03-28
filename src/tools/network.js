@@ -1,7 +1,3 @@
-/**
- * Network tools – list, get, create, delete for networks and subnets
- */
-
 import {
     listNetworks as fetchNetworks,
     getNetwork as fetchNetwork,
@@ -11,23 +7,25 @@ import {
     createSubnet as apiCreateSubnet,
     deleteSubnet as apiDeleteSubnet
 } from '../vhi/network.js';
+import { resolveId } from './resolver.js';
 
 export async function listNetworks(args = {}) {
     const networks = await fetchNetworks();
     return {
         count: (networks || []).length,
         networks: (networks || []).map(n => ({
-            id: n.id,
             name: n.name,
             status: n.status,
+            id: n.id,
         })),
     };
 }
 
 export async function getNetwork(args) {
-    if (!args.network_id) throw new Error('network_id required');
-    const network = await fetchNetwork(args.network_id);
-    if (!network) return { found: false, network_id: args.network_id };
+    const networkId = await resolveId('network', args.network_id);
+    if (!networkId) throw new Error('network_id required');
+    const network = await fetchNetwork(networkId);
+    if (!network) return { found: false, network_id: networkId };
     return { found: true, network };
 }
 
@@ -38,13 +36,15 @@ export async function createNetwork(args) {
 }
 
 export async function deleteNetwork(args) {
-    if (!args.network_id) throw new Error('network_id required');
-    await apiDeleteNetwork(args.network_id);
-    return { ok: true, action: 'delete_network', network_id: args.network_id };
+    const networkId = await resolveId('network', args.network_id);
+    if (!networkId) throw new Error('network_id required');
+    await apiDeleteNetwork(networkId);
+    return { ok: true, action: 'delete_network', network_id: networkId };
 }
 
 export async function listSubnets(args = {}) {
-    const subnets = await fetchSubnets({ network_id: args.network_id });
+    const networkId = await resolveId('network', args.network_id);
+    const subnets = await fetchSubnets({ network_id: networkId });
     return {
         count: (subnets || []).length,
         subnets: (subnets || []).map(s => ({
@@ -58,9 +58,10 @@ export async function listSubnets(args = {}) {
 }
 
 export async function createSubnet(args) {
-    if (!args.network_id || !args.cidr) throw new Error('network_id and cidr required');
+    const networkId = await resolveId('network', args.network_id);
+    if (!networkId || !args.cidr) throw new Error('network_id and cidr required');
     const subnetParams = {
-        network_id: args.network_id,
+        network_id: networkId,
         cidr: args.cidr,
         ip_version: args.ip_version || 4,
     };
@@ -71,7 +72,8 @@ export async function createSubnet(args) {
 }
 
 export async function deleteSubnet(args) {
-    if (!args.subnet_id) throw new Error('subnet_id required');
-    await apiDeleteSubnet(args.subnet_id);
-    return { ok: true, action: 'delete_subnet', subnet_id: args.subnet_id };
+    const subnetId = await resolveId('subnet', args.subnet_id);
+    if (!subnetId) throw new Error('subnet_id required');
+    await apiDeleteSubnet(subnetId);
+    return { ok: true, action: 'delete_subnet', subnet_id: subnetId };
 }

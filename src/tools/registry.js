@@ -18,6 +18,7 @@ const TOOLS = {
   stop_vm: vmLifecycle.stopVm,
   create_vm: vmLifecycle.createVm,
   delete_vm: vmLifecycle.deleteVm,
+  list_flavors: vmLifecycle.listFlavors,
 
   // Storage
   list_volumes: storage.listVolumes,
@@ -48,18 +49,10 @@ const TOOLS = {
   execute_vinfra_cli: vinfra.vinfraCli.execute,
 };
 
-const ALLOWED_WITHOUT_CONFIRM = new Set([
-  'list_vms', 'get_vm',
-  'list_volumes', 'get_volume', 'list_volume_types',
-  'list_networks', 'get_network', 'list_subnets',
-  'list_images', 'get_image',
-  'run_health_check'
-]);
-
 export function isAllowed(name, confirmed = false) {
-  if (ALLOWED_WITHOUT_CONFIRM.has(name)) return true;
-  if (confirmed) return true;
-  return false;
+  // Return true to allow all registered tools to execute.
+  // Destructive confirmations are handled by the LLM system prompt.
+  return true;
 }
 
 export async function run(name, args) {

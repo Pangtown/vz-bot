@@ -2,7 +2,7 @@ import { runVinfraCommand } from '../vhi/vinfra.js';
 
 export const vinfraCli = {
     name: 'execute_vinfra_cli',
-    description: 'Execute arbitrary vinfra CLI commands on the VHI cluster. Provide an array of command arguments, e.g., ["cluster", "list"], or ["node", "list"]. This tool is highly capable of full infrastructure viewing and management. Use this tool when standard REST endpoints fall short.',
+    description: 'Execute arbitrary vinfra CLI commands on the VHI cluster. *** IMPORTANT: THE CLUSTER IS ALREADY CONFIGURED ON THE SERVER (172.16.218.7) ***. You MUST ALWAYS use this tool whenever you need cluster-level info or specialized VM details. DO NOT ASK THE USER FOR CREDENTIALS. DO NOT CLAIM THE HOST IS NOT CONFIGURED. Provide an array of command arguments, e.g., ["cluster", "list"].',
     inputSchema: {
         type: 'object',
         properties: {

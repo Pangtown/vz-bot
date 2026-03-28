@@ -112,8 +112,9 @@ export async function createServer(options = {}) {
     payload.networks = [{ uuid: payload.networks }];
   }
 
-  // If volume_size or volume_type is provided, use block_device_mapping_v2
-  if (options.volume_size || options.volume_type) {
+  // Default to Boot from Volume (block_device_mapping_v2) if an image is provided
+  // to avoid MaxRetriesExceeded scheduling errors on compute nodes without ephemeral storage.
+  if (options.volume_size || options.volume_type || options.imageRef) {
     payload.block_device_mapping_v2 = [{
       boot_index: 0,
       uuid: options.imageRef,
@@ -123,10 +124,11 @@ export async function createServer(options = {}) {
       volume_type: options.volume_type || undefined,
       delete_on_termination: options.delete_on_termination !== false
     }];
-    // When using block_device_mapping_v2 for boot, imageRef should null or handled by BDM
-    // But Nova sometimes requires it depending on version. 2.67+ supports it in BDM.
+    // When using BDM for boot, the root imageRef must be removed
     delete payload.imageRef; 
   }
+
+  console.log('[CREATE_VM] Payload:', JSON.stringify({ server: payload }, null, 2));
 
   const res = await client.fetch(await computeUrl('/servers'), {
     method: 'POST',
@@ -138,7 +140,8 @@ export async function createServer(options = {}) {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`VHI Compute createServer failed (${res.status}): ${text.slice(0, 300)}`);
+    console.error(`[CREATE_VM] FAILED (${res.status}):`, text);
+    throw new Error(`VHI Compute createServer failed (${res.status}): ${text.slice(0, 500)}`);
   }
   const data = await res.json();
   return data.server || null;
@@ -199,13 +202,24 @@ export async function getVncConsole(serverId) {
 
 export async function listFlavors() {
   const client = await getClient();
-  const res = await client.fetch(await computeUrl('/flavors/detail'));
+  const res = await client.fetch(await computeUrl('/flavors/detail?is_public=None'));
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`VHI Compute listFlavors failed (${res.status}): ${text.slice(0, 300)}`);
   }
   const data = await res.json();
   return data.flavors || [];
+}
+
+export async function listHypervisors() {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl('/os-hypervisors/detail'));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute listHypervisors failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.hypervisors || [];
 }
 
 export async function listInterfaces(serverId) {

@@ -1,0 +1,94 @@
+{
+  "id": "039b7160-dbb3-4300-8a27-3bb1d32b8d32",
+  "name": "vm_AI",
+  "status": "ERROR",
+  "tenant_id": "aeba0066a44540d984349d01ab79ec7f",
+  "user_id": "e48e315f5b4540b0bc2f84e8fa19d1de",
+  "metadata": {},
+  "hostId": "",
+  "image": {
+    "id": "1a45b2db-a62e-4f00-baf9-f28887e7ec15",
+    "links": [
+      {
+        "rel": "bookmark",
+        "href": "https://172.16.218.7:8774/aeba0066a44540d984349d01ab79ec7f/images/1a45b2db-a62e-4f00-baf9-f28887e7ec15"
+      }
+    ]
+  },
+  "flavor": {
+    "id": "100",
+    "links": [
+      {
+        "rel": "bookmark",
+        "href": "https://172.16.218.7:8774/aeba0066a44540d984349d01ab79ec7f/flavors/100"
+      }
+    ]
+  },
+  "created": "2026-03-21T16:52:42Z",
+  "updated": "2026-03-21T16:52:52Z",
+  "addresses": {},
+  "accessIPv4": "",
+  "accessIPv6": "",
+  "links": [
+    {
+      "rel": "self",
+      "href": "https://172.16.218.7:8774/v2.1/aeba0066a44540d984349d01ab79ec7f/servers/039b7160-dbb3-4300-8a27-3bb1d32b8d32"
+    },
+    {
+      "rel": "bookmark",
+      "href": "https://172.16.218.7:8774/aeba0066a44540d984349d01ab79ec7f/servers/039b7160-dbb3-4300-8a27-3bb1d32b8d32"
+    }
+  ],
+  "OS-DCF:diskConfig": "MANUAL",
+  "fault": {
+    "code": 500,
+    "created": "2026-03-21T16:52:52Z",
+    "message": "Exceeded maximum number of retries. Exhausted all hosts available for retrying build failures for instance 039b7160-dbb3-4300-8a27-3bb1d32b8d32.",
+    "details": "Traceback (most recent call last):\n  File \"/usr/lib/python3.6/site-packages/nova/conductor/manager.py\", line 766, in build_instances\n    raise exception.MaxRetriesExceeded(reason=msg)\nnova.exception.MaxRetriesExceeded: Exceeded maximum number of retries. Exhausted all hosts available for retrying build failures for instance 039b7160-dbb3-4300-8a27-3bb1d32b8d32.\n"
+  },
+  "OS-EXT-AZ:availability_zone": "",
+  "config_drive": "",
+  "key_name": null,
+  "OS-SRV-USG:launched_at": null,
+  "OS-SRV-USG:terminated_at": null,
+  "OS-EXT-SRV-ATTR:host": null,
+  "OS-EXT-SRV-ATTR:instance_name": "instance-0000000c",
+  "OS-EXT-SRV-ATTR:hypervisor_hostname": null,
+  "OS-EXT-STS:task_state": null,
+  "OS-EXT-STS:vm_state": "error",
+  "OS-EXT-STS:power_state": 0,
+  "OS-EXT-STS:power_state_reason": null,
+  "os-extended-volumes:volumes_attached": [],
+  "vcpu_model": null,
+  "image_metadata": {
+    "image_validated": "yes",
+    "os_distro": "linux",
+    "os_type": "linux",
+    "hw_disk_bus": "virtio",
+    "min_ram": "0",
+    "min_disk": "1",
+    "disk_format": "qcow2",
+    "container_format": "bare",
+    "base_image_ref": "1a45b2db-a62e-4f00-baf9-f28887e7ec15",
+    "hw_machine_type": "pc-q35-vz9.0.0",
+    "hw_vif_multiqueue_enabled": "True"
+  },
+  "required_traits": [],
+  "hci_info": {
+    "network": [],
+    "boot_order": [],
+    "vzhardware": "2.0.1",
+    "max_mem": null,
+    "max_vcpu": null,
+    "has_pci_devices": null
+  },
+  "memory_mb": 512,
+  "vcpus": 1,
+  "root_gb": 0,
+  "guest_agent": {
+    "status": "unknown",
+    "version": null
+  },
+  "username": null,
+  "allow_set_password": true
+}

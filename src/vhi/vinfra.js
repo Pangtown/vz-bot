@@ -1,20 +1,50 @@
 import { Client } from 'ssh2';
 import { getContextValue } from '../gateway/context.js';
+import { loadGlobalSshConfig } from '../monitoring/ssh-storage.js';
 
 export async function runVinfraCommand(args, creds = {}) {
-    const host     = creds.host     || getContextValue('vhiSshHost', 'VHI_SSH_HOST');
-    const username = creds.username || getContextValue('vhiSshUser', 'VHI_SSH_USER') || 'root';
-    const password = creds.password || getContextValue('vhiSshPassword', 'VHI_SSH_PASSWORD');
-    const privateKey = creds.privateKey || getContextValue('vhiSshPrivateKey', 'VHI_SSH_PRIVATE_KEY');
-    const passphrase = creds.passphrase || getContextValue('vhiSshPassphrase', 'VHI_SSH_PASSPHRASE');
+    let host = creds.host || getContextValue('vhiSshHost', 'VHI_SSH_HOST');
+    let username = creds.username || getContextValue('vhiSshUser', 'VHI_SSH_USER') || 'root';
+    let password = creds.password || getContextValue('vhiSshPassword', 'VHI_SSH_PASSWORD');
+    let privateKey = creds.privateKey || getContextValue('vhiSshPrivateKey', 'VHI_SSH_PRIVATE_KEY');
+    let passphrase = creds.passphrase || getContextValue('vhiSshPassphrase', 'VHI_SSH_PASSPHRASE');
 
-    const vhiUser = getContextValue('vhiUser', 'VHI_USER');
-    const vhiPassword = getContextValue('vhiPassword', 'VHI_PASSWORD');
-    const vhiDomain = getContextValue('vhiDomain', 'VHI_DOMAIN_NAME') || 'Default';
-    const vhiProject = getContextValue('vhiProject', 'VHI_PROJECT');
+    let vhiUser = getContextValue('vhiUser', 'VHI_USER');
+    let vhiPassword = getContextValue('vhiPassword', 'VHI_PASSWORD');
+    let vhiDomain = getContextValue('vhiDomain', 'VHI_DOMAIN_NAME') || 'Default';
+    let vhiProject = getContextValue('vhiProject', 'VHI_PROJECT');
+    let vhiBaseUrl = getContextValue('vhiBaseUrl', 'VHI_BASE_URL');
+
+    // Fallback logic
+    if (!host) {
+        const baseUrl = creds.vhiBaseUrl || vhiBaseUrl;
+        const persistentConfig = await loadGlobalSshConfig(baseUrl);
+        if (persistentConfig.host) {
+            console.log(`[VINFRA] Using persistent SSH config for ${persistentConfig.host} (cluster: ${baseUrl || 'default'})`);
+            host = persistentConfig.host;
+            if (!username || username === 'root') username = persistentConfig.username || 'root';
+            if (!password) password = persistentConfig.password;
+            if (!privateKey) privateKey = persistentConfig.privateKey;
+            if (!passphrase) passphrase = persistentConfig.passphrase;
+        }
+    }
+
+    if (!host && vhiBaseUrl) {
+        try {
+            console.log(`[VINFRA] Falling back to cluster API host for SSH`);
+            host = new URL(vhiBaseUrl).hostname;
+        } catch (e) {
+            // ignore malformed URLs
+        }
+    }
+    if (!password && !privateKey && vhiPassword) {
+        password = vhiPassword;
+    }
 
     if (!host) {
-        throw new Error('Node SSH Host must be configured to run vinfra commands.');
+        const debugConfig = await loadGlobalSshConfig();
+        const configKeys = Object.keys(debugConfig).join(', ');
+        throw new Error(`Node SSH Host must be configured to run vinfra commands. Server-side fallback attempted but found keys: [${configKeys}]. Please ensure global SSH settings are saved in the dashboard.`);
     }
     if (!password && !privateKey) {
         throw new Error('Node SSH Password or Private Key must be provided.');
@@ -23,11 +53,13 @@ export async function runVinfraCommand(args, creds = {}) {
     return new Promise((resolve, reject) => {
         const conn = new Client();
         conn.on('ready', () => {
-            // Use environment variables for authentication to avoid shell quoting issues with flags.
+            // Use standard vinfra environment variables for authentication
             const envVars = [];
-            if (vhiUser)     envVars.push(`export VHA_USER='${vhiUser.replace(/'/g, "'\\''")}'`);
-            if (vhiPassword) envVars.push(`export VHA_PASSWORD='${vhiPassword.replace(/'/g, "'\\''")}'`);
-            if (vhiDomain)   envVars.push(`export VHA_DOMAIN='${vhiDomain.replace(/'/g, "'\\''")}'`);
+            if (vhiBaseUrl)  envVars.push(`export VINFRA_URL='${vhiBaseUrl.replace(/'/g, "'\\''")}'`);
+            if (vhiUser)     envVars.push(`export VINFRA_USERNAME='${vhiUser.replace(/'/g, "'\\''")}'`);
+            if (vhiPassword) envVars.push(`export VINFRA_PASSWORD='${vhiPassword.replace(/'/g, "'\\''")}'`);
+            if (vhiDomain)   envVars.push(`export VINFRA_DOMAIN='${vhiDomain.replace(/'/g, "'\\''")}'`);
+            if (vhiProject)  envVars.push(`export VINFRA_PROJECT='${vhiProject.replace(/'/g, "'\\''")}'`);
             
             const quotedArgs = args.map(a => `'${String(a).replace(/'/g, "'\\''")}'`).join(' ');
             

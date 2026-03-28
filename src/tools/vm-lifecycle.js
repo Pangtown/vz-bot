@@ -1,8 +1,19 @@
-/**
- * VM lifecycle tools – list, get, reboot, start, stop
- */
+import { listServers, getServer, rebootServer, startServer, stopServer, createServer, deleteServer, listFlavors as fetchFlavors } from '../vhi/compute.js';
+import { resolveId } from './resolver.js';
 
-import { listServers, getServer, rebootServer, startServer, stopServer, createServer, deleteServer } from '../vhi/compute.js';
+export async function listFlavors(args = {}) {
+  const flavors = await fetchFlavors();
+  return {
+    count: (flavors || []).length,
+    flavors: (flavors || []).map(f => ({
+      name: f.name,
+      vcpus: f.vcpus,
+      ram: f.ram,
+      disk: f.disk,
+      id: f.id,
+    })),
+  };
+}
 
 export async function listVms(args = {}) {
   const servers = await listServers({
@@ -12,49 +23,83 @@ export async function listVms(args = {}) {
   return {
     count: servers.length,
     vms: servers.map(s => ({
-      id: s.id,
       name: s.name,
       status: s.status,
       created: s.created,
+      id: s.id,
     })),
   };
 }
 
 export async function getVm(args) {
-  if (!args.server_id) throw new Error('server_id required');
-  const s = await getServer(args.server_id);
-  if (!s) return { found: false, server_id: args.server_id };
-  return { found: true, server: { id: s.id, name: s.name, status: s.status, created: s.created } };
+  const serverId = await resolveId('server', args.server_id);
+  if (!serverId) throw new Error('server_id required');
+  const s = await getServer(serverId);
+  if (!s) return { found: false, server_id: serverId };
+  return { 
+    found: true, 
+    server: { 
+      id: s.id, 
+      name: s.name, 
+      status: s.status, 
+      created: s.created,
+      vcpus: s.vcpus,
+      ram: s.ram,
+      disk: s.disk
+    } 
+  };
 }
 
 export async function rebootVm(args) {
-  if (!args.server_id) throw new Error('server_id required');
-  await rebootServer(args.server_id, args.type || 'SOFT');
-  return { ok: true, action: 'reboot', server_id: args.server_id };
+  const serverId = await resolveId('server', args.server_id);
+  if (!serverId) throw new Error('server_id required');
+  await rebootServer(serverId, args.type || 'SOFT');
+  return { ok: true, action: 'reboot', server_id: serverId };
 }
 
 export async function startVm(args) {
-  if (!args.server_id) throw new Error('server_id required');
-  await startServer(args.server_id);
-  return { ok: true, action: 'start', server_id: args.server_id };
+  const serverId = await resolveId('server', args.server_id);
+  if (!serverId) throw new Error('server_id required');
+  await startServer(serverId);
+  return { ok: true, action: 'start', server_id: serverId };
 }
 
 export async function stopVm(args) {
-  if (!args.server_id) throw new Error('server_id required');
-  await stopServer(args.server_id);
-  return { ok: true, action: 'stop', server_id: args.server_id };
+  const serverId = await resolveId('server', args.server_id);
+  if (!serverId) throw new Error('server_id required');
+  await stopServer(serverId);
+  return { ok: true, action: 'stop', server_id: serverId };
 }
 
 export async function createVm(args) {
   if (!args.name || !args.imageRef || !args.flavorRef) {
     throw new Error('name, imageRef, and flavorRef are required to create a VM');
   }
-  const server = await createServer(args);
+  
+  // Resolve names to IDs
+  const imageId = await resolveId('image', args.imageRef);
+  const flavorId = await resolveId('flavor', args.flavorRef);
+  
+  const createArgs = { 
+    ...args, 
+    imageRef: imageId, 
+    flavorRef: flavorId 
+  };
+
+  // Resolve network names
+  if (args.networks && Array.isArray(args.networks)) {
+    createArgs.networks = await Promise.all(args.networks.map(async net => ({
+      uuid: await resolveId('network', net.uuid)
+    })));
+  }
+
+  const server = await createServer(createArgs);
   return { ok: true, action: 'create_vm', server_id: server.id, server };
 }
 
 export async function deleteVm(args) {
-  if (!args.server_id) throw new Error('server_id required');
-  await deleteServer(args.server_id);
-  return { ok: true, action: 'delete_vm', server_id: args.server_id };
+  const serverId = await resolveId('server', args.server_id);
+  if (!serverId) throw new Error('server_id required');
+  await deleteServer(serverId);
+  return { ok: true, action: 'delete_vm', server_id: serverId };
 }
