@@ -5,7 +5,7 @@
 
 import { runWithContext } from './context.js';
 import { listServers, getServer, serverAction, startServer, stopServer, rebootServer, deleteServer, createServer, listFlavors, getVncConsole, listInterfaces, attachInterface, detachInterface } from '../vhi/compute.js';
-import { listNetworks, listSubnets, getPort, updatePort, deletePort, listSecurityGroups } from '../vhi/network.js';
+import { listNetworks, listSubnets, listPorts, getPort, updatePort, deletePort, listSecurityGroups } from '../vhi/network.js';
 import { listVolumes, getVolume, listVolumeTypes, attachVolume, detachVolume, createVolume, deleteVolume, extendVolume, retypeVolume, updateVolume, listSnapshots, createSnapshot, deleteSnapshot, revertSnapshot, uploadVolumeToImage } from '../vhi/block.js';
 import { listImages } from '../vhi/image.js';
 import { getToken, listProjects, listUsers } from '../vhi/identity.js';
@@ -488,6 +488,7 @@ async function handleUsers(req, res, ctx) {
 async function handleNodes(req, res, ctx) {
   try {
     const data = await runWithContext(ctx, async () => {
+      // 1. Fetch Nova Hypervisors (for basic stats)
       const base = ctx.vhiBaseUrl.replace(/\/$/, '');
       const port = process.env.VHI_COMPUTE_PORT || 8774;
       const url = `${base}:${port}/v2.1/os-hypervisors/detail`;
@@ -499,7 +500,127 @@ async function handleNodes(req, res, ctx) {
         throw new Error(`Nodes list failed (${r.status}): ${t.slice(0, 200)}`);
       }
       const d = await r.json();
-      return d.hypervisors || [];
+      const hypervisors = d.hypervisors || [];
+
+      // 2. Fetch Vinfra Nodes (for external IPs) & Compute Config (for overcommitment)
+      try {
+        const { runVinfraCommand } = await import('../vhi/vinfra.js');
+        
+        // Use a timeout to avoid blocking the whole API if SSH hangs
+        const withTimeout = (promise, ms, fallback) => 
+          Promise.race([promise, new Promise(res => setTimeout(() => res(fallback), ms))]);
+
+        const [vNodes, computeSvc] = await Promise.all([
+          withTimeout(runVinfraCommand(['node', 'list']).catch(() => []), 4000, []),
+          withTimeout(runVinfraCommand(['service', 'compute', 'show']).catch(() => ({})), 4000, {})
+        ]);
+
+        // Ensure we have expected types
+        const safeVNodes = Array.isArray(vNodes) ? vNodes : [];
+        if (safeVNodes.length > 0) {
+          console.log(`[VHI-API] First vinfra node keys: ${Object.keys(safeVNodes[0]).join(', ')}`);
+          console.log(`[VHI-API] First vinfra node raw:`, JSON.stringify(safeVNodes[0]));
+        }
+        const safeComputeSvc = (computeSvc && typeof computeSvc === 'object') ? computeSvc : {};
+        const cpuRatio = safeComputeSvc.config?.cpu_allocation_ratio || 16.0;
+
+        let finalNodes = [];
+
+        if (safeVNodes.length > 0) {
+          // 3. If vinfra gave us nodes, use them as primary source
+          finalNodes = safeVNodes.map(vn => {
+            const vName = vn.hostname || vn.host || vn.name || vn.id || 'unknown';
+            // Vinfra address can be an array in some versions - handle both
+            const vAddr = Array.isArray(vn.address) ? vn.address[0] : (vn.address || vn.ip || vn.host_ip || null);
+            
+            // Find hypervisor for this vinfra node by hostname, ID, or IP match
+            // We use string conversion for IDs to handle Integer vs UUID scenarios
+            const h = hypervisors.find(hv => 
+              (hv.hypervisor_hostname && vName && (
+                hv.hypervisor_hostname.toLowerCase() === vName.toLowerCase() || 
+                hv.hypervisor_hostname.split('.')[0].toLowerCase() === vName.split('.')[0].toLowerCase()
+              )) || 
+              (hv.id && String(hv.id) === String(vn.id)) ||
+              (hv.host_ip && hv.host_ip === vAddr)
+            );
+            
+            if (!h) {
+              console.log(`[VHI-API] No compute match for vinfra node: ${vName} (${vAddr}) - tagging as Management`);
+            } else {
+              console.log(`[VHI-API] Matched vinfra node ${vName} to hypervisor ${h.hypervisor_hostname} (ID: ${h.id})`);
+            }
+
+            return {
+              ...(h || {}),
+              id: vn.id,
+              hypervisor_hostname: vName || vn.id || 'unknown',
+              state: vn.state || h?.state || 'unknown',
+              status: vn.status || h?.status || 'unknown',
+              external_ip: vAddr || h?.host_ip || null,
+              cpu_allocation_ratio: cpuRatio,
+              // Flag to indicate if this is a compute node
+              is_compute: !!h
+            };
+          });
+        } else {
+          // 4. Fallback to Nova hypervisors if vinfra failed/timed out
+          finalNodes = hypervisors.map(h => {
+            return {
+              ...h,
+              external_ip: h.host_ip || null,
+              cpu_allocation_ratio: cpuRatio,
+              is_compute: true
+            };
+          });
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // ENHANCEMENT: Supplement Nova/Vinfra list with Neutron IP data
+        // ────────────────────────────────────────────────────────────────
+        try {
+          const [ports, networks] = await withTimeout(Promise.all([listPorts(), listNetworks()]), 3000).catch(() => [[], []]);
+          const netMap = {};
+          networks.forEach(n => { netMap[n.id] = n.name; });
+          
+          const hostPortMap = {};
+          ports.forEach(p => {
+            const hid = p['binding:host_id'];
+            if (!hid) return;
+            if (!hostPortMap[hid]) hostPortMap[hid] = [];
+            hostPortMap[hid].push({
+              name: netMap[p.network_id] || p.name || p.id.slice(0, 8),
+              ips: (p.fixed_ips || []).map(f => f.ip_address)
+            });
+          });
+
+          finalNodes = finalNodes.map(n => {
+            const hostname = n.hypervisor_hostname || n.hostname || n.name;
+            const hostPorts = hostPortMap[hostname] || hostPortMap[hostname?.split('.')[0]] || [];
+            if (hostPorts.length > 0) {
+              n._all_ips = hostPorts;
+              // Best external IP heuristic: look for Public/External or routable IP
+              const publicNet = hostPorts.find(hp => 
+                /public|external|internet/i.test(hp.name) || 
+                (hp.ips || []).some(ip => !ip.startsWith('10.') && !ip.startsWith('192.168.') && !ip.startsWith('172.'))
+              );
+              if (publicNet && publicNet.ips && publicNet.ips.length > 0) {
+                n.external_ip = publicNet.ips[0];
+              } else if (!n.external_ip && hostPorts[0].ips.length > 0) {
+                n.external_ip = hostPorts[0].ips[0];
+              }
+            }
+            return n;
+          });
+        } catch (netErr) {
+          console.log(`[VHI-API] Bulk Neutron discovery skipped: ${netErr.message}`);
+        }
+
+        console.log(`[VHI-API] handleNodes returning ${finalNodes.length} nodes:`, JSON.stringify(finalNodes.map(n => ({ host: n.hypervisor_hostname, ext: n.external_ip, compute: n.is_compute })), null, 2));
+        return finalNodes;
+      } catch (vErr) {
+        console.warn(`[VHI-API] Failed to enrich nodes with vinfra: ${vErr.message}`);
+        return hypervisors.map(h => ({ ...h, cpu_allocation_ratio: 16.0, is_compute: true }));
+      }
     });
     return json(res, 200, { nodes: data });
   } catch (err) {
@@ -507,7 +628,142 @@ async function handleNodes(req, res, ctx) {
   }
 }
 
-/** POST /api/vhi/nodes/:id/reboot */
+async function findNeutronNodeIps(hostname) {
+  try {
+    const [ports, networks] = await Promise.race([
+      Promise.all([listPorts(), listNetworks()]),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Neutron discovery timed out (4s)')), 4000))
+    ]);
+
+    const netMap = {};
+    networks.forEach(n => { netMap[n.id] = n.name; });
+
+    const nodePorts = ports.filter(p => p['binding:host_id'] === hostname || p['binding:host_id'] === hostname.split('.')[0]);
+    return nodePorts.map(p => ({
+      name: netMap[p.network_id] || p.name || p.id.slice(0, 8),
+      type: p.device_owner,
+      mac: p.mac_address,
+      ips: (p.fixed_ips || []).map(f => f.ip_address)
+    }));
+  } catch (err) {
+    console.error(`[VHI-API] findNeutronNodeIps failed for ${hostname}:`, err.message);
+    return [];
+  }
+}
+
+/** GET /api/vhi/nodes/:id */
+async function handleNodeGet(req, res, ctx, nodeId) {
+  try {
+    const data = await runWithContext(ctx, async () => {
+      const { runVinfraCommand } = await import('../vhi/vinfra.js');
+      const { getHypervisor } = await import('../vhi/compute.js');
+      
+      const withTimeout = (promise, ms) => 
+        Promise.race([
+          promise, 
+          new Promise((_, rej) => setTimeout(() => rej(new Error('Vinfra node show timed out (5s)')), ms))
+        ]);
+
+      let nodeDetails;
+      try {
+        // Primary source: Vinfra (deep hardware/service info)
+        nodeDetails = await withTimeout(runVinfraCommand(['node', 'show', nodeId]), 5000);
+      } catch (vErr) {
+        console.log(`[VHI-API] Vinfra node show failed for ${nodeId}, falling back to Nova: ${vErr.message}`);
+        
+        // Fallback: Nova Hypervisor (basic compute info)
+        const hNode = await getHypervisor(nodeId);
+        if (!hNode) throw new Error(`Node not found in Vinfra or Nova: ${nodeId}`);
+        
+        nodeDetails = {
+          id: hNode.id,
+          hostname: hNode.hypervisor_hostname,
+          status: hNode.status,
+          state: hNode.state,
+          cpu_model: hNode.cpu_info?.model || 'Generic',
+          cpus: hNode.vcpus,
+          ram_size: hNode.memory_mb * 1024 * 1024, // Convert MB to bytes
+          roles: ['compute'],
+          services: [{ name: 'nova-compute', status: hNode.state }],
+          networks: [{ name: 'Management', ips: [hNode.host_ip] }],
+          _is_fallback: true,
+          _host_ip: hNode.host_ip
+        };
+      }
+
+      // ────────────────────────────────────────────────────────────────
+      // ENHANCEMENT: Discover ALL IP addresses via SSH 'ip -j addr'
+      // ────────────────────────────────────────────────────────────────
+      let discoveredIps = false;
+      try {
+        const sshHost = nodeDetails.external_ip || nodeDetails._host_ip || nodeDetails.hostname;
+        if (sshHost) {
+          console.log(`[VHI-API] Fetching real network state via SSH for ${sshHost}...`);
+          const rawInterfaces = await withTimeout(runVinfraCommand(['/sbin/ip', '-j', 'addr'], { host: sshHost }), 3000);
+          
+          if (Array.isArray(rawInterfaces)) {
+            const realNetworks = rawInterfaces
+              .filter(iface => iface.ifname !== 'lo')
+              .map(iface => ({
+                name: iface.ifname,
+                mac: iface.address,
+                ips: (iface.addr_info || []).map(a => a.local).filter(Boolean)
+              }));
+            
+            if (realNetworks.length > 0) {
+              nodeDetails.networks = realNetworks;
+              discoveredIps = true;
+            }
+          }
+        }
+      } catch (sshErr) {
+        console.log(`[VHI-API] Real IP discovery via SSH failed: ${sshErr.message}`);
+      }
+
+      // ────────────────────────────────────────────────────────────────
+      // SECOND FALLBACK: Discover IP addresses via Neutron Ports
+      // ────────────────────────────────────────────────────────────────
+      if (!discoveredIps || (nodeDetails.networks || []).length <= 1) {
+        const hostname = nodeDetails.hostname || nodeDetails.hypervisor_hostname;
+        if (hostname) {
+          console.log(`[VHI-API] Fetching network state via Neutron for ${hostname}...`);
+          const neutronNetworks = await findNeutronNodeIps(hostname);
+          if (neutronNetworks.length > 0) {
+            // Merge or replace if Neutron has more info
+            if (!nodeDetails.networks || nodeDetails.networks.length <= 1) {
+              nodeDetails.networks = neutronNetworks;
+            } else {
+              // Supplement existing ones
+              neutronNetworks.forEach(nn => {
+                if (!nodeDetails.networks.find(en => en.mac === nn.mac)) {
+                  nodeDetails.networks.push(nn);
+                }
+              });
+            }
+
+            // HEURISTIC: Find the "best" external IP for SSH/Console
+            // Look for networks named Public, External, or those with routable IPs
+            const publicNet = neutronNetworks.find(n => 
+              /public|external|internet/i.test(n.name) || 
+              (n.ips || []).some(ip => !ip.startsWith('10.') && !ip.startsWith('192.168.') && !ip.startsWith('172.'))
+            );
+            if (publicNet && publicNet.ips && publicNet.ips.length > 0) {
+              nodeDetails.external_ip = publicNet.ips[0];
+            }
+          }
+        }
+      }
+
+      return nodeDetails;
+    });
+    return json(res, 200, data);
+  } catch (err) {
+    console.error(`[VHI-API] handleNodeGet fail for ${nodeId}: ${err.message}`);
+    return json(res, 500, { error: err.message });
+  }
+}
+
+/** POST /api/vhi/nodes/:id/action */
 async function handleNodeAction(req, res, ctx, nodeId) {
   const body = await readBody(req);
   const action = body.action;
@@ -529,14 +785,8 @@ async function handleNodeAction(req, res, ctx, nodeId) {
 
         // 2. Execute direct reboot command on the host
         console.log(`Sending direct reboot command to ${nodeId}...`);
-        // We use a separate call or chain it. Chaining is safer to ensure same session if needed,
-        // but runVinfraCommand handles a single command with auth.
-        // We'll run 'reboot' directly.
-        // NOTE: This will likely cause the SSH connection to drop, which is expected.
         try {
-          // We can't use 'vinfra' for the actual reboot if it's not supported.
           // We'll run a raw shell command. 
-          // I'll add a 'raw' option to runVinfraCommand or just use a raw command array.
           await runVinfraCommand(['/sbin/reboot'], creds);
         } catch (rErr) {
           // SSH often drops connection on reboot, so we ignore connection reset errors
@@ -544,18 +794,11 @@ async function handleNodeAction(req, res, ctx, nodeId) {
              throw rErr;
           }
         }
-        return;
       }
-      if (action === 'help') {
-        const { runVinfraCommand } = await import('../vhi/vinfra.js');
-        result = await runVinfraCommand(['help', 'node'], creds);
-        return;
-      }
-      throw new Error(`Unknown node action: ${action}`);
     });
-    return json(res, 200, { ok: true, help: result });
+    return json(res, 200, { ok: true, result });
   } catch (err) {
-    return json(res, 502, { error: err.message });
+    return json(res, 500, { error: err.message });
   }
 }
 
@@ -701,6 +944,12 @@ export async function handleVhiApi(req, res) {
     return true;
   }
 
+  // Cluster Registry Sync (Unauthenticated, for multi-cluster dashboard)
+  if (m === 'GET' && p === '/api/vhi/clusters/all') {
+      const allConfigs = await loadGlobalSshConfig();
+      const clusterUrls = Object.keys(allConfigs);
+      return json(res, 200, { clusters: clusterUrls });
+  }
 
   // All other endpoints require credentials via headers
   const ctx = extractContext(req);
@@ -711,6 +960,7 @@ export async function handleVhiApi(req, res) {
 
   // Compute
   if (m === 'GET' && p === '/api/vhi/servers') return handleServers(req, res, ctx);
+
 
   // --- ALERTS ---
   if (m === 'GET' && p === '/api/vhi/alerts') {
@@ -748,6 +998,9 @@ export async function handleVhiApi(req, res) {
 
   if (m === 'GET' && p === '/api/vhi/flavors') return handleFlavors(req, res, ctx);
   if (m === 'GET' && p === '/api/vhi/nodes') return handleNodes(req, res, ctx);
+
+  const nodeGetMatch = p.match(/^\/api\/vhi\/nodes\/([^/]+)$/);
+  if (m === 'GET' && nodeGetMatch) return handleNodeGet(req, res, ctx, nodeGetMatch[1]);
 
   const nodeActionMatch = p.match(/^\/api\/vhi\/nodes\/([^/]+)\/action$/);
   if (m === 'POST' && nodeActionMatch) return handleNodeAction(req, res, ctx, nodeActionMatch[1]);

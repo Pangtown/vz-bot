@@ -1121,6 +1121,9 @@
             <button class="tbl-refresh" id="globalSshBtn" onclick="openGlobalSshModal()" title="Global SSH Config for all nodes">
               <span class="ri">⚙</span> Global SSH
             </button>
+            <button class="tbl-refresh" id="clusterTerminalBtn" onclick="openClusterTerminal()" title="Launch Cluster Console">
+              <span class="ri">🖥</span> Console
+            </button>
             <button class="tbl-refresh" id="nodeRefresh"><span class="ri">↻</span> Refresh</button>
           </div>
         </div>
@@ -1138,7 +1141,6 @@
                 <th>vCPUs Used / Total</th>
                 <th>RAM Used / Total</th>
                 <th>Type</th>
-                <th style="text-align: right;">Actions</th>
               </tr>
             </thead>
             <tbody id="nodeBody">
@@ -1777,6 +1779,22 @@
   </div>
 </div>
 
+<!-- ═══════════════ NODE DETAILS DRAWER ═══════════════ -->
+<div id="nodeDrawer" class="info-drawer">
+  <div class="drawer-header">
+    <div>
+      <h2 id="nodeDetName" style="font-size:1.25rem; font-weight:700;">Node Details</h2>
+    </div>
+    <button class="chat-close" onclick="closeNodeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="nodeDetBody">
+    <!-- Content injected via JS -->
+  </div>
+  <div class="modal-footer" style="padding: 1rem 1.5rem; background: var(--bg-sidebar);">
+    <button class="btn btn-secondary" onclick="closeNodeDrawer()">Close</button>
+  </div>
+</div>
+
 <!-- ═══════════════ JAVASCRIPT ═══════════════ -->
 <script>
 'use strict';
@@ -1791,6 +1809,7 @@ let allVolumesFull = [];
 let allVolumesAvail = [];
 let currentEditingPortId = null;
 let currentVolDetails = null;
+let currentNodeDetails = null;
 let currentVmDetails = null;
 let currentVmInterfaces = [];
 
@@ -1871,9 +1890,9 @@ function authHeaders() {
     'X-VHI-Project':     session.project,
     'X-VHI-Project-ID':  session.projectId || '',
     'X-VHI-Domain':      session.userDomain,
-    'X-VHI-SSH-Host':     sshConfig.host || localStorage.getItem('vhiSshHost') || '',
-    'X-VHI-SSH-User':     sshConfig.username || localStorage.getItem('vhiSshUser') || 'root',
-    'X-VHI-SSH-Password': sshConfig.password || localStorage.getItem('vhiSshPassword') || '',
+    'X-VHI-SSH-Host':     sshConfig.host || '',
+    'X-VHI-SSH-User':     sshConfig.username || 'root',
+    'X-VHI-SSH-Password': sshConfig.password || '',
   };
 }
 
@@ -3127,9 +3146,11 @@ async function loadNodes() {
 
     // Dashboard: Node Health
     const recentNodesHtml = _nodes.slice(0, 5).map(n => {
-      const cpuUsed = `${n.vcpus_used}/${n.vcpus}`;
-      const ramUsed = `${Math.round((n.memory_mb-n.free_ram_mb)/1024)}/${Math.round(n.memory_mb/1024)}G`;
-      return `<tr><td><strong>${n.hypervisor_hostname || '–'}</strong></td><td>${statusBadge(n.state)}</td><td>${n.running_vms ?? '0'}</td><td class="text-dim">${cpuUsed}</td><td class="text-dim">${ramUsed}</td></tr>`;
+      const isCompute = n.is_compute !== false;
+      const cpuTotal = isCompute ? (n.vcpus * (n.cpu_allocation_ratio || 1)) : 0;
+      const cpuUsed = isCompute ? `${n.vcpus_used}/${cpuTotal}` : '–';
+      const ramUsed = isCompute ? `${Math.round((n.memory_mb-n.free_ram_mb)/1024)}/${Math.round(n.memory_mb/1024)}G` : '–';
+      return `<tr><td><strong style="cursor:pointer; color:var(--accent);" onclick="openNodeDetails('${n.id}')">${n.hypervisor_hostname || '–'}</strong><sup>${!isCompute ? 'mgmt' : ''}</sup></td><td>${statusBadge(n.state)}</td><td>${n.running_vms ?? '0'}</td><td class="text-dim">${cpuUsed}</td><td class="text-dim">${ramUsed}</td></tr>`;
     }).join('');
     document.getElementById('dashNodeBody').innerHTML = recentNodesHtml || '<tr><td colspan="5" class="text-dim text-center" style="padding:1rem;">No nodes found</td></tr>';
   } catch (err) {
@@ -3143,24 +3164,134 @@ async function loadNodes() {
 function renderNodes(query) {
   const tbody = document.getElementById('nodeBody');
   const rows = _nodes.map(n => {
-    const cpuPct = pct(n.vcpus_used, n.vcpus);
-    const ramPct = pct(n.memory_mb - n.free_ram_mb, n.memory_mb);
+    const isCompute = n.is_compute !== false;
+    const cpuTotal = isCompute ? (n.vcpus * (n.cpu_allocation_ratio || 1)) : 0;
+    const cpuPct = isCompute ? pct(n.vcpus_used, cpuTotal) : 0;
+    const ramPct = isCompute ? pct(n.memory_mb - n.free_ram_mb, n.memory_mb) : 0;
+    const nodeAddr = n.external_ip || n.hypervisor_hostname;
+    const nodeId = n.id;
+    
     return `<tr>
-      <td><strong>${n.hypervisor_hostname || '–'}</strong></td>
+      <td>
+        <strong style="cursor:pointer; color:var(--accent);" onclick="openNodeDetails('${nodeId}')">${n.hypervisor_hostname || '–'}</strong> 
+        ${!isCompute ? '<span class="badge badge-gray">Management</span>' : ''}
+      </td>
       <td>${statusBadge(n.state)}</td>
       <td>${statusBadge(n.status)}</td>
       <td>${n.running_vms ?? '–'}</td>
-      <td>${barHtml(cpuPct)} <span class="text-muted">${n.vcpus_used}/${n.vcpus}</span></td>
-      <td>${barHtml(ramPct)} <span class="text-muted">${Math.round((n.memory_mb-n.free_ram_mb)/1024)}/${Math.round(n.memory_mb/1024)} GB</span></td>
-      <td class="text-dim">${n.hypervisor_type || '–'}</td>
-      <td style="text-align: right; white-space: nowrap;">
-        <button class="act-btn" style="background:var(--accent-blue);color:#fff;" onclick="openSshTerminalDirect('${n.hypervisor_hostname}')">🖥 Console</button>
-      </td>
+      <td>${isCompute ? barHtml(cpuPct) : '–'} <span class="text-muted">${isCompute ? `${n.vcpus_used}/${cpuTotal}` : ''}</span></td>
+      <td>${isCompute ? barHtml(ramPct) : '–'} <span class="text-muted">${isCompute ? `${Math.round((n.memory_mb-n.free_ram_mb)/1024)}/${Math.round(n.memory_mb/1024)} GB` : ''}</span></td>
+      <td class="text-dim">${n.hypervisor_type || (isCompute ? '–' : 'controller')}</td>
     </tr>`;
   });
   const filtered = filterRows(rows, query);
   tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('📦', 'No nodes found');
 }
+
+async function openNodeDetails(id) {
+  toast('Loading node details...', 'inf');
+  document.getElementById('nodeDrawer').classList.add('open');
+  document.getElementById('nodeDetBody').innerHTML = skeletonRows(8);
+  
+  try {
+    const data = await apiGet(`/api/vhi/nodes/${id}`);
+    currentNodeDetails = data;
+    renderNodeDetails();
+  } catch (err) {
+    document.getElementById('nodeDetBody').innerHTML = `
+      <div style="padding:2rem; text-align:center;">
+        <span style="font-size:3rem;">⚠️</span>
+        <p style="margin-top:1rem; color:var(--text-dim);">Error loading details: ${err.message}</p>
+        <button class="btn btn-secondary" onclick="openNodeDetails('${id}')" style="margin-top:1rem;">Retry</button>
+      </div>
+    `;
+  }
+}
+
+function closeNodeDrawer() {
+  document.getElementById('nodeDrawer').classList.remove('open');
+  currentNodeDetails = null;
+}
+
+function renderNodeDetails() {
+  const node = currentNodeDetails;
+  if (!node) return;
+  
+  document.getElementById('nodeDetName').textContent = node.hostname || node.name || node.id;
+  
+  // vinfra node show usually returns fields like:
+  // cpu_model, ram_size, services, roles, status, state, disks, etc.
+  
+  const roles = (node.roles || []).map(r => `<span class="badge badge-default">${r}</span>`).join(' ') || '—';
+  const services = (node.services || []).map(s => `<li>${s.name}: ${statusBadge(s.status)}</li>`).join('') || '<li>None</li>';
+  
+  let html = `
+    <div class="drawer-section">
+      <h4>Host Overview</h4>
+      <div class="detail-grid">
+        <div class="detail-label">ID</div>
+        <div class="detail-val mono">${node.id}</div>
+        
+        <div class="detail-label">Hostname</div>
+        <div class="detail-val">${node.hostname || node.name || '—'}</div>
+        
+        <div class="detail-label">Status</div>
+        <div class="detail-val">${statusBadge(node.status)} / ${statusBadge(node.state)}</div>
+
+        <div class="detail-label">Roles</div>
+        <div class="detail-val">${roles}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Hardware</h4>
+      <div class="detail-grid">
+        <div class="detail-label">CPU Model</div>
+        <div class="detail-val">${node.cpu_model || '—'}</div>
+        
+        <div class="detail-label">CPUs</div>
+        <div class="detail-val">${node.cpus || 0} cores</div>
+
+        <div class="detail-label">RAM</div>
+        <div class="detail-val">${node.ram_size ? (node.ram_size / 1024 / 1024 / 1024).toFixed(1) + ' GB' : '—'}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Services</h4>
+      <ul style="list-style:none; font-size:.88rem; display:flex; flex-direction:column; gap:.5rem;">
+        ${services}
+      </ul>
+    </div>
+  `;
+  
+  // Add network if available
+  if (node.networks && node.networks.length > 0) {
+    const netHtml = node.networks.map(n => `
+      <div style="margin-bottom:.8rem; padding:.6rem; background:var(--bg-content); border-radius:4px;">
+        <div style="font-weight:600; font-size:.85rem; margin-bottom:.3rem;">${n.name || 'Interface'}</div>
+        <div class="detail-grid" style="grid-template-columns: 80px 1fr; font-size:.8rem;">
+          <div class="detail-label">IPs</div>
+          <div class="detail-val">${(n.ips || []).join(', ') || '—'}</div>
+          <div class="detail-label">MAC</div>
+          <div class="detail-val mono">${n.mac || '—'}</div>
+        </div>
+      </div>
+    `).join('');
+    
+    html += `
+      <div class="drawer-section">
+        <h4>Network Interfaces</h4>
+        ${netHtml}
+      </div>
+    `;
+  }
+
+  document.getElementById('nodeDetBody').innerHTML = html;
+}
+
+window.openNodeDetails = openNodeDetails;
+window.closeNodeDrawer = closeNodeDrawer;
 
 hookSearch('nodeSearch', q => renderNodes(q));
 
@@ -3188,9 +3319,9 @@ async function doRebootNode() {
   let creds = {};
   if (saved) {
     try {
-      const config = JSON.parse(saved);
+      const isNodeSpecific = !!localStorage.getItem(getNodeSshKey(hostname));
       creds = {
-        host: config.host || hostname,
+        host: isNodeSpecific ? (config.host || hostname) : hostname,
         username: config.username,
         password: config.authMethod === 'password' ? config.password : undefined,
         privateKey: config.authMethod === 'key' ? config.privateKey : undefined,
@@ -3418,9 +3549,10 @@ function openTerminal() {
     return;
   }
   
+  const isNodeSpecific = !!localStorage.getItem(getNodeSshKey(hostname));
   const config = JSON.parse(saved);
   const creds = {
-    host: config.host || hostname, // if global, we still need node IP. If config.host is empty, use current node hostname
+    host: isNodeSpecific ? (config.host || hostname) : hostname,
     username: config.username,
     password: config.authMethod === 'password' ? config.password : undefined,
     privateKey: config.authMethod === 'key' ? config.privateKey : undefined,
@@ -3492,11 +3624,44 @@ document.addEventListener('keydown', (e) => {
 window.openTerminal = openTerminal;
 window.closeTerminal = closeTerminal;
 
+async function openClusterTerminal() {
+  let host = null;
+  
+  // 1. Try to get from global SSH settings (which might be server-side)
+  try {
+    const res = await fetch('/api/vhi/settings/ssh');
+    if (res.ok) {
+      const config = await res.json();
+      if (config.host) host = config.host;
+    }
+  } catch (e) {}
+
+  // 2. Fallback to local storage global key
+  if (!host) {
+    const localSaved = localStorage.getItem(getGlobalSshKey());
+    if (localSaved) {
+      try { const config = JSON.parse(localSaved); if (config.host) host = config.host; } catch(e) {}
+    }
+  }
+
+  // 3. Last resort: use the dashboard base URL
+  if (!host) {
+    host = localStorage.getItem('vhiBaseUrl')?.replace(/https?:\/\//, '').split(':')[0];
+  }
+
+  if (!host) {
+    toast('No cluster host found. Please check your Global SSH settings.', 'err');
+    return;
+  }
+  openSshTerminalDirect(host);
+}
+
 function openSshTerminalDirect(hostname) {
   currentSshNode = hostname;
   openTerminal();
 }
 window.openSshTerminalDirect = openSshTerminalDirect;
+window.openClusterTerminal = openClusterTerminal;
 
 // ── VOLUMES ───────────────────────────────────────────────────────────────
 
@@ -4177,8 +4342,28 @@ function updateConnectionStatus() {
   }
 }
 
-// Initial connection check
-updateConnectionStatus();
+// Initial connection check & sync with server config
+(async () => {
+    try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+            const config = await res.json();
+            // Only populate if local storage is empty to avoid overwriting user's browser-specific keys
+            if (!localStorage.getItem('llmProvider') && config.llmProvider) {
+                localStorage.setItem('llmProvider', config.llmProvider);
+            }
+            if (!localStorage.getItem('llmApiKey') && config.apiKey) {
+                localStorage.setItem('llmApiKey', config.apiKey);
+            }
+            if (!localStorage.getItem('llmBaseUrl') && config.llmBaseUrl) {
+                localStorage.setItem('llmBaseUrl', config.llmBaseUrl);
+            }
+        }
+    } catch (e) {
+        console.warn('Sync LLM config failed', e);
+    }
+    updateConnectionStatus();
+})();
 
 document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
   localStorage.setItem('llmProvider', llmProviderInput.value);

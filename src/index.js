@@ -63,6 +63,8 @@ const app = async (req, res) => {
     res.end(JSON.stringify({
       llmProvider: process.env.LLM_PROVIDER || 'anthropic',
       llmModel: process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
+      apiKey: process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '',
+      llmBaseUrl: process.env.LLM_BASE_URL || '',
       availableProviders: ['anthropic', 'gemini', 'openai'],
       authRequired: !!process.env.WEB_PASSWORD,
     }));

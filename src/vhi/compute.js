@@ -222,6 +222,18 @@ export async function listHypervisors() {
   return data.hypervisors || [];
 }
 
+export async function getHypervisor(id) {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl(`/os-hypervisors/${id}`));
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    const text = await res.text();
+    throw new Error(`VHI Compute getHypervisor failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.hypervisor || null;
+}
+
 export async function listInterfaces(serverId) {
   const client = await getClient();
   const res = await client.fetch(await computeUrl(`/servers/${serverId}/os-interface`));

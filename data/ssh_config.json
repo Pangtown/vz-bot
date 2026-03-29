@@ -5,18 +5,22 @@
     "password": "Nexpass8188!",
     "authMethod": "password"
   },
+  "https://172.16.222.14": {
+    "host": "172.16.222.14",
+    "username": "root",
+    "password": "Virtuozzo123!",
+    "authMethod": "password"
+  },
   "https://demo.nexvantage.com": {
     "host": "demo.nexvantage.com",
     "username": "root",
     "password": "VirtuozzoD3m0!",
     "authMethod": "password"
   },
-  "https://${{VHI_BASE_URL}}": {
-    "host": "172.16.218.7",
+  "https://prod-a2ej2aeui1389ce9c3db9a.demo-virtuozzo.com": {
+    "host": "prod-a2ej2aeui1389ce9c3db9a.demo-virtuozzo.com",
     "username": "root",
-    "authMethod": "password",
-    "password": "Nexpass8188!",
-    "privateKey": "",
-    "passphrase": ""
+    "password": "@c7r841JWMe%9Z3Pj5W",
+    "authMethod": "password"
   }
 }

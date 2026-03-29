@@ -67,7 +67,7 @@ export async function runVinfraCommand(args, creds = {}) {
             const isRaw = args[0].startsWith('/') || args[0] === 'reboot';
             const command = isRaw 
               ? `${envVars.join('; ')}; ${quotedArgs}`
-              : `${envVars.join('; ')}; vinfra ${quotedArgs} -f json`;
+              : `${envVars.join('; ')}; vinfra --insecure ${quotedArgs} -f json`;
 
             conn.exec(command, (err, stream) => {
                 if (err) {

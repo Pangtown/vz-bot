@@ -771,8 +771,52 @@
       }
     }
 
+    // Auto-sync with server registry
+    async function syncWithServer() {
+      try {
+        const res = await fetch('/api/vhi/clusters/all');
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverUrls = data.clusters || [];
+        
+        let changed = false;
+        serverUrls.forEach(url => {
+          const normalized = url.replace(/\/$/, '');
+          if (!clusters.some(c => normalizeClusterUrl(c.baseUrl) === normalized)) {
+            // Found a missing cluster, add a skeleton entry
+            const baseUrl = normalized;
+            const proj = 'admin'; // default
+            clusters.push({
+              id: `${baseUrl.replace(/https?:\/\//, '')}_${proj}`,
+              baseUrl: baseUrl,
+              username: 'admin',
+              password: '', // will need to be entered or fetched if we had a secure sync
+              project: proj,
+              userDomain: 'Default',
+              projectDomain: 'Default'
+            });
+            changed = true;
+          }
+        });
+        
+        if (changed) {
+          saveClusters();
+          renderGrid();
+          showToast('Synchronized clusters from server', 'inf');
+        }
+      } catch (e) {
+        console.warn('Sync failed', e);
+      }
+    }
+
+    function normalizeClusterUrl(url) {
+      if (!url) return '';
+      return url.replace(/\/$/, '');
+    }
+
     // Initialize layout
     renderGrid();
+    syncWithServer();
 
     // Auto-refresh every 60s
     setInterval(() => {
