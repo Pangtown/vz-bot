@@ -244,3 +244,14 @@
 {"vCpu":49,"ramGb":"105.9","storageGb":1690,"networkTraffic":"5.18 GB Tx / 12.66 GB Rx","timestamp":"2026-04-02T01:11:57.871Z"}
 {"vCpu":5,"ramGb":"24.8","storageGb":2,"networkTraffic":"4.75 GB Tx / 4.23 GB Rx","timestamp":"2026-04-02T01:12:23.175Z"}
 {"vCpu":53,"ramGb":"112.8","storageGb":2306,"networkTraffic":"1.56 GB Tx / 5.01 GB Rx","timestamp":"2026-04-03T12:39:03.395Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"2.17 GB Tx / 8.83 GB Rx","timestamp":"2026-04-05T22:00:00.934Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"1.70 GB Tx / 11.55 GB Rx","timestamp":"2026-04-05T23:00:00.867Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"5.83 GB Tx / 10.72 GB Rx","timestamp":"2026-04-06T00:00:01.415Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"2.45 GB Tx / 4.54 GB Rx","timestamp":"2026-04-06T01:00:00.626Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"2.52 GB Tx / 2.64 GB Rx","timestamp":"2026-04-06T02:00:00.672Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"5.96 GB Tx / 3.85 GB Rx","timestamp":"2026-04-06T03:00:01.062Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"4.23 GB Tx / 2.58 GB Rx","timestamp":"2026-04-06T04:00:01.737Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"4.13 GB Tx / 13.52 GB Rx","timestamp":"2026-04-06T05:00:00.693Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"2.74 GB Tx / 14.44 GB Rx","timestamp":"2026-04-06T06:00:00.982Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"1.10 GB Tx / 3.38 GB Rx","timestamp":"2026-04-06T07:00:01.079Z"}
+{"vCpu":53,"ramGb":"88.4","storageGb":1453,"networkTraffic":"4.62 GB Tx / 3.00 GB Rx","timestamp":"2026-04-06T08:00:01.593Z"}
