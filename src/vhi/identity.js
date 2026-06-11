@@ -4,9 +4,12 @@
  */
 
 import { getContextValue } from '../gateway/context.js';
+import { registerInsecureHost } from '../utils/tls.js';
 
 const getBaseUrl = () => {
   const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL') || 'https://172.16.218.7';
+  // Every VHI API call flows through here — allow this host's self-signed cert
+  registerInsecureHost(base);
   return base.replace(/\/$/, '');
 };
 
@@ -44,8 +47,7 @@ export async function getToken() {
     },
   };
 
-  console.log('Fetching', url, 'for user', user, 'and project', projectName);
-  console.dir(body, { depth: null });
+  console.log('Fetching', url, 'for user', user);
   const res = await fetch(url, {
     method: 'POST',
     headers: {

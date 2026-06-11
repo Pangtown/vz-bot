@@ -1,0 +1,617 @@
+cluster alert delete
+cluster alert list
+cluster alert show
+cluster alert types list
+cluster auditlog list
+cluster auditlog show
+cluster backup create
+cluster backup show
+cluster certificate add
+cluster certificate list
+cluster certificate remove
+cluster create
+cluster delete
+cluster filebeat config delete
+cluster filebeat config reload
+cluster filebeat config set
+cluster filebeat disable
+cluster filebeat enable
+cluster filebeat list
+cluster filebeat show
+cluster ha create
+cluster ha delete
+cluster ha node add
+cluster ha node remove
+cluster ha show
+cluster ha switch-primary
+cluster ha update
+cluster license load
+cluster license show
+cluster license update
+cluster network conversion precheck
+cluster network conversion start
+cluster network conversion status
+cluster network create
+cluster network delete
+cluster network encryption bypass add
+cluster network encryption bypass delete
+cluster network encryption bypass list
+cluster network encryption cancel
+cluster network encryption disable
+cluster network encryption enable
+cluster network encryption status
+cluster network ipv6-prefix assign
+cluster network ipv6-prefix remove
+cluster network ipv6-prefix show
+cluster network list
+cluster network migration apply
+cluster network migration generate-config
+cluster network migration resume
+cluster network migration retry
+cluster network migration revert
+cluster network migration show
+cluster network migration start
+cluster network reconfiguration show
+cluster network set
+cluster network set-bulk
+cluster network show
+cluster node join-config get
+cluster node join-config set
+cluster overview
+cluster password reset
+cluster password show
+cluster problem-report
+cluster settings automatic-disk-replacement set
+cluster settings automatic-disk-replacement show
+cluster settings client-fanout-mode set
+cluster settings client-fanout-mode show
+cluster settings dns set
+cluster settings dns show
+cluster settings email-notifications disable
+cluster settings email-notifications set
+cluster settings email-notifications show
+cluster settings encryption set
+cluster settings encryption show
+cluster settings locale list
+cluster settings locale set
+cluster settings locale show
+cluster settings number-of-cses-per-disk set
+cluster settings number-of-cses-per-disk show
+cluster settings report set
+cluster settings report show
+cluster settings ssl set
+cluster settings ssl show
+cluster settings totp set
+cluster settings totp show
+cluster show
+cluster sshkey add
+cluster sshkey delete
+cluster sshkey list
+cluster storage-policy create
+cluster storage-policy delete
+cluster storage-policy list
+cluster storage-policy set
+cluster storage-policy show
+cluster storage-redundancies
+cluster switch-to-ipv6
+cluster traffic-type assignment apply
+cluster traffic-type assignment retry
+cluster traffic-type assignment revert
+cluster traffic-type assignment show
+cluster traffic-type assignment start
+cluster traffic-type create
+cluster traffic-type delete
+cluster traffic-type list
+cluster traffic-type set
+cluster traffic-type show
+cluster user change-password
+cluster user create
+cluster user delete
+cluster user list
+cluster user list-available-roles
+cluster user set
+cluster user show
+cses-config change
+cses-config show
+debug issue-ssh-key
+domain create
+domain delete
+domain group create
+domain group delete
+domain group list
+domain group set
+domain group show
+domain group user add
+domain group user list
+domain group user remove
+domain idp create
+domain idp delete
+domain idp list
+domain idp set
+domain idp show
+domain list
+domain project create
+domain project delete
+domain project list
+domain project set
+domain project show
+domain project user list
+domain project user remove
+domain properties access list
+domain properties access set
+domain properties create
+domain properties delete
+domain properties keys list
+domain properties show
+domain properties update
+domain set
+domain show
+domain user create
+domain user delete
+domain user group list
+domain user list
+domain user list-available-roles
+domain user set
+domain user show
+domain user totp disable
+domain user totp enable
+domain user totp generate-secret
+domain user totp set
+domain user totp show
+domain user unlock
+failure domain list
+failure domain rename
+help
+location create
+location delete
+location list
+location move
+location rename
+location show
+logging severity set
+logging severity show
+memory-policy vstorage-services per-cluster change
+memory-policy vstorage-services per-cluster reset
+memory-policy vstorage-services per-cluster show
+memory-policy vstorage-services per-node change
+memory-policy vstorage-services per-node reset
+memory-policy vstorage-services per-node show
+node certificate ipsec renew
+node disk assign
+node disk blink off
+node disk blink on
+node disk list
+node disk release
+node disk show
+node disk show diagnostic-info
+node forget
+node iface create-bond
+node iface create-vlan
+node iface delete
+node iface down
+node iface list
+node iface set
+node iface show
+node iface up
+node iscsi target add
+node iscsi target delete
+node join
+node list
+node maintenance precheck
+node maintenance start
+node maintenance status
+node maintenance stop
+node network bond create
+node network bond delete
+node network iface delete
+node network iface down
+node network iface list
+node network iface set
+node network iface show
+node network iface up
+node network vlan create
+node network vlan delete
+node ram-reservation list
+node ram-reservation show
+node ram-reservation total
+node release
+node show
+node token create
+node token show
+node token validate
+service backup cluster accounts import
+service backup cluster accounts move
+service backup cluster add-upstream
+service backup cluster change-upstream
+service backup cluster deploy-reverse-proxy
+service backup cluster deploy-standalone
+service backup cluster deploy-upstream
+service backup cluster export-upstream
+service backup cluster process
+service backup cluster rebalance
+service backup cluster release
+service backup cluster remove-upstream
+service backup cluster renew-certificates
+service backup cluster restart-nodes
+service backup cluster show
+service backup cluster turn-into-upstream
+service backup cluster upstream-only
+service backup geo-replication primary cancel
+service backup geo-replication primary disable
+service backup geo-replication primary download-configs
+service backup geo-replication primary establish
+service backup geo-replication primary setup
+service backup geo-replication secondary cancel
+service backup geo-replication secondary promote-to-primary
+service backup geo-replication secondary setup
+service backup geo-replication show
+service backup limits-params change
+service backup limits-params show
+service backup node add
+service backup node list
+service backup node release
+service backup registration add
+service backup registration add-true-image
+service backup registration delete
+service backup registration export
+service backup registration import
+service backup registration list
+service backup registration renew-certificates
+service backup registration renew-true-image-certs
+service backup registration show
+service backup registration update
+service backup storage-params change
+service backup storage-params show
+service backup throttling reset
+service backup throttling set
+service backup throttling show
+service backup volume-params change
+service backup volume-params show
+service block-storage target-group acl add
+service block-storage target-group acl delete
+service block-storage target-group acl list
+service block-storage target-group acl set
+service block-storage target-group create
+service block-storage target-group delete
+service block-storage target-group list
+service block-storage target-group set
+service block-storage target-group show
+service block-storage target-group start
+service block-storage target-group stop
+service block-storage target-group target connection list
+service block-storage target-group target create
+service block-storage target-group target delete
+service block-storage target-group target list
+service block-storage target-group target show
+service block-storage target-group volume attach
+service block-storage target-group volume detach
+service block-storage target-group volume list
+service block-storage target-group volume show
+service block-storage user create
+service block-storage user delete
+service block-storage user list
+service block-storage user set
+service block-storage user show
+service block-storage volume create
+service block-storage volume delete
+service block-storage volume list
+service block-storage volume set
+service block-storage volume show
+service compute backup configure
+service compute backup show
+service compute backup-plan create
+service compute backup-plan delete
+service compute backup-plan execution list
+service compute backup-plan execution show
+service compute backup-plan list
+service compute backup-plan set
+service compute backup-plan show
+service compute backup-plan volume add
+service compute backup-plan volume list
+service compute backup-plan volume remove
+service compute baseline-cpu
+service compute cluster create
+service compute cluster delete
+service compute cluster set
+service compute cluster show
+service compute cluster stat
+service compute create
+service compute delete
+service compute flavor create
+service compute flavor delete
+service compute flavor list
+service compute flavor show
+service compute floatingip create
+service compute floatingip delete
+service compute floatingip list
+service compute floatingip set
+service compute floatingip show
+service compute image create
+service compute image delete
+service compute image list
+service compute image save
+service compute image set
+service compute image show
+service compute k8saas config
+service compute k8saas create
+service compute k8saas defaults set
+service compute k8saas defaults show
+service compute k8saas delete
+service compute k8saas list
+service compute k8saas rotate-ca
+service compute k8saas set
+service compute k8saas show
+service compute k8saas upgrade
+service compute k8saas workergroup create
+service compute k8saas workergroup delete
+service compute k8saas workergroup list
+service compute k8saas workergroup set
+service compute k8saas workergroup show
+service compute key create
+service compute key delete
+service compute key list
+service compute key show
+service compute lbaas configure
+service compute lbaas show
+service compute load-balancer create
+service compute load-balancer delete
+service compute load-balancer failover
+service compute load-balancer flavor list
+service compute load-balancer flavor show
+service compute load-balancer flavorprofile list
+service compute load-balancer flavorprofile show
+service compute load-balancer list
+service compute load-balancer pool create
+service compute load-balancer pool delete
+service compute load-balancer pool list
+service compute load-balancer pool set
+service compute load-balancer pool show
+service compute load-balancer recreate
+service compute load-balancer set
+service compute load-balancer show
+service compute load-balancer stats
+service compute multipath config reload
+service compute multipath config set
+service compute multipath config show
+service compute network agent list
+service compute network create
+service compute network delete
+service compute network list
+service compute network set
+service compute network show
+service compute node add
+service compute node fence
+service compute node list
+service compute node release
+service compute node show
+service compute node unfence
+service compute notification disable
+service compute notification set
+service compute notification show
+service compute placement assign
+service compute placement create
+service compute placement delete
+service compute placement delete-assign
+service compute placement list
+service compute placement show
+service compute placement update
+service compute port create
+service compute port delete
+service compute port list
+service compute port set
+service compute port show
+service compute quotas show
+service compute quotas update
+service compute resource-policies action list
+service compute resource-policies action show
+service compute resource-policies policy analyze
+service compute resource-policies policy disable
+service compute resource-policies policy enable
+service compute resource-policies policy list
+service compute resource-policies policy set
+service compute resource-policies policy show
+service compute resource-policies recommendation apply
+service compute resource-policies recommendation cancel
+service compute resource-policies recommendation list
+service compute resource-policies recommendation show
+service compute router create
+service compute router delete
+service compute router iface add
+service compute router iface list
+service compute router iface remove
+service compute router list
+service compute router set
+service compute router show
+service compute security-group create
+service compute security-group delete
+service compute security-group list
+service compute security-group rule create
+service compute security-group rule delete
+service compute security-group rule list
+service compute security-group rule show
+service compute security-group set
+service compute security-group show
+service compute server cancel-stop
+service compute server console
+service compute server create
+service compute server delete
+service compute server evacuate
+service compute server event list
+service compute server event show
+service compute server iface attach
+service compute server iface detach
+service compute server iface list
+service compute server iface set
+service compute server list
+service compute server log
+service compute server meta set
+service compute server meta unset
+service compute server migrate
+service compute server pause
+service compute server reboot
+service compute server rescue
+service compute server reset-state
+service compute server resize
+service compute server resume
+service compute server set
+service compute server shelve
+service compute server show
+service compute server start
+service compute server stat
+service compute server stop
+service compute server suspend
+service compute server tag add
+service compute server tag delete
+service compute server tag list
+service compute server unpause
+service compute server unrescue
+service compute server unshelve
+service compute server volume attach
+service compute server volume detach
+service compute server volume list
+service compute server volume show
+service compute set
+service compute show
+service compute stat
+service compute storage add
+service compute storage list
+service compute storage remove
+service compute storage set
+service compute storage show
+service compute storage-policy create
+service compute storage-policy delete
+service compute storage-policy list
+service compute storage-policy set
+service compute storage-policy show
+service compute subnet create
+service compute subnet delete
+service compute subnet list
+service compute subnet set
+service compute subnet show
+service compute task abort
+service compute task retry
+service compute task show
+service compute volume backup create
+service compute volume backup delete
+service compute volume backup list
+service compute volume backup restore
+service compute volume backup show
+service compute volume clone
+service compute volume create
+service compute volume delete
+service compute volume extend
+service compute volume list
+service compute volume reset-state
+service compute volume set
+service compute volume show
+service compute volume snapshot create
+service compute volume snapshot delete
+service compute volume snapshot list
+service compute volume snapshot reset-state
+service compute volume snapshot revert
+service compute volume snapshot set
+service compute volume snapshot show
+service compute volume snapshot upload-to-image
+service compute volume upload-to-image
+service compute vpn connection create
+service compute vpn connection delete
+service compute vpn connection list
+service compute vpn connection restart
+service compute vpn connection set
+service compute vpn connection show
+service compute vpn endpoint-group list
+service compute vpn endpoint-group show
+service compute vpn ike-policy list
+service compute vpn ike-policy show
+service compute vpn ipsec-policy list
+service compute vpn ipsec-policy show
+service file-storage cluster create
+service file-storage cluster delete
+service file-storage cluster set
+service file-storage cluster show
+service file-storage export create
+service file-storage export delete
+service file-storage export list
+service file-storage export set
+service file-storage export show
+service file-storage node add
+service file-storage node list
+service file-storage node remove
+service file-storage node show
+service file-storage share create
+service file-storage share delete
+service file-storage share list
+service file-storage share set
+service file-storage share show
+service file-storage share start
+service file-storage share stop
+service nfs cluster create
+service nfs cluster delete
+service nfs export create
+service nfs export delete
+service nfs export list
+service nfs export set
+service nfs export show
+service nfs kerberos settings set
+service nfs kerberos settings show
+service nfs node add
+service nfs node list
+service nfs node release
+service nfs share create
+service nfs share delete
+service nfs share list
+service nfs share set
+service nfs share show
+service nfs share start
+service nfs share stop
+service s3 cluster change
+service s3 cluster create
+service s3 cluster delete
+service s3 cluster show
+service s3 node add
+service s3 node change
+service s3 node list
+service s3 node release
+service s3 replication add
+service s3 replication delete
+service s3 replication list
+service s3 replication show
+service s3 replication show token
+service s3 self-service create
+service s3 self-service domain disable
+service s3 self-service domain enable
+service s3 self-service domain limits add
+service s3 self-service domain limits get
+service s3 self-service domain limits remove
+service s3 self-service domain quotas add
+service s3 self-service domain quotas get
+service s3 self-service domain quotas remove
+service s3 self-service domain show
+service s3 self-service show
+service s3 self-service user keys add
+service s3 self-service user keys delete
+service s3 self-service user keys disable
+service s3 self-service user keys enable
+service s3 self-service user limits add
+service s3 self-service user limits get
+service s3 self-service user limits remove
+service s3 self-service user link
+service s3 self-service user quotas add
+service s3 self-service user quotas get
+service s3 self-service user quotas remove
+service s3 self-service user show
+service s3 self-service user unlink
+service s3 show
+service s3 users default-quotas add
+service s3 users default-quotas get
+service s3 users default-quotas remove
+software-updates cancel
+software-updates check-for-updates
+software-updates download
+software-updates eligibility-check
+software-updates pause
+software-updates release-notes
+software-updates reset
+software-updates resume
+software-updates start
+software-updates status

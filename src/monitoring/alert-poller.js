@@ -1,4 +1,4 @@
-import { runVinfraCommand } from '../vhi/vinfra.js';
+import { runVinfraCommand, runVinfraBatch } from '../vhi/vinfra.js';
 import { saveAlerts, getLastTimestamp } from './alert-storage.js';
 import { getLastValidContext } from '../gateway/context.js';
 import { loadGlobalSshConfig, normalizeUrl } from './ssh-storage.js';
@@ -42,14 +42,23 @@ export async function runAlertPoll(ctx = null) {
         const enriched = [];
         console.log(`[ALERTS] Enriching ${alerts.length} alerts for ${clusterUrl}...`);
         
-        for (const alert of alerts) {
-            try {
-                const details = await runVinfraCommand(['cluster', 'alert', 'show', alert.id], context || {});
-                enriched.push({ ...alert, ...details });
-            } catch (err) {
-                console.error(`[ALERTS] Failed to enrich alert ${alert.id}:`, err.message);
-                enriched.push(alert);
-            }
+        try {
+            const batchCmds = alerts.map(alert => ['cluster', 'alert', 'show', alert.id]);
+            const batchResults = await runVinfraBatch(batchCmds, context || {});
+            
+            alerts.forEach((alert, i) => {
+                const details = batchResults[i];
+                if (details && typeof details === 'object') {
+                    enriched.push({ ...alert, ...details });
+                } else {
+                    console.error(`[ALERTS] Failed to enrich alert ${alert.id}: invalid response`);
+                    enriched.push(alert);
+                }
+            });
+        } catch (err) {
+            console.error(`[ALERTS] Failed to run batch enrichment:`, err.message);
+            // Fallback to un-enriched alerts
+            alerts.forEach(alert => enriched.push(alert));
         }
 
         // 3. Save to storage

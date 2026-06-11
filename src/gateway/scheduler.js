@@ -30,7 +30,8 @@ export function getLastBilling() {
 }
 
 export function start(config = {}) {
-  const intervalMinutes = config.healthPollIntervalMinutes || 5;
+  // Clamp to 1–59: cron `*/N` syntax is invalid for N > 59
+  const intervalMinutes = Math.min(59, Math.max(1, Number(config.healthPollIntervalMinutes) || 5));
   if (healthJob) return;
   healthJob = cron.schedule(`*/${intervalMinutes} * * * *`, async () => {
     if (!process.env.VHI_USER || !process.env.VHI_PASSWORD) {
@@ -42,7 +43,8 @@ export function start(config = {}) {
       lastHealthTime = new Date().toISOString();
       await alerts.emitAlerts(result);
     } catch (err) {
-      console.error('Health poll error:', err.message);
+      const cause = err.cause ? ` (${err.cause.code || err.cause.message})` : '';
+      console.error(`Health poll error: ${err.message}${cause}`);
     }
   });
   console.log(`Scheduler: health poll every ${intervalMinutes} min`);

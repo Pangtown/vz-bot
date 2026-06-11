@@ -5,8 +5,10 @@
 
 import 'dotenv/config';
 
-// Disable TLS warnings for self-signed certificates from VHI
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+// Accept self-signed certificates ONLY for registered VHI hosts.
+// All other HTTPS traffic (LLM APIs, etc.) keeps full TLS verification.
+import { installVhiTlsBypass, registerInsecureHost } from './utils/tls.js';
+installVhiTlsBypass();
 import { createServer } from 'http';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
@@ -14,9 +16,20 @@ import { join, dirname } from 'path';
 import * as scheduler from './gateway/scheduler.js';
 import { runWithContext } from './gateway/context.js';
 import { handleVhiApi } from './gateway/vhi-api.js';
+import { logger } from './utils/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 18789;
+
+// Safety net: a stray error in any async path (pollers, SSH bridge, WebSocket)
+// must not take down the whole service.
+process.on('uncaughtException', (err) => {
+  logger.error(`Uncaught exception (service kept alive): ${err.message}`, { error: err, stack: err.stack });
+});
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  logger.error(`Unhandled rejection (service kept alive): ${msg}`, { reason });
+});
 
 let chatPageHtml = null;
 async function getChatPage() {
@@ -40,7 +53,7 @@ async function getClustersPage() {
 }
 
 const app = async (req, res) => {
-  const url = req.url || '/';
+  const url = (req.url || '/').split('?')[0];
   const method = req.method || 'GET';
   if (method === 'POST' && (url === '/api/chat' || url === '/api/chat/')) {
     return handlePostChat(req, res);
@@ -54,16 +67,24 @@ const app = async (req, res) => {
     if (handled) return;
   }
   if (method === 'GET' && (url === '/api/health' || url === '/api/health/')) {
+    logger.debug('Health check requested');
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', service: 'vz-bot' }));
+    res.end(JSON.stringify({ 
+      status: 'ok', 
+      service: 'vz-bot',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    }));
     return;
   }
   if (method === 'GET' && (url === '/api/config' || url === '/api/config/')) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       llmProvider: process.env.LLM_PROVIDER || 'anthropic',
-      llmModel: process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
-      apiKey: process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '',
+      llmModel: process.env.LLM_MODEL || 'claude-sonnet-4-6',
+      // Never expose the actual API key; the server falls back to its env key
+      // when the client doesn't supply one.
+      hasApiKey: !!(process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY),
       llmBaseUrl: process.env.LLM_BASE_URL || '',
       availableProviders: ['anthropic', 'gemini', 'openai'],
       authRequired: !!process.env.WEB_PASSWORD,
@@ -125,6 +146,7 @@ function verifyWebPassword(payload) {
 }
 
 async function handleLlmTest(req, res) {
+  let provider = process.env.LLM_PROVIDER || 'anthropic';
   try {
     const payload = await readJsonBody(req);
     if (!verifyWebPassword(payload)) {
@@ -132,7 +154,7 @@ async function handleLlmTest(req, res) {
       res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid web password' }));
       return;
     }
-    const provider = payload?.provider || payload?.llmProvider || process.env.LLM_PROVIDER || 'anthropic';
+    provider = payload?.provider || payload?.llmProvider || provider;
     const apiKey = payload?.apiKey || process.env.ANTHROPIC_API_KEY || '';
     const baseUrl = payload?.llmBaseUrl || process.env.OPENAI_BASE_URL || '';
     const { testConnection } = await import('./llm/provider.js');
@@ -140,6 +162,7 @@ async function handleLlmTest(req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
   } catch (err) {
+    logger.error(`LLM test failed: ${err.message}`, { error: err, provider });
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: err.message || String(err) }));
   }
@@ -179,6 +202,7 @@ async function handlePostChat(req, res) {
     return;
   }
   try {
+    if (vhiBaseUrl) registerInsecureHost(vhiBaseUrl);
     const { createRouter } = await import('./gateway/router.js');
     const router = createRouter(() => { });
     const reply = await runWithContext({
@@ -187,12 +211,21 @@ async function handlePostChat(req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ reply, conversationId }));
   } catch (err) {
+    logger.error(`Error handling chat request: ${err.message}`, { error: err });
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: err.message || String(err) }));
   }
 }
 
-const server = createServer((req, res) => app(req, res).catch(() => { }));
+const server = createServer((req, res) => app(req, res).catch((err) => {
+  logger.error(`Unhandled request error: ${err.message}`, { error: err, url: req.url });
+  if (!res.headersSent) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  } else {
+    res.end();
+  }
+}));
 
 // ── WebSocket SSH Bridge ───────────────────────────────────────────────────
 import { WebSocketServer } from 'ws';
@@ -202,18 +235,31 @@ const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws) => {
   let shell = null;
-  
+
+  // Sending on a closed socket emits an unhandled 'error' and crashes the
+  // process — only send while the socket is open, and absorb socket errors.
+  const safeSend = (payload) => {
+    if (ws.readyState === ws.OPEN) ws.send(payload);
+  };
+  ws.on('error', (err) => logger.error(`WS socket error: ${err.message}`));
+
   ws.on('message', (msg) => {
     try {
       const data = JSON.parse(msg);
-      
+
       // Initialize shell on 'init' message
       if (data.type === 'init') {
+        // Require web password (when configured) before opening an SSH shell
+        if (process.env.WEB_PASSWORD && data.webPassword !== process.env.WEB_PASSWORD) {
+          safeSend(JSON.stringify({ type: 'error', message: 'Unauthorized: Invalid web password' }));
+          ws.close();
+          return;
+        }
         const { creds } = data;
-        shell = openSshShell(creds, 
-          (out) => ws.send(JSON.stringify({ type: 'data', data: out.toString() })),
+        shell = openSshShell(creds,
+          (out) => safeSend(JSON.stringify({ type: 'data', data: out.toString() })),
           (err) => {
-            ws.send(JSON.stringify({ type: 'error', message: err ? err.message : 'Session closed' }));
+            safeSend(JSON.stringify({ type: 'error', message: err ? err.message : 'Session closed' }));
             ws.close();
           }
         );
@@ -234,10 +280,11 @@ wss.on('connection', (ws) => {
 
 server.listen(PORT, () => {
   const url = 'http://localhost:' + PORT;
-  console.log('VZ Bot listening on ' + url);
-  console.log('Open this URL in your browser for the chat page (text box to type messages):');
-  console.log('  ' + url);
+  logger.info(`VZ Bot listening on ${url}`);
+  logger.info('Open this URL in your browser for the chat page (text box to type messages):');
+  logger.info(`  ${url}`);
   if (process.env.HEALTH_POLL_ENABLED !== '0') {
+    logger.info(`Scheduler: health poll every ${Number(process.env.HEALTH_POLL_MINUTES) || 5} min`);
     scheduler.start({ healthPollIntervalMinutes: Number(process.env.HEALTH_POLL_MINUTES) || 5 });
   }
 });

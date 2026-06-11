@@ -69,7 +69,7 @@ export async function testConnection(options = {}) {
   try {
     const client = getAnthropicClient(key.trim());
     await client.messages.create({
-      model: options.model || process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
+      model: options.model || process.env.LLM_MODEL || 'claude-sonnet-4-6',
       max_tokens: 10,
       messages: [{ role: 'user', content: 'Reply with OK.' }],
     });
@@ -189,7 +189,7 @@ export async function chat(messages, options = {}) {
   const client = getAnthropicClient(apiKey.trim() || undefined);
   const anthropicMessages = toAnthropicMessages(messages);
   const res = await client.messages.create({
-    model: options.model || process.env.LLM_MODEL || 'claude-sonnet-4-20250514',
+    model: options.model || process.env.LLM_MODEL || 'claude-sonnet-4-6',
     max_tokens: options.maxTokens || 4096,
     system: SYSTEM_PROMPT,
     tools: toClaudeTools(),

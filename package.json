@@ -8,7 +8,11 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "cli:vhi": "node src/cli-vhi.js",
-    "test": "node --test src/**/*.test.js 2>/dev/null || echo 'No tests yet'"
+    "test": "node test/utils.test.js",
+    "test:utils": "node test/utils.test.js",
+    "codebase:backup": "node src/backup-cli.js create",
+    "codebase:list": "node src/backup-cli.js list",
+    "codebase:restore": "node src/backup-cli.js restore"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -20,7 +24,12 @@
     "node-cron": "^3.0.3",
     "openai": "^6.27.0",
     "ssh2": "^1.17.0",
+    "undici": "^8.4.1",
+    "winston": "^3.13.0",
     "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
   },
   "optionalDependencies": {
     "@slack/bolt": "^3.17.0"

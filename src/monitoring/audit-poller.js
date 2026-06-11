@@ -1,4 +1,4 @@
-import { runVinfraCommand } from '../vhi/vinfra.js';
+import { runVinfraCommand, runVinfraBatch } from '../vhi/vinfra.js';
 import { saveEvents, getLastTimestamp } from './audit-storage.js';
 import { getLastValidContext } from '../gateway/context.js';
 import { loadGlobalSshConfig, normalizeUrl } from './ssh-storage.js';
@@ -59,15 +59,23 @@ export async function runAuditPoll(ctx = null) {
             // Limit enrichment to avoid long SSH hangs
             const toFetch = newEvents.slice(0, 50);
 
-            for (const event of toFetch) {
-                try {
-                    // Fetch full details (Component, Description, etc.)
-                    const details = await runVinfraCommand(['cluster', 'auditlog', 'show', event.id], context || {});
-                    enrichedEvents.push({ ...event, ...details });
-                } catch (err) {
-                    console.error(`[AUDIT] Failed to enrich event ${event.id}:`, err.message);
-                    enrichedEvents.push(event); // Fallback
-                }
+            try {
+                const batchCmds = toFetch.map(event => ['cluster', 'auditlog', 'show', event.id]);
+                const batchResults = await runVinfraBatch(batchCmds, context || {});
+                
+                toFetch.forEach((event, i) => {
+                    const details = batchResults[i];
+                    if (details && typeof details === 'object') {
+                        enrichedEvents.push({ ...event, ...details });
+                    } else {
+                        console.error(`[AUDIT] Failed to enrich event ${event.id}: invalid response`);
+                        enrichedEvents.push(event); // Fallback
+                    }
+                });
+            } catch (err) {
+                console.error(`[AUDIT] Failed to run batch enrichment:`, err.message);
+                // Graceful fallback to un-enriched events if batch execution fails completely
+                toFetch.forEach(event => enrichedEvents.push(event));
             }
 
             saveEvents(enrichedEvents, clusterUrl);

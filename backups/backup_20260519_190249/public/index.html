@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VZ Bot – VHI Assistant</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin: 0;
+      background: #1a1d23;
+      color: #e2e4e9;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 1rem 1.5rem;
+      background: #252830;
+      border-bottom: 1px solid #3d424d;
+      font-weight: 600;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .header span {
+      color: #7dd3fc;
+    }
+
+    .llm-picker {
+      margin-left: auto;
+      font-weight: normal;
+      font-size: 0.9rem;
+      color: #9ca3af;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .llm-picker select {
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid #3d424d;
+      background: #1a1d23;
+      color: #e2e4e9;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .llm-picker.connected select,
+    .llm-picker.connected .llm-label {
+      color: #22c55e;
+    }
+
+    .llm-picker.connected select {
+      border-color: #22c55e;
+    }
+
+    .llm-api-key {
+      width: 220px;
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid #3d424d;
+      background: #1a1d23;
+      color: #e2e4e9;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+
+    .llm-api-key::placeholder {
+      color: #71767e;
+    }
+
+    .llm-test-btn {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.8rem;
+      background: #166534;
+      border-radius: 6px;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .llm-test-btn:hover {
+      background: #15803d;
+    }
+
+    .llm-test-btn:disabled {
+      background: #3d424d;
+      cursor: not-allowed;
+    }
+
+    .llm-status {
+      font-size: 0.75rem;
+      margin-left: 0.25rem;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .msg {
+      max-width: 85%;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .msg.user {
+      align-self: flex-end;
+      background: #2563eb;
+      color: #fff;
+    }
+
+    .msg.assistant {
+      align-self: flex-start;
+      background: #2d323d;
+      border: 1px solid #3d424d;
+    }
+
+    .msg.error {
+      align-self: flex-start;
+      background: #451a1a;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+    }
+
+    .input-area {
+      padding: 1rem 1.5rem;
+      background: #252830;
+      border-top: 1px solid #3d424d;
+    }
+
+    .input-label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #9ca3af;
+      margin-bottom: 0.5rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-end;
+    }
+
+    textarea {
+      flex: 1;
+      min-height: 52px;
+      max-height: 160px;
+      padding: 0.75rem 1rem;
+      border: 2px solid #3d424d;
+      border-radius: 8px;
+      background: #1a1d23;
+      color: #e2e4e9;
+      font: inherit;
+      font-size: 1rem;
+      resize: vertical;
+    }
+
+    textarea::placeholder {
+      color: #71767e;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      background: #3d424d;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: #71767e;
+      margin-top: 0.5rem;
+    }
+
+    .login-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(26, 29, 35, 0.95);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+
+    .login-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .login-box {
+      background: #252830;
+      padding: 2.5rem;
+      border-radius: 16px;
+      border: 1px solid #3d424d;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .login-box h2 {
+      margin: 0 0 0.5rem 0;
+      color: #e2e4e9;
+      font-weight: 600;
+    }
+
+    .login-box p {
+      color: #9ca3af;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+
+    .login-box input {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      border: 1px solid #3d424d;
+      background: #1a1d23;
+      color: #e2e4e9;
+      font: inherit;
+      box-sizing: border-box;
+    }
+
+    .login-box input:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    .login-box button {
+      width: 100%;
+      padding: 0.85rem;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .login-box button:hover {
+      background: #1d4ed8;
+    }
+
+    .login-error {
+      color: #fca5a5;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      min-height: 1.2em;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <span>VZ Bot</span> – VHI 7.x Assistant
+    <div class="llm-picker" id="llmPicker">
+      <span class="llm-label">LLM</span>
+      <select id="llmProvider" title="Choose LLM provider">
+        <option value="anthropic">Claude (Anthropic)</option>
+        <option value="gemini">Gemini (Google)</option>
+        <option value="openai">OpenAI / Local</option>
+        <option value="perplexity">Perplexity</option>
+      </select>
+      <input type="text" id="llmBaseUrl" class="llm-api-key" placeholder="Base URL (e.g. http://localhost:11434/v1)"
+        autocomplete="off" style="display: none;" />
+      <input type="password" id="llmApiKey" class="llm-api-key" placeholder="API key (or set in .env)"
+        autocomplete="off" />
+      <button type="button" id="llmTest" class="llm-test-btn">Test connection</button>
+      <button type="button" id="settingsBtn" class="llm-test-btn" style="background: #374151;">Settings</button>
+      <span class="llm-status" id="llmStatus"></span>
+    </div>
+  </div>
+  <div class="messages" id="messages"></div>
+  <div class="input-area">
+    <label for="input" class="input-label">Type your message</label>
+    <div class="input-row">
+      <textarea id="input" placeholder="Type here: e.g. List all VMs, Run a health check…" rows="2"></textarea>
+      <button id="send" type="button">Send</button>
+    </div>
+    <div class="hint">Examples: "List all VMs" · "Run a health check" · "What's the status of my infrastructure?"</div>
+  </div>
+
+  <div id="loginOverlay" class="login-overlay hidden">
+    <div class="login-box">
+      <h2>VZ Bot Login</h2>
+      <p>Please enter the password to access.</p>
+      <input type="password" id="webPasswordInput" placeholder="Password" />
+      <button id="loginBtn">Login</button>
+      <div id="loginError" class="login-error"></div>
+    </div>
+  </div>
+
+  <div id="settingsOverlay" class="login-overlay hidden">
+    <div class="login-box" style="width:380px; text-align: left;">
+      <h2 style="margin-top:0; text-align: center;">VHI API Settings</h2>
+      <p style="font-size:13px; color:#9ca3af; margin-bottom:15px; text-align: center;">Override the <code>.env</code>
+        file credentials for this session.</p>
+
+      <div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">API Base URL</label>
+        <input type="text" id="vhiBaseUrlInput" class="llm-api-key" placeholder="https://..." autocomplete="off" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">API Username</label>
+        <input type="text" id="vhiUserInput" class="llm-api-key" placeholder="e.g. admin" autocomplete="off" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">API Password</label>
+        <input type="password" id="vhiPasswordInput" class="llm-api-key" placeholder="••••••••" autocomplete="off" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">API Project Name</label>
+        <input type="text" id="vhiProjectInput" class="llm-api-key" placeholder="Project name (e.g. admin)"
+          autocomplete="off" />
+        <p style="font-size: 0.8rem; color: #fca5a5; margin-top: -5px; margin-bottom: 15px;">Note: Should match your
+          username (e.g. admin). "Default" is often incorrect.</p>
+
+        <hr style="border: 0; border-top: 1px solid #3d424d; margin: 15px 0;" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">Node SSH Host (for vinfra)</label>
+        <input type="text" id="vhiSshHostInput" class="llm-api-key" placeholder="e.g. 172.16.218.7"
+          autocomplete="off" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">Node SSH User</label>
+        <input type="text" id="vhiSshUserInput" class="llm-api-key" placeholder="e.g. root" autocomplete="off" />
+
+        <label style="color:#e2e4e9; font-size:0.9rem; font-weight:600;">Node SSH Password</label>
+        <input type="password" id="vhiSshPasswordInput" class="llm-api-key" placeholder="••••••••" autocomplete="off" />
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:20px;">
+        <button type="button" id="saveSettingsBtn" class="llm-test-btn" style="flex:1;">Save locally</button>
+        <button type="button" id="clearSettingsBtn" class="llm-test-btn"
+          style="background:#ef4444; flex:1;">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let webPassword = '';
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const llmSelect = document.getElementById('llmProvider');
+    const llmApiKey = document.getElementById('llmApiKey');
+    const llmTestBtn = document.getElementById('llmTest');
+    const llmStatus = document.getElementById('llmStatus');
+    const llmPicker = document.getElementById('llmPicker');
+
+    const llmBaseUrl = document.getElementById('llmBaseUrl');
+
+    llmSelect.addEventListener('change', () => {
+      if (llmSelect.value === 'openai') {
+        llmBaseUrl.style.display = 'inline-block';
+        llmApiKey.placeholder = 'API key (optional for local)';
+      } else {
+        llmBaseUrl.style.display = 'none';
+        llmApiKey.placeholder = 'API key (or set in .env)';
+      }
+    });
+
+    function handleAuthError(data) {
+      if (data && (data.error || '').includes('Unauthorized')) {
+        document.getElementById('loginOverlay').classList.remove('hidden');
+        document.getElementById('loginError').textContent = 'Invalid password. Please try again.';
+        document.getElementById('webPasswordInput').value = '';
+        return true;
+      }
+      return false;
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', () => {
+      webPassword = document.getElementById('webPasswordInput').value.trim();
+      document.getElementById('loginError').textContent = '';
+      if (!webPassword) {
+        document.getElementById('loginError').textContent = 'Please enter a password';
+        return;
+      }
+      document.getElementById('loginOverlay').classList.add('hidden');
+    });
+
+    document.getElementById('webPasswordInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('loginBtn').click();
+    });
+
+    function loadSettings() {
+      document.getElementById('vhiBaseUrlInput').value = localStorage.getItem('vhiBaseUrl') || '';
+      document.getElementById('vhiUserInput').value = localStorage.getItem('vhiUser') || '';
+      document.getElementById('vhiPasswordInput').value = localStorage.getItem('vhiPassword') || '';
+      document.getElementById('vhiProjectInput').value = localStorage.getItem('vhiProject') || '';
+      document.getElementById('vhiSshHostInput').value = localStorage.getItem('vhiSshHost') || '';
+      document.getElementById('vhiSshUserInput').value = localStorage.getItem('vhiSshUser') || '';
+      document.getElementById('vhiSshPasswordInput').value = localStorage.getItem('vhiSshPassword') || '';
+
+      const savedBaseUrl = localStorage.getItem('llmBaseUrl');
+      if (savedBaseUrl) llmBaseUrl.value = savedBaseUrl;
+    }
+
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+      const url = document.getElementById('vhiBaseUrlInput').value.trim();
+      const user = document.getElementById('vhiUserInput').value.trim();
+      const pass = document.getElementById('vhiPasswordInput').value.trim();
+      const proj = document.getElementById('vhiProjectInput').value.trim();
+      const sshHost = document.getElementById('vhiSshHostInput').value.trim();
+      const sshUser = document.getElementById('vhiSshUserInput').value.trim();
+      const sshPass = document.getElementById('vhiSshPasswordInput').value.trim();
+
+      if (url) localStorage.setItem('vhiBaseUrl', url); else localStorage.removeItem('vhiBaseUrl');
+      if (user) localStorage.setItem('vhiUser', user); else localStorage.removeItem('vhiUser');
+      if (pass) localStorage.setItem('vhiPassword', pass); else localStorage.removeItem('vhiPassword');
+      if (proj) localStorage.setItem('vhiProject', proj); else localStorage.removeItem('vhiProject');
+      if (sshHost) localStorage.setItem('vhiSshHost', sshHost); else localStorage.removeItem('vhiSshHost');
+      if (sshUser) localStorage.setItem('vhiSshUser', sshUser); else localStorage.removeItem('vhiSshUser');
+      if (sshPass) localStorage.setItem('vhiSshPassword', sshPass); else localStorage.removeItem('vhiSshPassword');
+
+      document.getElementById('settingsOverlay').classList.add('hidden');
+    });
+
+    document.getElementById('clearSettingsBtn').addEventListener('click', () => {
+      localStorage.removeItem('vhiBaseUrl');
+      localStorage.removeItem('vhiUser');
+      localStorage.removeItem('vhiPassword');
+      localStorage.removeItem('vhiProject');
+      localStorage.removeItem('vhiSshHost');
+      localStorage.removeItem('vhiSshUser');
+      localStorage.removeItem('vhiSshPassword');
+      loadSettings();
+      document.getElementById('settingsOverlay').classList.add('hidden');
+    });
+
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+      loadSettings();
+      document.getElementById('settingsOverlay').classList.remove('hidden');
+    });
+
+    async function loadConfig() {
+      try {
+        const res = await fetch('/api/config');
+        const cfg = await res.json();
+        if (cfg.llmProvider && llmSelect) {
+          llmSelect.value = cfg.llmProvider;
+          llmSelect.dispatchEvent(new Event('change'));
+        }
+        if (cfg.authRequired) {
+          document.getElementById('loginOverlay').classList.remove('hidden');
+        }
+      } catch (_) { }
+    }
+    loadConfig();
+
+    function setConnected(connected, message) {
+      if (llmPicker) {
+        llmPicker.classList.toggle('connected', !!connected);
+      }
+      if (llmStatus) {
+        llmStatus.textContent = message || '';
+        llmStatus.style.color = connected ? '#22c55e' : '#9ca3af';
+      }
+    }
+
+    llmTestBtn.addEventListener('click', async function () {
+      const provider = llmSelect ? llmSelect.value : 'anthropic';
+      const apiKey = (llmApiKey && llmApiKey.value) ? llmApiKey.value.trim() : '';
+      const baseUrl = (llmBaseUrl && llmBaseUrl.value) ? llmBaseUrl.value.trim() : '';
+
+      if (provider === 'openai' && baseUrl) {
+        localStorage.setItem('llmBaseUrl', baseUrl);
+      }
+
+      llmStatus.textContent = 'Testing…';
+      llmStatus.style.color = '#9ca3af';
+      llmPicker.classList.remove('connected');
+      llmTestBtn.disabled = true;
+      try {
+        const res = await fetch('/api/llm/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, apiKey, llmBaseUrl: baseUrl, webPassword })
+        });
+        const data = await res.json();
+        if (handleAuthError(data)) {
+          setConnected(false, 'Unauthorized');
+          return;
+        }
+        if (data.ok) {
+          setConnected(true, 'Connected');
+        } else {
+          setConnected(false, data.error || 'Failed');
+        }
+      } catch (err) {
+        setConnected(false, err.message || 'Error');
+      } finally {
+        llmTestBtn.disabled = false;
+      }
+    });
+
+    function addMessage(role, text, isError = false) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + (isError ? 'error' : role);
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function send() {
+      const message = inputEl.value.trim();
+      if (!message) return;
+      inputEl.value = '';
+      addMessage('user', message);
+      sendBtn.disabled = true;
+      try {
+        const provider = llmSelect ? llmSelect.value : 'anthropic';
+        const apiKey = (llmApiKey && llmApiKey.value) ? llmApiKey.value.trim() : null;
+        const baseUrl = (llmBaseUrl && llmBaseUrl.value) ? llmBaseUrl.value.trim() : null;
+
+        if (provider === 'openai' && baseUrl) {
+          localStorage.setItem('llmBaseUrl', baseUrl);
+        }
+
+        const vhiBaseUrl = localStorage.getItem('vhiBaseUrl');
+        const vhiUser = localStorage.getItem('vhiUser');
+        const vhiProject = localStorage.getItem('vhiProject');
+        const vhiPassword = localStorage.getItem('vhiPassword');
+        const vhiSshHost = localStorage.getItem('vhiSshHost');
+        const vhiSshUser = localStorage.getItem('vhiSshUser');
+        const vhiSshPassword = localStorage.getItem('vhiSshPassword');
+
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            conversationId: 'web-ui',
+            llmProvider: provider,
+            apiKey: apiKey || undefined,
+            llmBaseUrl: baseUrl || undefined,
+            vhiBaseUrl,
+            vhiUser,
+            vhiProject,
+            vhiPassword,
+            vhiSshHost,
+            vhiSshUser,
+            vhiSshPassword,
+            webPassword
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (!handleAuthError(data)) {
+            addMessage('assistant', data.error || 'Request failed', true);
+          }
+          return;
+        }
+        addMessage('assistant', data.reply || 'No response.');
+      } catch (err) {
+        addMessage('assistant', 'Network error: ' + err.message, true);
+      } finally {
+        sendBtn.disabled = false;
+        inputEl.focus();
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        send();
+      }
+    });
+    inputEl.focus();
+  </script>
+</body>
+
+</html>

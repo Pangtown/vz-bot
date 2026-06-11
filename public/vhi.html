@@ -747,9 +747,90 @@
       padding: 1rem 1.5rem; border-top: 1px solid var(--border);
       display: flex; justify-content: flex-end; gap: .75rem; background: var(--bg-light);
     }
+    /* Console Modal specific */
+    .console-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .console-option {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem;
+      cursor: pointer;
+      transition: all var(--transition);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      text-align: center;
+      background: var(--bg-card);
+    }
+    .console-option:hover {
+      border-color: var(--accent);
+      background: rgba(227,0,15,0.05);
+      transform: translateY(-2px);
+    }
+    .console-option .ri {
+      font-size: 2rem;
+      color: var(--accent);
+    }
+    .console-option h5 {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+    .console-option p {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin: 0;
+    }
   </style>
 </head>
 <body>
+  
+<!-- ═══════════════ CONSOLE SELECTION MODAL ═══════════════ -->
+<div id="consoleModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 520px;">
+    <div class="modal-header">
+      <h3>Access VM Console</h3>
+      <button class="modal-close" onclick="closeConsoleModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 1rem; color: var(--text-dim); font-size: 0.88rem;">
+        Choose how you want to connect to <strong><span id="consoleVmName">...</span></strong>. 
+        For full copy-paste support, we recommend using <strong>Virt-viewer</strong>.
+      </p>
+      
+      <div class="console-options">
+        <div class="console-option" onclick="openWebConsole('vnc', 'novnc')">
+          <span class="ri">🖥️</span>
+          <h5>VNC (Web)</h5>
+          <p>Standard browser console. No native copy-paste.</p>
+        </div>
+        <div class="console-option" onclick="openWebConsole('spice', 'spice-html5')">
+          <span class="ri">🌶️</span>
+          <h5>SPICE (Web)</h5>
+          <p>Modern web console. Requires cluster config.</p>
+        </div>
+        <div class="console-option" onclick="openWebConsole('rdp', 'rdp-html5')">
+          <span class="ri">🪟</span>
+          <h5>RDP (Web)</h5>
+          <p>Windows Remote Desktop via browser.</p>
+        </div>
+        <div class="console-option" onclick="downloadVvFile()">
+          <span class="ri">📥</span>
+          <h5>Virt-viewer</h5>
+          <p>Best experience. Download .vv file for local app.</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeConsoleModal()">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════ LOGIN OVERLAY ═══════════════ -->
 <div id="loginOverlay">
@@ -1118,18 +1199,13 @@
           <h2>Compute Nodes</h2>
           <span class="panel-badge" id="nodeCount">Loading…</span>
           <div class="panel-actions">
-            <button class="tbl-refresh" id="globalSshBtn" onclick="openGlobalSshModal()" title="Global SSH Config for all nodes">
-              <span class="ri">⚙</span> Global SSH
-            </button>
-            <button class="tbl-refresh" id="clusterTerminalBtn" onclick="openClusterTerminal()" title="Launch Cluster Console">
-              <span class="ri">🖥</span> Console
-            </button>
             <button class="tbl-refresh" id="nodeRefresh"><span class="ri">↻</span> Refresh</button>
           </div>
         </div>
         <div class="table-card">
-          <div class="table-toolbar">
-            <input type="search" class="search-input" id="nodeSearch" placeholder="Search nodes…">
+          <div class="table-toolbar" style="display: flex; gap: 1rem;">
+            <input type="search" class="search-input" id="nodeSearch" placeholder="Search nodes…" style="flex: 1;">
+            <button class="btn btn-secondary" onclick="openGlobalSshModal()"><span class="ri">⚙</span> Global Cluster SSH</button>
           </div>
           <table>
             <thead>
@@ -1790,7 +1866,11 @@
   <div class="drawer-body" id="nodeDetBody">
     <!-- Content injected via JS -->
   </div>
-  <div class="modal-footer" style="padding: 1rem 1.5rem; background: var(--bg-sidebar);">
+  <div class="modal-footer" style="padding: 1rem 1.5rem; background: var(--bg-sidebar); display: flex; justify-content: space-between;">
+    <div>
+      <button class="btn btn-secondary" onclick="openNodeSshModal(currentNodeDetails?.hostname || currentNodeDetails?.name || currentNodeDetails?.id)" style="margin-right: 0.5rem;"><span class="ri">⚙</span> Node SSH</button>
+      <button class="btn btn-primary" onclick="currentSshNode = (currentNodeDetails?.hostname || currentNodeDetails?.name || currentNodeDetails?.id); openTerminal()"><span class="ri">🖥</span> Console</button>
+    </div>
     <button class="btn btn-secondary" onclick="closeNodeDrawer()">Close</button>
   </div>
 </div>
@@ -2042,13 +2122,12 @@ async function doLogin() {
     loadAll();
   } catch (err) {
     setLoginStatus(err.message || 'Connection failed', 'error');
+    // If auto-connect hid the overlay, bring it back gracefully on error
+    document.getElementById('loginOverlay').classList.remove('hidden');
+    document.getElementById('loginOverlay').style.display = '';
+    document.getElementById('appShell').classList.remove('visible');
   } finally {
     btn.disabled = false; btn.textContent = 'Connect';
-    // Clear credentials populated by multi-cluster dashboard redirect
-    localStorage.removeItem('vhiBaseUrl');
-    localStorage.removeItem('vhiUser');
-    localStorage.removeItem('vhiPassword');
-    localStorage.removeItem('vhiProject');
   }
 }
 
@@ -2064,14 +2143,27 @@ if (fwdBaseUrl && fwdUser && fwdPass) {
   document.getElementById('loginPass').value = fwdPass;
   if (fwdProj) document.getElementById('loginProject').value = fwdProj;
   
+  // Hide login overlay immediately (permanently destroy the overlay to avoid CSS transition flashes)
+  const overlay = document.getElementById('loginOverlay');
+  overlay.classList.add('hidden');
+  overlay.style.display = 'none';
+  
+  document.getElementById('appShell').classList.add('visible');
+  
   // Auto-connect
   doLogin();
 }
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
   session = null;
+  localStorage.removeItem('vhiBaseUrl');
+  localStorage.removeItem('vhiUser');
+  localStorage.removeItem('vhiPassword');
+  localStorage.removeItem('vhiProject');
+  
   document.getElementById('appShell').classList.remove('visible');
   document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('loginOverlay').style.display = '';
   document.getElementById('loginPass').value = '';
   setLoginStatus('', '');
   // reset panels
@@ -2610,24 +2702,75 @@ async function deleteVM(id) {
   }
 }
 
+let consoleVmId = null;
+
 async function vmConsole(id) {
-  toast(`Requesting console URL…`, 'inf');
+  const vm = _vms.find(v => v.id === id);
+  consoleVmId = id;
+  document.getElementById('consoleVmName').textContent = vm ? vm.name : 'VM';
+  document.getElementById('consoleModal').classList.remove('hidden');
+}
+
+function closeConsoleModal() {
+  document.getElementById('consoleModal').classList.add('hidden');
+  consoleVmId = null;
+}
+
+async function openWebConsole(protocol, type) {
+  toast(`Requesting ${protocol.toUpperCase()} console…`, 'inf');
   try {
-    const res = await apiPost(`/api/vhi/servers/${id}/action`, { action: 'console' });
+    const res = await apiPost(`/api/vhi/servers/${consoleVmId}/action`, { 
+      action: 'console',
+      protocol: protocol,
+      type: type 
+    });
     if (res.url) {
       let u = res.url;
-      if (u.includes('vnc_auto.html')) {
+      // Some proxies need vnc.html instead of vnc_auto.html
+      if (type === 'novnc' && u.includes('vnc_auto.html')) {
         u = u.replace('vnc_auto.html', 'vnc.html');
       }
       window.open(u, '_blank', 'width=1000,height=800');
       toast('Console opened', 'ok');
+      closeConsoleModal();
     } else {
-      throw new Error('No console URL returned');
+      throw new Error('No console URL returned. Make sure the console type is supported on your cluster.');
     }
   } catch(err) {
     toast(`Console failed: ${err.message}`, 'err');
   }
 }
+
+async function downloadVvFile() {
+  toast('Generating Virt-viewer file…', 'inf');
+  const id = consoleVmId;
+  try {
+    // We try to get connection details from a special endpoint or compute action
+    // In many environments, requesting a 'spice' protocol with 'spice' type returns a .vv file URL
+    const res = await apiPost(`/api/vhi/servers/${id}/action`, { 
+      action: 'console',
+      protocol: 'spice',
+      type: 'spice' 
+    });
+    
+    if (res.url) {
+      window.location.href = res.url;
+      toast('Download started', 'ok');
+      closeConsoleModal();
+    } else {
+      // Fallback: Manually trigger a .vv file generation endpoint if we have one
+      // window.location.href = `/api/vhi/servers/${id}/console-vv`;
+      throw new Error('Virt-viewer (.vv) not supported by this cluster directly.');
+    }
+  } catch (err) {
+    toast(`VV failed: ${err.message}`, 'err');
+  }
+}
+
+window.vmConsole = vmConsole;
+window.closeConsoleModal = closeConsoleModal;
+window.openWebConsole = openWebConsole;
+window.downloadVvFile = downloadVvFile;
 
 // ── VM DETAILS DRAWER ────────────────────────────────────────────────────────
 
@@ -3213,6 +3356,42 @@ function closeNodeDrawer() {
   currentNodeDetails = null;
 }
 
+function getTrafficTypeBadge(type = '') {
+  const key = type.toLowerCase().replace(/[\s_-]+/g, '');
+  let bg = 'rgba(100, 116, 139, 0.12)';
+  let color = '#94a3b8';
+  let border = '1px solid rgba(100, 116, 139, 0.25)';
+  
+  if (key.includes('storage')) {
+    bg = 'rgba(59, 130, 246, 0.15)';
+    color = '#60a5fa';
+    border = '1px solid rgba(59, 130, 246, 0.3)';
+  } else if (key.includes('mgmt') || key.includes('management') || key.includes('internal')) {
+    bg = 'rgba(20, 184, 166, 0.15)';
+    color = '#2dd4bf';
+    border = '1px solid rgba(20, 184, 166, 0.3)';
+  } else if (key.includes('api') || key.includes('compute')) {
+    bg = 'rgba(245, 158, 11, 0.15)';
+    color = '#fbbf24';
+    border = '1px solid rgba(245, 158, 11, 0.3)';
+  } else if (key.includes('ssh')) {
+    bg = 'rgba(16, 185, 129, 0.15)';
+    color = '#34d399';
+    border = '1px solid rgba(16, 185, 129, 0.3)';
+  } else if (key.includes('vnc')) {
+    bg = 'rgba(139, 92, 246, 0.15)';
+    color = '#a78bfa';
+    border = '1px solid rgba(139, 92, 246, 0.3)';
+  } else if (key.includes('public') || key.includes('external')) {
+    bg = 'rgba(236, 72, 153, 0.15)';
+    color = '#f472b6';
+    border = '1px solid rgba(236, 72, 153, 0.3)';
+  }
+  
+  const text = type.split(/[_\s]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return `<span class="badge" style="background:${bg}; color:${color}; border:${border}; text-transform:none; font-weight:600; font-size:0.68rem; margin:2px 2px 2px 0; display:inline-flex; align-items:center; border-radius:12px; padding: 0.15rem 0.55rem;">${text}</span>`;
+}
+
 function renderNodeDetails() {
   const node = currentNodeDetails;
   if (!node) return;
@@ -3267,17 +3446,39 @@ function renderNodeDetails() {
   
   // Add network if available
   if (node.networks && node.networks.length > 0) {
-    const netHtml = node.networks.map(n => `
-      <div style="margin-bottom:.8rem; padding:.6rem; background:var(--bg-content); border-radius:4px;">
-        <div style="font-weight:600; font-size:.85rem; margin-bottom:.3rem;">${n.name || 'Interface'}</div>
-        <div class="detail-grid" style="grid-template-columns: 80px 1fr; font-size:.8rem;">
-          <div class="detail-label">IPs</div>
-          <div class="detail-val">${(n.ips || []).join(', ') || '—'}</div>
-          <div class="detail-label">MAC</div>
-          <div class="detail-val mono">${n.mac || '—'}</div>
+    let displayNets = node.networks || [];
+    if (displayNets.length === 0) displayNets = [{ name: 'No Networks Found', ips: [] }];
+
+    const netHtml = displayNets.map(n => {
+      const trafficBadges = (n.traffic_types || [])
+        .map(t => getTrafficTypeBadge(t))
+        .join('') || '';
+      
+      const ifnameTag = n.ifname 
+        ? `<span class="badge" style="background:var(--bg-light); color:var(--text-dim); border:1px solid var(--border); font-size:0.68rem; text-transform:none; font-weight:600; padding:0.1rem 0.4rem; border-radius:4px; margin-left: auto;">${n.ifname}</span>`
+        : '';
+
+      return `
+        <div style="margin-bottom:.8rem; padding:.8rem; background:var(--bg-content); border:1px solid var(--border); border-radius:6px;">
+          <div style="display:flex; align-items:center; font-weight:600; font-size:.88rem; margin-bottom:.5rem;">
+            <span>${n.name || 'Interface'}</span>
+            ${ifnameTag}
+          </div>
+          <div class="detail-grid" style="grid-template-columns: 80px 1fr; font-size:.8rem; gap: .4rem .5rem;">
+            <div class="detail-label">IPs</div>
+            <div class="detail-val" style="color:var(--text); font-weight:500;">${(n.ips || []).join(', ') || '—'}</div>
+            <div class="detail-label">MAC</div>
+            <div class="detail-val mono">${n.mac || '—'}</div>
+            ${trafficBadges ? `
+              <div class="detail-label" style="align-self: center;">Traffic</div>
+              <div class="detail-val" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">
+                ${trafficBadges}
+              </div>
+            ` : ''}
+          </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
     
     html += `
       <div class="drawer-section">
@@ -3568,7 +3769,7 @@ function openTerminal() {
   terminalWs = new WebSocket(`${protocol}//${window.location.host}`);
   
   terminalWs.onopen = () => {
-    terminalWs.send(JSON.stringify({ type: 'init', creds }));
+    terminalWs.send(JSON.stringify({ type: 'init', creds, webPassword: localStorage.getItem('webPassword') || '' }));
     container.innerHTML += '<div style="color:#0f0">Connection established.</div>';
     document.getElementById('terminalInput').focus();
   };
@@ -3579,6 +3780,10 @@ function openTerminal() {
       appendTerminalData(msg.data);
     } else if (msg.type === 'error') {
       container.innerHTML += `<div style="color:var(--danger)">Error: ${msg.message}</div>`;
+      if (/web password/i.test(msg.message || '')) {
+        const pw = prompt('This server requires a web password for the SSH terminal:');
+        if (pw) { localStorage.setItem('webPassword', pw); openNodeTerminal(hostname); }
+      }
     }
   };
 
@@ -4352,9 +4557,8 @@ function updateConnectionStatus() {
             if (!localStorage.getItem('llmProvider') && config.llmProvider) {
                 localStorage.setItem('llmProvider', config.llmProvider);
             }
-            if (!localStorage.getItem('llmApiKey') && config.apiKey) {
-                localStorage.setItem('llmApiKey', config.apiKey);
-            }
+            // Server no longer exposes its API key; chat falls back to the
+            // server-side key automatically when none is set locally.
             if (!localStorage.getItem('llmBaseUrl') && config.llmBaseUrl) {
                 localStorage.setItem('llmBaseUrl', config.llmBaseUrl);
             }

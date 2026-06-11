@@ -1,0 +1,16 @@
+{
+  "name": "backup_20260519_190249",
+  "created": "2026-05-20T01:02:49.725Z",
+  "reason": "Pre-refactoring initial snapshot",
+  "files": [
+    "src",
+    "public",
+    "config",
+    "package.json",
+    "package-lock.json",
+    "README.md",
+    "IMPROVEMENTS.md",
+    ".env.example",
+    ".gitignore"
+  ]
+}
