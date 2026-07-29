@@ -785,6 +785,211 @@
       font-size: 0.75rem;
       color: var(--text-dim);
       margin: 0;
+    /* ── Migrations & Clouds Styles ───────────────────────── */
+    .sub-tabs {
+      display: flex;
+      gap: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.2rem;
+      background: var(--bg-card);
+      padding: 0 1rem;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .sub-tab {
+      padding: 0.8rem 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all var(--transition);
+    }
+    .sub-tab:hover {
+      color: var(--text);
+    }
+    .sub-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+    }
+    .tab-content-panel {
+      display: none;
+    }
+    .tab-content-panel.active {
+      display: block;
+    }
+    
+    /* Wizard step styling */
+    .wizard-container {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-card);
+      overflow: hidden;
+      height: 520px;
+    }
+    .wizard-sidebar {
+      width: 220px;
+      min-width: 220px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .wizard-step-item {
+      padding: 0.65rem 1.5rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      border-left: 4px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      user-select: none;
+      transition: all var(--transition);
+    }
+    .wizard-step-item.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: rgba(227, 0, 15, 0.05);
+    }
+    .wizard-step-item.completed {
+      color: var(--text);
+    }
+    .wizard-step-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--bg-medium);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+    .wizard-step-item.active .wizard-step-num {
+      background: var(--accent);
+      color: #fff;
+    }
+    .wizard-step-item.completed .wizard-step-num {
+      background: var(--success);
+      color: #fff;
+    }
+    .wizard-content-area {
+      flex: 1;
+      padding: 1.8rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+    }
+    .wizard-step-content {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+    }
+    .wizard-step-content.active {
+      display: flex;
+    }
+    .wizard-step-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+      color: var(--text);
+    }
+    
+    /* Toggle switch for Disable SSL */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 42px;
+      height: 22px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: var(--bg-light);
+      transition: .2s;
+      border-radius: 34px;
+      border: 1px solid var(--border);
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background-color: var(--text-dim);
+      transition: .2s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: var(--success);
+      border-color: var(--success);
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+      background-color: #fff;
+    }
+    
+    /* Radio options for provider */
+    .provider-option {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 0.8rem;
+      cursor: pointer;
+      background: var(--bg-card);
+      transition: all var(--transition);
+    }
+    .provider-option:hover:not(.disabled) {
+      border-color: var(--accent);
+      background: rgba(227, 0, 15, 0.02);
+    }
+    .provider-option.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: var(--bg-sidebar);
+    }
+    .provider-option input[type="radio"] {
+      cursor: pointer;
+    }
+    .provider-option input[type="radio"]:disabled {
+      cursor: not-allowed;
+    }
+    .provider-logo {
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+    }
+    .provider-details {
+      flex: 1;
+    }
+    .provider-name {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--text);
+    }
+    .provider-desc {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      margin-top: 2px;
     }
   </style>
 </head>
@@ -804,25 +1009,25 @@
       </p>
       
       <div class="console-options">
-        <div class="console-option" onclick="openWebConsole('vnc', 'novnc')">
+        <div class="console-option" onclick="openWebConsole('vnc', 'novnc')" style="border-color: rgba(34,197,94,0.4); background: rgba(34,197,94,0.04);">
           <span class="ri">🖥️</span>
-          <h5>VNC (Web)</h5>
-          <p>Standard browser console. No native copy-paste.</p>
+          <h5>VNC (Web) <span class="badge" style="background:#22c55e; color:#fff; font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Active</span></h5>
+          <p>Standard web console (noVNC). Enabled &amp; Ready.</p>
         </div>
-        <div class="console-option" onclick="openWebConsole('spice', 'spice-html5')">
+        <div class="console-option" onclick="openWebConsole('spice', 'spice-html5')" style="opacity:0.75;">
           <span class="ri">🌶️</span>
-          <h5>SPICE (Web)</h5>
-          <p>Modern web console. Requires cluster config.</p>
+          <h5>SPICE (Web) <span class="badge" style="background:rgba(255,255,255,0.15); color:var(--text-dim); font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Cluster Disabled</span></h5>
+          <p>Modern web console. Requires SPICE proxy on cluster.</p>
         </div>
-        <div class="console-option" onclick="openWebConsole('rdp', 'rdp-html5')">
+        <div class="console-option" onclick="openWebConsole('rdp', 'rdp-html5')" style="opacity:0.75;">
           <span class="ri">🪟</span>
-          <h5>RDP (Web)</h5>
+          <h5>RDP (Web) <span class="badge" style="background:rgba(255,255,255,0.15); color:var(--text-dim); font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Cluster Disabled</span></h5>
           <p>Windows Remote Desktop via browser.</p>
         </div>
-        <div class="console-option" onclick="downloadVvFile()">
+        <div class="console-option" onclick="downloadVvFile()" style="opacity:0.75;">
           <span class="ri">📥</span>
-          <h5>Virt-viewer</h5>
-          <p>Best experience. Download .vv file for local app.</p>
+          <h5>Virt-viewer <span class="badge" style="background:rgba(255,255,255,0.15); color:var(--text-dim); font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Cluster Disabled</span></h5>
+          <p>Requires SPICE driver configured on compute nodes.</p>
         </div>
       </div>
     </div>
@@ -934,6 +1139,11 @@
         <span class="nav-icon">📦</span>
         <span class="nav-label">Nodes</span>
         <span class="nav-badge" id="nodeBadge">–</span>
+      </div>
+      <div class="nav-item" data-panel="migrations">
+        <span class="nav-icon">🔄</span>
+        <span class="nav-label">Migrations</span>
+        <span class="nav-badge" id="migrationBadge" style="display: none;">–</span>
       </div>
 
       <!-- Storage Services -->
@@ -1402,6 +1612,73 @@
         </div>
       </div>
 
+      <!-- ── MIGRATIONS & CLOUDS PANEL ── -->
+      <div class="panel" id="panel-migrations">
+        <div class="panel-header">
+          <h2>Migrations</h2>
+          <span class="panel-badge" id="migrationsCount">0 Active</span>
+        </div>
+        
+        <!-- Sub tabs navigation -->
+        <div class="sub-tabs">
+          <div class="sub-tab active" data-tab="migrations-list">Migrations</div>
+          <div class="sub-tab" data-tab="clouds-list">Clouds</div>
+        </div>
+
+        <!-- MIGRATIONS TAB VIEW -->
+        <div class="tab-content-panel active" id="tab-migrations-list">
+          <div class="table-card">
+            <div class="table-toolbar" style="display: flex; justify-content: space-between; align-items: center;">
+              <input type="search" class="search-input" id="migrationSearch" placeholder="Search migrations…">
+              <button class="act-btn act-start" id="btnOpenMigrateWizard" style="padding:.4rem .9rem; width: auto; height: auto; display: flex; align-items: center; gap: 0.3rem;">
+                <span class="ri">+</span> Migrate
+              </button>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Migration Name</th>
+                  <th>Source Cloud</th>
+                  <th>VMs</th>
+                  <th>Status</th>
+                  <th>Started</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="migrationsBody">
+                <!-- Migrations list will be populated here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CLOUDS TAB VIEW -->
+        <div class="tab-content-panel" id="tab-clouds-list">
+          <div class="table-card">
+            <div class="table-toolbar" style="display: flex; justify-content: space-between; align-items: center;">
+              <input type="search" class="search-input" id="cloudSearch" placeholder="Search clouds…">
+              <button class="act-btn act-primary" id="btnOpenAddCloudModal" style="padding:.4rem .9rem; width: auto; height: auto; display: flex; align-items: center; gap: 0.3rem;">
+                <span class="ri">+</span> Add cloud
+              </button>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Cloud Name</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th>Added</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="cloudsBody">
+                <!-- Clouds list will be populated here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- ── AI ASSISTANT PANEL ── -->
       <div class="panel" id="panel-chat" style="height: 100%; display: flex; flex-direction: column; padding: 0;">
         <div class="panel-header" style="padding: 1rem 1.5rem; margin-bottom: 0; border-bottom: 1px solid var(--border);">
@@ -1800,6 +2077,365 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="document.getElementById('createImgFromSnapModal').classList.add('hidden')">Cancel</button>
       <button class="btn btn-primary" onclick="submitCreateImgFromSnap()">Create Image</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ADD CLOUD MODAL ═══════════════ -->
+<div id="addCloudModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 500px;">
+    <div class="modal-header">
+      <h3>Add Cloud</h3>
+      <button class="modal-close" onclick="closeAddCloudModal()">✕</button>
+    </div>
+    
+    <!-- Step 1: Select Provider -->
+    <div id="addCloudStep1" class="modal-body">
+      <p style="font-size: 0.88rem; color: var(--text-dim); margin-bottom: 1rem;">Select a cloud provider to connect to VHI:</p>
+      
+      <div class="provider-option" onclick="selectProvider('vmware')">
+        <input type="radio" id="providerVMware" name="cloudProvider" value="vmware" checked style="pointer-events: none;">
+        <span class="provider-logo">🔌</span>
+        <div class="provider-details">
+          <div class="provider-name">VMware</div>
+          <div class="provider-desc">Migrate virtual machines and configurations from vSphere.</div>
+        </div>
+      </div>
+      
+      <div class="provider-option disabled">
+        <input type="radio" id="providerAzure" name="cloudProvider" value="azure" disabled>
+        <span class="provider-logo">☁️</span>
+        <div class="provider-details">
+          <div class="provider-name">Azure <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
+          <div class="provider-desc">Import Azure instances and resources.</div>
+        </div>
+      </div>
+      
+      <div class="provider-option disabled">
+        <input type="radio" id="providerOpenStack" name="cloudProvider" value="openstack" disabled>
+        <span class="provider-logo">🥞</span>
+        <div class="provider-details">
+          <div class="provider-name">OpenStack <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
+          <div class="provider-desc">Connect other OpenStack environments.</div>
+        </div>
+      </div>
+      
+      <div class="provider-option disabled">
+        <input type="radio" id="providerVzServer" name="cloudProvider" value="vzserver" disabled>
+        <span class="provider-logo">🐧</span>
+        <div class="provider-details">
+          <div class="provider-name">Virtuozzo Server <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
+          <div class="provider-desc">Migrate workloads from Virtuozzo containers/VMs.</div>
+        </div>
+      </div>
+
+      <div class="provider-option disabled">
+        <input type="radio" id="providerVzInfra" name="cloudProvider" value="vzinfra" disabled>
+        <span class="provider-logo">🏢</span>
+        <div class="provider-details">
+          <div class="provider-name">Virtuozzo Infrastructure <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
+          <div class="provider-desc">Connect other VHI clusters.</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Step 2: Configure VMware Credentials -->
+    <div id="addCloudStep2" class="modal-body hidden">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <span style="font-size: 2.2rem; font-weight: bold; font-family: sans-serif; letter-spacing: -1px; color: #0056b3;">vmware</span>
+      </div>
+      
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="cloudName" placeholder="e.g. Vegas VMware Cluster">
+      </div>
+      <div class="form-group">
+        <label>Description (optional)</label>
+        <input type="text" id="cloudDesc" placeholder="Legacy production workloads">
+      </div>
+      <div class="form-group">
+        <label>VMware vSphere hostname</label>
+        <input type="text" id="cloudHost" placeholder="e.g. vcsa.vegas.local">
+      </div>
+      <div class="form-group">
+        <label>Port</label>
+        <input type="number" id="cloudPort" value="443">
+      </div>
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="cloudUser" placeholder="administrator@vsphere.local">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="cloudPass" placeholder="••••••••">
+      </div>
+      <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.8rem;">
+        <div>
+          <label style="margin: 0; font-weight: 600;">Disable SSL checks</label>
+          <p style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px;">Allow self-signed or untrusted SSL certificates.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="cloudInsecure" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btnAddCloudBack" style="display:none;" onclick="addCloudGoBack()">Back</button>
+      <button class="btn btn-secondary" id="btnAddCloudCancel" onclick="closeAddCloudModal()">Cancel</button>
+      <button class="btn btn-primary" id="btnAddCloudNext" onclick="addCloudGoNext()">Next</button>
+      <button class="btn btn-primary" id="btnAddCloudSubmit" style="display:none;" onclick="submitAddCloud()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MIGRATE WORKLOAD WIZARD ═══════════════ -->
+<div id="migrateVmModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 820px; max-width: 95vw;">
+    <div class="modal-header">
+      <h3>Migrate</h3>
+      <button class="modal-close" onclick="closeMigrateModal()">✕</button>
+    </div>
+    <div class="wizard-container">
+      
+      <!-- Left sidebar steps -->
+      <div class="wizard-sidebar">
+        <div class="wizard-step-item active" data-step="1">
+          <span class="wizard-step-num">1</span>
+          <span>Source cloud</span>
+        </div>
+        <div class="wizard-step-item" data-step="2">
+          <span class="wizard-step-num">2</span>
+          <span>Source VMs</span>
+        </div>
+        <div class="wizard-step-item" data-step="3">
+          <span class="wizard-step-num">3</span>
+          <span>Source options</span>
+        </div>
+        <div class="wizard-step-item" data-step="4">
+          <span class="wizard-step-num">4</span>
+          <span>Network mapping</span>
+        </div>
+        <div class="wizard-step-item" data-step="5">
+          <span class="wizard-step-num">5</span>
+          <span>Target options</span>
+        </div>
+        <div class="wizard-step-item" data-step="6">
+          <span class="wizard-step-num">6</span>
+          <span>Storage mapping</span>
+        </div>
+        <div class="wizard-step-item" data-step="7">
+          <span class="wizard-step-num">7</span>
+          <span>User scripts</span>
+        </div>
+        <div class="wizard-step-item" data-step="8">
+          <span class="wizard-step-num">8</span>
+          <span>Migration options</span>
+        </div>
+        <div class="wizard-step-item" data-step="9">
+          <span class="wizard-step-num">9</span>
+          <span>Summary</span>
+        </div>
+      </div>
+      
+      <!-- Right wizard content area -->
+      <div class="wizard-content-area">
+        
+        <!-- Step 1: Choose Source Cloud -->
+        <div class="wizard-step-content active" id="wizStep1">
+          <div class="wizard-step-title">Choose the source cloud</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.8rem;">Select the configured cloud environment to migrate from.</p>
+          <div class="table-card" style="margin-bottom: 1rem; border-color: var(--border); max-height: 280px; overflow-y: auto;">
+            <div class="table-toolbar">
+              <input type="search" class="search-input" id="wizCloudSearch" placeholder="Search clouds…" oninput="filterWizClouds()">
+            </div>
+            <table style="font-size: 0.85rem;">
+              <thead>
+                <tr>
+                  <th style="width: 50px;">Select</th>
+                  <th>Name</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
+              <tbody id="wizCloudBody">
+                <!-- Added clouds list goes here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- Step 2: Choose Source VMs -->
+        <div class="wizard-step-content" id="wizStep2">
+          <div class="wizard-step-title">Choose VMs to migrate</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.8rem;">Select one or more virtual machines from the source cloud.</p>
+          <div class="table-card" style="margin-bottom: 1rem; border-color: var(--border); max-height: 280px; overflow-y: auto;">
+            <div class="table-toolbar">
+              <input type="search" class="search-input" id="wizVmSearch" placeholder="Search VMs…" oninput="filterWizVms()">
+            </div>
+            <table style="font-size: 0.85rem;">
+              <thead>
+                <tr>
+                  <th style="width: 50px;">Select</th>
+                  <th>VM Name</th>
+                  <th>Cores / RAM</th>
+                  <th>Disk Count</th>
+                </tr>
+              </thead>
+              <tbody id="wizVmBody">
+                <!-- Mock VMs list goes here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- Step 3: Source options -->
+        <div class="wizard-step-content" id="wizStep3">
+          <div class="wizard-step-title">Source options</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Configure connection details for fetching data from the source environment.</p>
+          <div class="form-group">
+            <label>Data Transfer Method</label>
+            <select id="wizTransportType">
+              <option value="ssh">SSH (Default - secure transfer via port 22)</option>
+              <option value="nfc">NFC (vSphere Network File Copy - port 902)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Concurrent Transfers Limit</label>
+            <input type="number" id="wizMaxConcurrency" value="2" min="1" max="5">
+            <p class="text-dim" style="font-size: 0.72rem; margin-top: 4px;">Limit simultaneous VM disk copies to conserve network bandwidth.</p>
+          </div>
+        </div>
+        
+        <!-- Step 4: Network mapping -->
+        <div class="wizard-step-content" id="wizStep4">
+          <div class="wizard-step-title">Network mapping</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Map networks from the source cloud to VHI target virtual networks.</p>
+          <div class="form-group">
+            <label>Source Network (VMware VM Network)</label>
+            <select id="wizSrcNetwork">
+              <option value="VM Network">VM Network (Standard Switch)</option>
+              <option value="dvPortGroup-Prod">dvPortGroup-Prod (Distributed Switch)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Target Network (VHI Virtual Network)</label>
+            <select id="wizTgtNetwork">
+              <!-- Dynamically populated from VHI networks -->
+            </select>
+          </div>
+        </div>
+        
+        <!-- Step 5: Target options -->
+        <div class="wizard-step-content" id="wizStep5">
+          <div class="wizard-step-title">Target options</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Configure target storage policies and default flavor sizing.</p>
+          <div class="form-group">
+            <label>Default Storage Policy</label>
+            <select id="wizTgtPolicy">
+              <!-- Dynamically populated from VHI storage policies -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Target Flavor Mapping</label>
+            <select id="wizTgtFlavor">
+              <!-- Dynamically populated from VHI flavors -->
+            </select>
+          </div>
+        </div>
+        
+        <!-- Step 6: Storage mapping -->
+        <div class="wizard-step-content" id="wizStep6">
+          <div class="wizard-step-title">Storage mapping</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Specify target volume types for mapped disks.</p>
+          <div style="border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; background: var(--bg-sidebar);">
+            <div style="display:flex; justify-content:space-between; font-weight:600; font-size:0.85rem; margin-bottom:0.6rem;">
+              <span>Source Disk</span>
+              <span>Target Volume Type</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem;">
+              <span>Disk 1 (System - SCSI 0:0)</span>
+              <select id="wizDisk1Type" style="width: 200px; padding: 4px 8px; border-radius:4px;">
+                <!-- Populated via VHI storage policies -->
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Step 7: User scripts -->
+        <div class="wizard-step-content" id="wizStep7">
+          <div class="wizard-step-title">User scripts</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.8rem;">Provide shell scripts to execute inside the virtual machine post-migration (e.g. for guest agent installation).</p>
+          <div class="form-group">
+            <label>Post-migration Script (Bash/PowerShell)</label>
+            <textarea id="wizPostScript" placeholder="#!/bin/bash&#10;# Clean up VMware Tools and install QEMU Guest Agent&#10;yum remove -y open-vm-tools&#10;yum install -y qemu-guest-agent&#10;systemctl enable --now qemu-guest-agent" rows="6" style="font-family: Consolas, monospace; font-size: 0.8rem;"></textarea>
+          </div>
+        </div>
+        
+        <!-- Step 8: Migration options -->
+        <div class="wizard-step-content" id="wizStep8">
+          <div class="wizard-step-title">Migration options</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Configure scheduling and execution parameters.</p>
+          <div class="form-group">
+            <label>Migration Type</label>
+            <div style="display: flex; gap: 1.5rem; margin-top: 0.3rem;">
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem;">
+                <input type="radio" name="wizMigrationType" value="cold" checked> Cold Migration (Offline)
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem;">
+                <input type="radio" name="wizMigrationType" value="live"> Live Migration (Online)
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Schedule</label>
+            <div style="display: flex; gap: 1.5rem; margin-top: 0.3rem;">
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem;">
+                <input type="radio" name="wizSchedule" value="now" checked> Start Immediately
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem;">
+                <input type="radio" name="wizSchedule" value="later" disabled> Run on Schedule (Coming soon)
+              </label>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Step 9: Summary -->
+        <div class="wizard-step-content" id="wizStep9">
+          <div class="wizard-step-title">Summary</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Review your configuration settings before starting the migration.</p>
+          <div style="display: grid; grid-template-columns: 140px 1fr; gap: 0.6rem 0.5rem; font-size: 0.85rem; background: var(--bg-sidebar); padding: 1.2rem; border-radius: var(--radius); border: 1px solid var(--border);">
+            <div class="detail-label">Source Cloud:</div>
+            <div class="detail-val" id="sumSrcCloud">-</div>
+            
+            <div class="detail-label">Selected VMs:</div>
+            <div class="detail-val" id="sumVms">-</div>
+            
+            <div class="detail-label">Transport:</div>
+            <div class="detail-val" id="sumTransport">-</div>
+            
+            <div class="detail-label">Network Map:</div>
+            <div class="detail-val" id="sumNetMap">-</div>
+            
+            <div class="detail-label">Storage Policy:</div>
+            <div class="detail-val" id="sumStorage">-</div>
+            
+            <div class="detail-label">Target Flavor:</div>
+            <div class="detail-val" id="sumFlavor">-</div>
+            
+            <div class="detail-label">Migration Type:</div>
+            <div class="detail-val" id="sumMigType">-</div>
+          </div>
+        </div>
+        
+        <!-- Footer actions -->
+        <div style="display: flex; justify-content: flex-end; gap: 0.8rem; border-top: 1px solid var(--border); padding-top: 1.2rem; margin-top: 1rem;">
+          <button class="btn btn-secondary" id="btnWizBack" onclick="wizGoBack()" disabled>Back</button>
+          <button class="btn btn-secondary" onclick="closeMigrateModal()">Cancel</button>
+          <button class="btn btn-primary" id="btnWizNext" onclick="wizGoNext()">Next</button>
+          <button class="btn btn-primary" id="btnWizStart" style="display: none;" onclick="startMigration()">Start Migration</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -2410,7 +3046,10 @@ async function submitVmForm() {
   try {
     const payload = {
       name,
+      imageRef,
       flavorRef,
+      volume_size: diskSize,
+      volume_type: volumeType,
       networks: [{ uuid: networkUuid }],
       min_count: 1,
       max_count: 1,
@@ -2734,37 +3373,20 @@ async function openWebConsole(protocol, type) {
       toast('Console opened', 'ok');
       closeConsoleModal();
     } else {
-      throw new Error('No console URL returned. Make sure the console type is supported on your cluster.');
+      throw new Error('No console URL returned by cluster.');
     }
   } catch(err) {
+    if (protocol !== 'vnc') {
+      toast(`${protocol.toUpperCase()} is disabled on this cluster. Opening VNC web console instead…`, 'warn');
+      return openWebConsole('vnc', 'novnc');
+    }
     toast(`Console failed: ${err.message}`, 'err');
   }
 }
 
 async function downloadVvFile() {
-  toast('Generating Virt-viewer file…', 'inf');
-  const id = consoleVmId;
-  try {
-    // We try to get connection details from a special endpoint or compute action
-    // In many environments, requesting a 'spice' protocol with 'spice' type returns a .vv file URL
-    const res = await apiPost(`/api/vhi/servers/${id}/action`, { 
-      action: 'console',
-      protocol: 'spice',
-      type: 'spice' 
-    });
-    
-    if (res.url) {
-      window.location.href = res.url;
-      toast('Download started', 'ok');
-      closeConsoleModal();
-    } else {
-      // Fallback: Manually trigger a .vv file generation endpoint if we have one
-      // window.location.href = `/api/vhi/servers/${id}/console-vv`;
-      throw new Error('Virt-viewer (.vv) not supported by this cluster directly.');
-    }
-  } catch (err) {
-    toast(`VV failed: ${err.message}`, 'err');
-  }
+  toast('Virt-viewer (.vv) requires SPICE driver configured on compute nodes. Opening VNC console instead…', 'warn');
+  openWebConsole('vnc', 'novnc');
 }
 
 window.vmConsole = vmConsole;
@@ -4843,6 +5465,561 @@ async function runExport() {
     toast('Export error: ' + err.message, 'err');
   }
 }
+
+// ── MIGRATIONS & CLOUDS LOGIC ─────────────────────────────────────────────
+
+let _clouds = [];
+let _migrations = [];
+let _activeWizStep = 1;
+let _selectedCloudId = null;
+let _selectedVms = [];
+let _migrationProgressInterval = null;
+
+// Mock VMs database for VMware sources
+const _mockVmDatabase = [
+  { id: 'vm-101', name: 'prod-mysql-db-01', spec: '4 vCPUs / 16 GB RAM', disks: 2 },
+  { id: 'vm-102', name: 'frontend-nginx-edge', spec: '2 vCPUs / 4 GB RAM', disks: 1 },
+  { id: 'vm-103', name: 'k8s-master-node', spec: '4 vCPUs / 8 GB RAM', disks: 2 },
+  { id: 'vm-104', name: 'legacy-windows-app', spec: '4 vCPUs / 16 GB RAM', disks: 1 },
+  { id: 'vm-105', name: 'staging-redis-cache', spec: '2 vCPUs / 8 GB RAM', disks: 1 }
+];
+
+function loadMigrationsPage() {
+  // Load from local storage
+  _clouds = JSON.parse(localStorage.getItem('vhi_clouds') || '[]');
+  _migrations = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+  
+  renderClouds();
+  renderMigrations();
+  updateMigrationBadge();
+  
+  // Start the background progress simulation if any active migrations exist
+  if (_migrations.some(m => m.status !== 'ACTIVE' && m.status !== 'ERROR')) {
+    startProgressSimulation();
+  }
+}
+
+// Hook sub-tab switching
+document.querySelectorAll('#panel-migrations .sub-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#panel-migrations .sub-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('#panel-migrations .tab-content-panel').forEach(p => p.classList.remove('active'));
+    
+    tab.classList.add('active');
+    const contentId = 'tab-' + tab.dataset.tab;
+    document.getElementById(contentId).classList.add('active');
+  });
+});
+
+// Sidebar nav click hook
+document.querySelector('.nav-item[data-panel="migrations"]')?.addEventListener('click', () => {
+  loadMigrationsPage();
+});
+
+// Trigger load when loaded
+if (session) {
+  loadMigrationsPage();
+}
+
+function renderClouds() {
+  const tbody = document.getElementById('cloudsBody');
+  if (!tbody) return;
+  
+  const query = document.getElementById('cloudSearch')?.value.toLowerCase() || '';
+  const filtered = _clouds.filter(c => {
+    return !query || 
+      c.name.toLowerCase().includes(query) || 
+      c.host.toLowerCase().includes(query) || 
+      (c.desc || '').toLowerCase().includes(query);
+  });
+  
+  if (!filtered.length) {
+    tbody.innerHTML = emptyState('🔌', 'No clouds added yet');
+    return;
+  }
+  
+  tbody.innerHTML = filtered.map(c => `
+    <tr>
+      <td>
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <span style="font-size:1.3rem;">🔌</span>
+          <div>
+            <strong style="color:var(--text);">${escapeHtml(c.name)}</strong>
+            <div class="text-dim" style="font-size:0.75rem; margin-top:2px;">${escapeHtml(c.host)}:${c.port}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="badge badge-default">VMware</span></td>
+      <td class="text-dim">${escapeHtml(c.desc || '—')}</td>
+      <td class="text-dim mono" style="font-size:0.8rem;">${new Date(c.added).toLocaleDateString()}</td>
+      <td style="text-align: right;">
+        <button class="txt-btn act-danger" onclick="deleteCloud('${c.id}')" title="Delete Cloud"><span class="ri">🗑️</span> Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function deleteCloud(id) {
+  if (!confirm('Are you sure you want to remove this cloud connection? This will not affect running VMs.')) return;
+  _clouds = _clouds.filter(c => c.id !== id);
+  localStorage.setItem('vhi_clouds', JSON.stringify(_clouds));
+  renderClouds();
+  toast('Cloud removed successfully', 'ok');
+}
+
+function renderMigrations() {
+  const tbody = document.getElementById('migrationsBody');
+  if (!tbody) return;
+  
+  const query = document.getElementById('migrationSearch')?.value.toLowerCase() || '';
+  const filtered = _migrations.filter(m => {
+    return !query || 
+      m.name.toLowerCase().includes(query) || 
+      m.srcCloudName.toLowerCase().includes(query);
+  });
+  
+  if (!filtered.length) {
+    tbody.innerHTML = emptyState('🔄', 'No migrations created yet');
+    return;
+  }
+  
+  tbody.innerHTML = filtered.map(m => {
+    let statusHtml = '';
+    const active = m.status !== 'ACTIVE' && m.status !== 'ERROR';
+    
+    if (active) {
+      statusHtml = `
+        <div style="display:flex; flex-direction:column; gap:4px; width:160px;">
+          <div style="display:flex; justify-content:space-between; font-size:0.75rem;">
+            <span style="font-weight:600; color:var(--accent);">${escapeHtml(m.status)}</span>
+            <span style="font-weight:700;">${m.progress}%</span>
+          </div>
+          <div class="bar-wrap" style="width:100%;"><div class="bar-fill bar-crit" style="width:${m.progress}%; background:var(--accent);"></div></div>
+        </div>
+      `;
+    } else if (m.status === 'ACTIVE') {
+      statusHtml = `<span class="badge badge-success">ACTIVE</span>`;
+    } else {
+      statusHtml = `<span class="badge badge-error">ERROR</span>`;
+    }
+    
+    return `
+      <tr>
+        <td>
+          <div style="font-weight:600; color:var(--text);">${escapeHtml(m.name)}</div>
+          <div class="text-dim" style="font-size:0.75rem; margin-top:2px;">Type: ${m.migType === 'live' ? 'Live' : 'Cold'}</div>
+        </td>
+        <td class="text-dim">${escapeHtml(m.srcCloudName)}</td>
+        <td><span class="badge badge-default">${m.vms.length} VMs</span></td>
+        <td>${statusHtml}</td>
+        <td class="text-dim mono" style="font-size:0.8rem;">${new Date(m.started).toLocaleString()}</td>
+        <td style="text-align: right;">
+          ${active 
+            ? `<button class="txt-btn act-danger" onclick="cancelMigration('${m.id}')" title="Cancel Migration"><span class="ri">⏹️</span> Cancel</button>`
+            : `<button class="txt-btn act-danger" onclick="deleteMigration('${m.id}')" title="Delete Log"><span class="ri">🗑️</span> Delete</button>`
+          }
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function cancelMigration(id) {
+  if (!confirm('Are you sure you want to cancel this migration?')) return;
+  _migrations = _migrations.map(m => m.id === id ? { ...m, status: 'ERROR', progress: 0 } : m);
+  localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
+  renderMigrations();
+  updateMigrationBadge();
+  toast('Migration cancelled', 'warn');
+}
+
+function deleteMigration(id) {
+  if (!confirm('Delete this migration record?')) return;
+  _migrations = _migrations.filter(m => m.id !== id);
+  localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
+  renderMigrations();
+  updateMigrationBadge();
+  toast('Record deleted', 'ok');
+}
+
+// Update the badge counter in the sidebar
+function updateMigrationBadge() {
+  const badge = document.getElementById('migrationBadge');
+  if (!badge) return;
+  
+  const activeCount = _migrations.filter(m => m.status !== 'ACTIVE' && m.status !== 'ERROR').length;
+  document.getElementById('migrationsCount').textContent = `${activeCount} Active`;
+  
+  if (activeCount > 0) {
+    badge.textContent = activeCount;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// Simulation Interval for migrating progress
+function startProgressSimulation() {
+  if (_migrationProgressInterval) return;
+  
+  _migrationProgressInterval = setInterval(() => {
+    let completedAny = false;
+    let changes = false;
+    
+    _migrations = _migrations.map(m => {
+      if (m.status === 'ACTIVE' || m.status === 'ERROR') return m;
+      
+      changes = true;
+      let newProgress = m.progress + Math.floor(Math.random() * 8) + 4;
+      if (newProgress >= 100) {
+        newProgress = 100;
+        completedAny = true;
+        toast(`Migration "${m.name}" completed successfully!`, 'ok');
+        return { ...m, progress: 100, status: 'ACTIVE' };
+      }
+      
+      let newStatus = m.status;
+      if (newProgress < 15) {
+        newStatus = 'PREPARING';
+      } else if (newProgress < 85) {
+        newStatus = 'TRANSFERRING';
+      } else {
+        newStatus = 'FINALIZING';
+      }
+      
+      return { ...m, progress: newProgress, status: newStatus };
+    });
+    
+    if (changes) {
+      localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
+      renderMigrations();
+      updateMigrationBadge();
+    }
+    
+    // Stop simulator if nothing is active
+    if (!_migrations.some(m => m.status !== 'ACTIVE' && m.status !== 'ERROR')) {
+      clearInterval(_migrationProgressInterval);
+      _migrationProgressInterval = null;
+    }
+  }, 2000);
+}
+
+// ── ADD CLOUD FLOW ────────────────────────────────────────────────────────
+
+const addCloudModal = document.getElementById('addCloudModal');
+let _selectedProvider = 'vmware';
+
+function openAddCloudModal() {
+  document.getElementById('cloudName').value = '';
+  document.getElementById('cloudDesc').value = '';
+  document.getElementById('cloudHost').value = '';
+  document.getElementById('cloudPort').value = '443';
+  document.getElementById('cloudUser').value = '';
+  document.getElementById('cloudPass').value = '';
+  document.getElementById('cloudInsecure').checked = true;
+  
+  selectProvider('vmware');
+  addCloudGoBack(); // show step 1
+  addCloudModal.classList.remove('hidden');
+}
+
+function closeAddCloudModal() {
+  addCloudModal.classList.add('hidden');
+}
+
+function selectProvider(provider) {
+  _selectedProvider = provider;
+  document.getElementById('providerVMware').checked = provider === 'vmware';
+}
+
+function addCloudGoNext() {
+  if (_selectedProvider !== 'vmware') {
+    return toast('Select VMware to continue', 'warn');
+  }
+  document.getElementById('addCloudStep1').classList.add('hidden');
+  document.getElementById('addCloudStep2').classList.remove('hidden');
+  
+  document.getElementById('btnAddCloudBack').style.display = '';
+  document.getElementById('btnAddCloudCancel').style.display = 'none';
+  document.getElementById('btnAddCloudNext').style.display = 'none';
+  document.getElementById('btnAddCloudSubmit').style.display = '';
+}
+
+function addCloudGoBack() {
+  document.getElementById('addCloudStep1').classList.remove('hidden');
+  document.getElementById('addCloudStep2').classList.add('hidden');
+  
+  document.getElementById('btnAddCloudBack').style.display = 'none';
+  document.getElementById('btnAddCloudCancel').style.display = '';
+  document.getElementById('btnAddCloudNext').style.display = '';
+  document.getElementById('btnAddCloudSubmit').style.display = 'none';
+}
+
+function submitAddCloud() {
+  const name = document.getElementById('cloudName').value.trim();
+  const desc = document.getElementById('cloudDesc').value.trim();
+  const host = document.getElementById('cloudHost').value.trim();
+  const port = parseInt(document.getElementById('cloudPort').value, 10);
+  const user = document.getElementById('cloudUser').value.trim();
+  const pass = document.getElementById('cloudPass').value;
+  const insecure = document.getElementById('cloudInsecure').checked;
+  
+  if (!name || !host || !port || !user || !pass) {
+    return toast('Please configure all required fields', 'warn');
+  }
+  
+  const newCloud = {
+    id: 'cloud-' + Math.random().toString(36).substr(2, 9),
+    name,
+    desc,
+    host,
+    port,
+    user,
+    pass,
+    insecure,
+    added: new Date().toISOString()
+  };
+  
+  _clouds.push(newCloud);
+  localStorage.setItem('vhi_clouds', JSON.stringify(_clouds));
+  
+  closeAddCloudModal();
+  renderClouds();
+  toast(`Cloud "${name}" added successfully`, 'ok');
+}
+
+// Hook up Add Cloud trigger
+document.getElementById('btnOpenAddCloudModal')?.addEventListener('click', openAddCloudModal);
+
+// ── MIGRATE WIZARD FLOW ───────────────────────────────────────────────────
+
+const migrateModal = document.getElementById('migrateVmModal');
+
+function openMigrateModal() {
+  _clouds = JSON.parse(localStorage.getItem('vhi_clouds') || '[]');
+  if (_clouds.length === 0) {
+    alert('Please configure at least one Cloud connection first.');
+    // switch tab to Clouds and open add cloud modal
+    document.querySelector('#panel-migrations [data-tab="clouds-list"]').click();
+    openAddCloudModal();
+    return;
+  }
+  
+  _activeWizStep = 1;
+  _selectedCloudId = null;
+  _selectedVms = [];
+  
+  // Populate select boxes in steps dynamically
+  populateWizardSelectFields();
+  
+  // Render step panels
+  showWizStep(1);
+  migrateModal.classList.remove('hidden');
+}
+
+function closeMigrateModal() {
+  migrateModal.classList.add('hidden');
+}
+
+function populateWizardSelectFields() {
+  // Source Cloud Step 1 List
+  const wizCloudBody = document.getElementById('wizCloudBody');
+  wizCloudBody.innerHTML = _clouds.map(c => `
+    <tr style="cursor:pointer;" onclick="selectWizCloud('${c.id}')">
+      <td><input type="radio" name="wizCloudRadio" id="wizCloudRadio_${c.id}" value="${c.id}" ${c.id === _selectedCloudId ? 'checked' : ''}></td>
+      <td><strong>${escapeHtml(c.name)}</strong></td>
+      <td><span class="badge badge-default">VMware</span></td>
+    </tr>
+  `).join('');
+  
+  // Target network mapping select target network using VHI networks
+  const tgtNetSelect = document.getElementById('wizTgtNetwork');
+  tgtNetSelect.innerHTML = _nets.map(n => `<option value="${n.id}">${escapeHtml(n.name || n.id)}</option>`).join('');
+  
+  // Target options target policies
+  const tgtPolicySelect = document.getElementById('wizTgtPolicy');
+  tgtPolicySelect.innerHTML = _volTypes.map(vt => `<option value="${vt.name}">${escapeHtml(vt.name)}</option>`).join('');
+  
+  // Target options target flavors
+  const tgtFlavorSelect = document.getElementById('wizTgtFlavor');
+  tgtFlavorSelect.innerHTML = _flavors.map(f => `<option value="${f.id}">${escapeHtml(f.name)} (${f.vcpus} vCPU, ${fmtBytes(f.ram * 1024 * 1024)} RAM)</option>`).join('');
+  
+  // Storage mapping disk 1 policy target select
+  const diskSelect = document.getElementById('wizDisk1Type');
+  diskSelect.innerHTML = _volTypes.map(vt => `<option value="${vt.name}">${escapeHtml(vt.name)}</option>`).join('');
+}
+
+function selectWizCloud(id) {
+  _selectedCloudId = id;
+  const radio = document.getElementById(`wizCloudRadio_${id}`);
+  if (radio) radio.checked = true;
+  
+  // Populate VMware VMs list in Step 2 based on selection
+  const wizVmBody = document.getElementById('wizVmBody');
+  wizVmBody.innerHTML = _mockVmDatabase.map(vm => `
+    <tr style="cursor:pointer;" onclick="toggleWizVm('${vm.id}')">
+      <td><input type="checkbox" id="wizVmCb_${vm.id}" value="${vm.id}" ${_selectedVms.includes(vm.id) ? 'checked' : ''}></td>
+      <td><strong>${escapeHtml(vm.name)}</strong></td>
+      <td class="text-dim">${escapeHtml(vm.spec)}</td>
+      <td class="text-dim">${vm.disks} disks</td>
+    </tr>
+  `).join('');
+}
+
+function toggleWizVm(id) {
+  const index = _selectedVms.indexOf(id);
+  if (index === -1) {
+    _selectedVms.push(id);
+  } else {
+    _selectedVms.splice(index, 1);
+  }
+  const cb = document.getElementById(`wizVmCb_${id}`);
+  if (cb) cb.checked = _selectedVms.includes(id);
+}
+
+function filterWizClouds() {
+  const query = document.getElementById('wizCloudSearch').value.toLowerCase();
+  const rows = document.querySelectorAll('#wizCloudBody tr');
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(query) ? '' : 'none';
+  });
+}
+
+function filterWizVms() {
+  const query = document.getElementById('wizVmSearch').value.toLowerCase();
+  const rows = document.querySelectorAll('#wizVmBody tr');
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(query) ? '' : 'none';
+  });
+}
+
+function showWizStep(step) {
+  _activeWizStep = step;
+  
+  // Toggle sidebar items
+  document.querySelectorAll('.wizard-sidebar .wizard-step-item').forEach(item => {
+    const itemStep = parseInt(item.dataset.step, 10);
+    item.classList.toggle('active', itemStep === step);
+    item.classList.toggle('completed', itemStep < step);
+  });
+  
+  // Toggle step contents
+  document.querySelectorAll('.wizard-content-area .wizard-step-content').forEach(content => {
+    content.classList.remove('active');
+  });
+  document.getElementById(`wizStep${step}`).classList.add('active');
+  
+  // Footers
+  document.getElementById('btnWizBack').disabled = step === 1;
+  document.getElementById('btnWizNext').style.display = step === 9 ? 'none' : '';
+  document.getElementById('btnWizStart').style.display = step === 9 ? '' : 'none';
+  
+  if (step === 9) {
+    populateWizSummary();
+  }
+}
+
+function wizGoNext() {
+  // Validate steps before moving forward
+  if (_activeWizStep === 1 && !_selectedCloudId) {
+    return toast('Select a source cloud to continue', 'warn');
+  }
+  if (_activeWizStep === 2 && _selectedVms.length === 0) {
+    return toast('Select at least one virtual machine to migrate', 'warn');
+  }
+  
+  showWizStep(_activeWizStep + 1);
+}
+
+function wizGoBack() {
+  showWizStep(_activeWizStep - 1);
+}
+
+function populateWizSummary() {
+  const cloud = _clouds.find(c => c.id === _selectedCloudId);
+  const vms = _mockVmDatabase.filter(vm => _selectedVms.includes(vm.id));
+  
+  const transport = document.getElementById('wizTransportType').value.toUpperCase();
+  
+  const targetNetSelect = document.getElementById('wizTgtNetwork');
+  const targetNetName = targetNetSelect.options[targetNetSelect.selectedIndex]?.text || '';
+  
+  const targetPolicySelect = document.getElementById('wizTgtPolicy');
+  const targetPolicyName = targetPolicySelect.options[targetPolicySelect.selectedIndex]?.text || '';
+  
+  const targetFlavorSelect = document.getElementById('wizTgtFlavor');
+  const targetFlavorName = targetFlavorSelect.options[targetFlavorSelect.selectedIndex]?.text || '';
+  
+  const isLive = document.querySelector('input[name="wizMigrationType"]:checked')?.value === 'live';
+  
+  document.getElementById('sumSrcCloud').textContent = cloud ? cloud.name : '-';
+  document.getElementById('sumVms').textContent = vms.map(v => v.name).join(', ');
+  document.getElementById('sumTransport').textContent = `${transport} (Max Concurrency: ${document.getElementById('wizMaxConcurrency').value})`;
+  document.getElementById('sumNetMap').textContent = `${document.getElementById('wizSrcNetwork').value} ➔ ${targetNetName}`;
+  document.getElementById('sumStorage').textContent = targetPolicyName;
+  document.getElementById('sumFlavor').textContent = targetFlavorName;
+  document.getElementById('sumMigType').textContent = isLive ? 'Live Migration (Online)' : 'Cold Migration (Offline)';
+}
+
+function startMigration() {
+  const cloud = _clouds.find(c => c.id === _selectedCloudId);
+  const vms = _mockVmDatabase.filter(vm => _selectedVms.includes(vm.id));
+  const isLive = document.querySelector('input[name="wizMigrationType"]:checked')?.value === 'live';
+  
+  // Create migration records for selected VMs
+  vms.forEach(vm => {
+    const newMigration = {
+      id: 'mig-' + Math.random().toString(36).substr(2, 9),
+      name: `Migrate ${vm.name}`,
+      srcCloudId: _selectedCloudId,
+      srcCloudName: cloud ? cloud.name : 'Unknown',
+      vms: [vm.name],
+      migType: isLive ? 'live' : 'cold',
+      status: 'QUEUED',
+      progress: 0,
+      started: new Date().toISOString()
+    };
+    _migrations.unshift(newMigration);
+  });
+  
+  localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
+  closeMigrateModal();
+  renderMigrations();
+  updateMigrationBadge();
+  startProgressSimulation();
+  
+  toast(`Migration started for ${vms.length} VM(s)`, 'ok');
+}
+
+// Hook up main trigger
+document.getElementById('btnOpenMigrateWizard')?.addEventListener('click', openMigrateModal);
+
+// Helper function to escape HTML
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+// Expose functions globally to be callable from HTML onclick handlers
+window.closeAddCloudModal = closeAddCloudModal;
+window.addCloudGoNext = addCloudGoNext;
+window.addCloudGoBack = addCloudGoBack;
+window.submitAddCloud = submitAddCloud;
+window.selectProvider = selectProvider;
+window.deleteCloud = deleteCloud;
+
+window.closeMigrateModal = closeMigrateModal;
+window.selectWizCloud = selectWizCloud;
+window.toggleWizVm = toggleWizVm;
+window.filterWizClouds = filterWizClouds;
+window.filterWizVms = filterWizVms;
+window.wizGoNext = wizGoNext;
+window.wizGoBack = wizGoBack;
+window.startMigration = startMigration;
+window.cancelMigration = cancelMigration;
+window.deleteMigration = deleteMigration;
 
 </script>
 </body>

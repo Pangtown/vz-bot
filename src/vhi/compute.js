@@ -97,10 +97,16 @@ export async function deleteServer(serverId) {
 export async function createServer(options = {}) {
   const client = await getClient();
   
+  // Extract BDM options if present
+  const bdm = Array.isArray(options.block_device_mapping_v2) ? options.block_device_mapping_v2[0] : null;
+  const imageRef = options.imageRef || (bdm?.source_type === 'image' ? bdm.uuid : undefined);
+  const volumeSize = options.volume_size || bdm?.volume_size || 50;
+  const volumeType = options.volume_type || bdm?.volume_type;
+
   // Abstraction for easier LLM use
   const payload = {
     name: options.name,
-    imageRef: options.imageRef,
+    imageRef: imageRef,
     flavorRef: options.flavorRef,
     networks: options.networks || [],
     min_count: options.min_count || 1,
@@ -112,20 +118,18 @@ export async function createServer(options = {}) {
     payload.networks = [{ uuid: payload.networks }];
   }
 
-  // Default to Boot from Volume (block_device_mapping_v2) if an image is provided
+  // Default to Boot from Volume (block_device_mapping_v2) if an image or volume specs are provided
   // to avoid MaxRetriesExceeded scheduling errors on compute nodes without ephemeral storage.
-  if (options.volume_size || options.volume_type || options.imageRef) {
+  if (volumeSize || volumeType || imageRef) {
     payload.block_device_mapping_v2 = [{
       boot_index: 0,
-      uuid: options.imageRef,
+      uuid: imageRef,
       source_type: 'image',
       destination_type: 'volume',
-      volume_size: options.volume_size || 50,
-      volume_type: options.volume_type || undefined,
+      volume_size: volumeSize,
+      volume_type: volumeType || undefined,
       delete_on_termination: options.delete_on_termination !== false
     }];
-    // When using BDM for boot, the root imageRef must be removed
-    delete payload.imageRef; 
   }
 
   console.log('[CREATE_VM] Payload:', JSON.stringify({ server: payload }, null, 2));
@@ -180,14 +184,9 @@ export async function getRemoteConsole(serverId, protocol = 'vnc', type = 'novnc
         const baseUri = new URL(base);
         const baseHostname = baseUri.hostname;
         
-        // Regex to check if hostname is NOT an IP address
-        const isIp = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(baseHostname);
-        
-        if (!isIp) {
-          console.log(`[DEBUG] Overriding VNC IP with hostname: ${baseHostname}`);
-          // Replace the IP segment of the URL (e.g., https://208.98.41.133:6080/...) with hostname
-          consoleUrl = consoleUrl.replace(/https?:\/\/[^:/]+(:[0-9]+)/, `${baseUri.protocol}//${baseHostname}$1`);
-        }
+        console.log(`[DEBUG] Overriding console hostname to target VHI endpoint: ${baseHostname}`);
+        // Replace scheme + hostname returned by Nova (e.g., https://demo.nexvantage.net:6080/...) with reachable base hostname
+        consoleUrl = consoleUrl.replace(/https?:\/\/[^:/]+(:[0-9]+)/, `${baseUri.protocol}//${baseHostname}$1`);
       } catch (err) {
         console.error('[DEBUG] Failed to override VNC URL hostname:', err.message);
       }
@@ -197,7 +196,10 @@ export async function getRemoteConsole(serverId, protocol = 'vnc', type = 'novnc
   }
   
   const textErr = await res.text();
-  throw new Error(`VNC Console negotiation failed (${res.status}): ${textErr.slice(0, 200)}`);
+  if (res.status === 400 || textErr.includes('Unavailable console type') || textErr.includes('Invalid input') || textErr.includes('Invalid console type')) {
+    throw new Error(`Console type '${type}' (${protocol}) is not enabled on this VHI cluster. Only VNC (noVNC) is currently configured in Nova.`);
+  }
+  throw new Error(`Console negotiation failed (${res.status}): ${textErr.slice(0, 200)}`);
 }
 
 export async function listFlavors() {
