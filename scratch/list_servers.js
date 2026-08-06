@@ -1,8 +1,9 @@
+import 'dotenv/config';
 import { listServers } from '../src/vhi/compute.js';
 
-process.env.VHI_USER = 'admin';
-process.env.VHI_PASSWORD = 'Nexpass8188!';
-process.env.VHI_BASE_URL = 'https://172.16.218.7';
+process.env.VHI_USER = process.env.VHI_USER || 'admin';
+process.env.VHI_PASSWORD = process.env.VHI_PASSWORD || '';
+process.env.VHI_BASE_URL = process.env.VHI_BASE_URL || 'https://172.16.218.7';
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 async function run() {

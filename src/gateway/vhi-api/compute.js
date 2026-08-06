@@ -1,6 +1,6 @@
 import { runWithContext } from '../context.js';
 import { listServers, getServer, serverAction, startServer, stopServer, rebootServer, deleteServer, createServer, listFlavors, getRemoteConsole } from '../../vhi/compute.js';
-import { listImages } from '../../vhi/image.js';
+import { listImages, createImage, uploadImageData, updateImageVisibility, deleteImage } from '../../vhi/image.js';
 import { listPorts, listNetworks, updatePort } from '../../vhi/network.js';
 import { listInterfaces, attachInterface, detachInterface, getHypervisor } from '../../vhi/compute.js';
 import { attachVolume, detachVolume } from '../../vhi/block.js';
@@ -96,6 +96,63 @@ export async function handleImages(req, res, ctx) {
     return json(res, 200, { images: data });
   } catch (err) {
     logger.error(`handleImages error: ${err.message}`, { error: err.message });
+    return json(res, 502, { error: err.message });
+  }
+}
+
+// POST /api/vhi/images — create image metadata record (returns queued image)
+export async function handleCreateImage(req, res, ctx) {
+  try {
+    const body = await readBody(req);
+    if (!body.name || !String(body.name).trim()) {
+      return json(res, 400, { error: 'Image name is required' });
+    }
+    const image = await runWithContext(ctx, () => createImage(body));
+    logger.info(`Created image record: ${image.id || 'unknown'}`);
+    return json(res, 200, { image });
+  } catch (err) {
+    logger.error(`handleCreateImage error: ${err.message}`, { error: err.message });
+    // Surface Glance's 403 for non-admin public requests as a clear message
+    const status = /403/.test(err.message) ? 403 : 502;
+    return json(res, status, { error: err.message });
+  }
+}
+
+// PUT /api/vhi/images/:id/file — stream binary image data into a queued image
+export async function handleUploadImage(req, res, ctx, imageId) {
+  try {
+    const contentLength = req.headers['content-length'];
+    await runWithContext(ctx, () => uploadImageData(imageId, req, contentLength));
+    logger.info(`Uploaded data for image ${imageId}`);
+    return json(res, 200, { ok: true });
+  } catch (err) {
+    logger.error(`handleUploadImage error: ${err.message}`, { error: err.message });
+    return json(res, 502, { error: err.message });
+  }
+}
+
+// PATCH /api/vhi/images/:id — change visibility (public requires admin)
+export async function handleUpdateImage(req, res, ctx, imageId) {
+  try {
+    const body = await readBody(req);
+    const image = await runWithContext(ctx, () => updateImageVisibility(imageId, body.visibility));
+    logger.info(`Set image ${imageId} visibility to ${body.visibility}`);
+    return json(res, 200, { image });
+  } catch (err) {
+    logger.error(`handleUpdateImage error: ${err.message}`, { error: err.message });
+    const status = /403/.test(err.message) ? 403 : 502;
+    return json(res, status, { error: err.message });
+  }
+}
+
+// DELETE /api/vhi/images/:id
+export async function handleDeleteImage(req, res, ctx, imageId) {
+  try {
+    await runWithContext(ctx, () => deleteImage(imageId));
+    logger.info(`Deleted image ${imageId}`);
+    return json(res, 200, { ok: true });
+  } catch (err) {
+    logger.error(`handleDeleteImage error: ${err.message}`, { error: err.message });
     return json(res, 502, { error: err.message });
   }
 }

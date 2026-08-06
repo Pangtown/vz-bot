@@ -52,6 +52,13 @@ async function getClustersPage() {
   return clustersPageHtml;
 }
 
+let marketplacePageHtml = null;
+async function getMarketplacePage() {
+  if (marketplacePageHtml) return marketplacePageHtml;
+  marketplacePageHtml = await readFile(join(__dirname, '..', 'public', 'marketplace.html'), 'utf8');
+  return marketplacePageHtml;
+}
+
 const app = async (req, res) => {
   const url = (req.url || '/').split('?')[0];
   const method = req.method || 'GET';
@@ -121,6 +128,17 @@ const app = async (req, res) => {
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Error loading clusters page.');
+    }
+    return;
+  }
+  if (method === 'GET' && (url === '/marketplace' || url === '/marketplace/' || url === '/marketplace.html')) {
+    try {
+      const html = await getMarketplacePage();
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error loading marketplace page.');
     }
     return;
   }

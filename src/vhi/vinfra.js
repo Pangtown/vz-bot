@@ -37,6 +37,20 @@ export async function runVinfraCommand(args, creds = {}) {
             // ignore malformed URLs
         }
     }
+
+    // Host was provided (e.g. a specific node IP) but no secret: use the
+    // credentials stored in the cluster-global SSH config ("cluster key" auth).
+    if (host && !password && !privateKey) {
+        const baseUrl = creds.vhiBaseUrl || vhiBaseUrl;
+        const persistentConfig = await loadGlobalSshConfig(baseUrl);
+        if (persistentConfig.password || persistentConfig.privateKey) {
+            console.log(`[VINFRA] Using stored cluster SSH credentials for ${host} (cluster: ${baseUrl || 'default'})`);
+            if (!username || username === 'root') username = persistentConfig.username || username || 'root';
+            password = persistentConfig.password;
+            privateKey = persistentConfig.privateKey;
+            passphrase = persistentConfig.passphrase;
+        }
+    }
     if (!password && !privateKey && vhiPassword) {
         password = vhiPassword;
     }

@@ -1,6 +1,7 @@
 import { extractContext, json } from './vhi-api/helpers.js';
 import { handleAuth } from './vhi-api/auth.js';
-import { handleServers, handleServerGet, handleServerDelete, handleServerAction, handleCreateServer, handleFlavors, handleNodes, handleNodeGet, handleNodeAction, handleImages, handleServerInterfaces, handleServerVolumes } from './vhi-api/compute.js';
+import { handleMarketplaceScripts } from './vhi-api/marketplace.js';
+import { handleServers, handleServerGet, handleServerDelete, handleServerAction, handleCreateServer, handleFlavors, handleNodes, handleNodeGet, handleNodeAction, handleImages, handleCreateImage, handleUploadImage, handleUpdateImage, handleDeleteImage, handleServerInterfaces, handleServerVolumes } from './vhi-api/compute.js';
 import { handleNetworks, handleSecurityGroups, handlePortGet } from './vhi-api/network.js';
 import { handleVolumeTypes, handleVolumes, handleVolumeGet, handleVolumeUpdate, handleVolumeDelete, handleVolumeExtend, handleVolumeRetype, handleSnapshots, handleSnapshotAction } from './vhi-api/block.js';
 import { handleProjects, handleUsers } from './vhi-api/identity.js';
@@ -17,6 +18,11 @@ export async function handleVhiApi(req, res) {
 
   if (m === 'POST' && p === '/api/vhi/auth') {
     await handleAuth(req, res);
+    return true;
+  }
+
+  if (p.startsWith('/api/vhi/marketplace/scripts')) {
+    await handleMarketplaceScripts(req, res, m, p);
     return true;
   }
 
@@ -110,6 +116,12 @@ export async function handleVhiApi(req, res) {
       if (m === 'POST' && snapActionMatch) { await handleSnapshotAction(req, res, ctx, snapActionMatch[1]); return true; }
 
       if (m === 'GET' && p === '/api/vhi/images') { await handleImages(req, res, ctx); return true; }
+      if (m === 'POST' && p === '/api/vhi/images') { await handleCreateImage(req, res, ctx); return true; }
+      const imgFileMatch = p.match(/^\/api\/vhi\/images\/([^/]+)\/file$/);
+      if (m === 'PUT' && imgFileMatch) { await handleUploadImage(req, res, ctx, imgFileMatch[1]); return true; }
+      const imgMatch = p.match(/^\/api\/vhi\/images\/([^/]+)$/);
+      if (m === 'PATCH' && imgMatch) { await handleUpdateImage(req, res, ctx, imgMatch[1]); return true; }
+      if (m === 'DELETE' && imgMatch) { await handleDeleteImage(req, res, ctx, imgMatch[1]); return true; }
 
       if (m === 'GET' && p === '/api/vhi/projects') { await handleProjects(req, res, ctx); return true; }
       if (m === 'GET' && p === '/api/vhi/users') { await handleUsers(req, res, ctx); return true; }

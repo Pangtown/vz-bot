@@ -1,8 +1,9 @@
+import 'dotenv/config';
 import { Client } from 'ssh2';
 
-const host = '172.16.218.7';
-const username = 'root';
-const password = 'Nexpass8188!';
+const host = process.env.VHI_SSH_HOST || '172.16.218.7';
+const username = process.env.VHI_SSH_USER || 'root';
+const password = process.env.VHI_SSH_PASSWORD || process.env.VHI_PASSWORD || '';
 
 function execSsh(cmd) {
     return new Promise((resolve, reject) => {
@@ -22,7 +23,10 @@ function execSsh(cmd) {
 
 async function main() {
     try {
-        const env = "export VINFRA_PORTAL='172.16.218.7'; export VINFRA_USERNAME='admin'; export VINFRA_PASSWORD='Nexpass8188!'";
+        const vhiUser = process.env.VHI_USER || 'admin';
+        const vhiPass = process.env.VHI_PASSWORD || '';
+        const vhiUrl = process.env.VHI_BASE_URL || '172.16.218.7';
+        const env = `export VINFRA_PORTAL='${vhiUrl}'; export VINFRA_USERNAME='${vhiUser}'; export VINFRA_PASSWORD='${vhiPass}'`;
         const ids = [2751, 2750, 2749];
         
         // Build batch command

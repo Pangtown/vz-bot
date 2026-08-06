@@ -1,4 +1,4 @@
-﻿Fetching https://172.16.218.7:5000/v3/auth/tokens for user admin and project admin
+Fetching https://172.16.218.7:5000/v3/auth/tokens for user admin and project admin
 {
   auth: {
     identity: {
@@ -7,7 +7,7 @@
         user: {
           name: 'admin',
           domain: { name: 'Default' },
-          password: 'Nexpass8188!'
+          password: '***HIDDEN***'
         }
       }
     },

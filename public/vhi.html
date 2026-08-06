@@ -191,6 +191,14 @@
     .form-group {
       margin-bottom: 1rem;
     }
+    /* Generic hide for toggled form sections (auth-method fields, hints).
+       Scoped so it doesn't break .modal-overlay's opacity-based transitions. */
+    .form-group.hidden,
+    .form-group input.hidden,
+    .form-group select.hidden,
+    .btn.hidden {
+      display: none;
+    }
     .form-group label {
       display: block;
       font-size: .78rem;
@@ -1095,6 +1103,7 @@
   <header class="app-header">
     <span class="logo">Virtuozzo<span> Infrastructure</span></span>
     <span class="spacer"></span>
+    <a href="/marketplace" class="btn-chat-toggle" id="marketplaceLink" style="text-decoration:none; margin-right:0.5rem;" title="Deploy VMs from templates">🛒 Marketplace</a>
     <a href="/clusters" class="btn-chat-toggle" style="text-decoration:none; margin-right:0.5rem;" title="Multi-Cluster Dashboard">🌐 Clusters</a>
     <button class="btn-chat-toggle" id="themeToggle" title="Toggle Theme" style="margin-right:0.5rem">🌓 Theme</button>
     <button class="btn-chat-toggle" id="settingsToggle" title="Settings" style="margin-right:0.5rem">⚙ Settings</button>
@@ -1415,7 +1424,6 @@
         <div class="table-card">
           <div class="table-toolbar" style="display: flex; gap: 1rem;">
             <input type="search" class="search-input" id="nodeSearch" placeholder="Search nodes…" style="flex: 1;">
-            <button class="btn btn-secondary" onclick="openGlobalSshModal()"><span class="ri">⚙</span> Global Cluster SSH</button>
           </div>
           <table>
             <thead>
@@ -1427,10 +1435,11 @@
                 <th>vCPUs Used / Total</th>
                 <th>RAM Used / Total</th>
                 <th>Type</th>
+                <th>Access</th>
               </tr>
             </thead>
             <tbody id="nodeBody">
-              <tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr>
+              <tr class="skeleton-row"><td colspan="8"><div class="skeleton"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -1587,6 +1596,7 @@
           <h2>Images</h2>
           <span class="panel-badge" id="imgCount">Loading…</span>
           <div class="panel-actions">
+            <button class="tbl-refresh" id="imgUploadBtn">⬆ Upload Image</button>
             <button class="tbl-refresh" id="imgRefresh"><span class="ri">↻</span> Refresh</button>
           </div>
         </div>
@@ -1603,10 +1613,11 @@
                 <th>Size</th>
                 <th>Disk Format</th>
                 <th>Visibility</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="imgBody">
-              <tr class="skeleton-row"><td colspan="6"><div class="skeleton"></div></td></tr>
+              <tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -1791,6 +1802,59 @@
   </div>
 </div>
 
+<!-- ═══════════════ UPLOAD IMAGE MODAL ═══════════════ -->
+<div id="uploadImgModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 500px;">
+    <div class="modal-header">
+      <h3>Upload Image</h3>
+      <button class="modal-close" id="closeUploadImgModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Image File (.qcow2, .img, .iso, .raw, .vmdk)</label>
+        <input type="file" id="upImgFile" accept=".qcow2,.img,.iso,.raw,.vmdk,.vhd,.vhdx">
+      </div>
+      <div class="form-group">
+        <label>Image Name</label>
+        <input type="text" id="upImgName" placeholder="e.g. ubuntu-24.04-cloud">
+      </div>
+      <div class="form-group">
+        <label>Disk Format</label>
+        <select id="upImgFormat">
+          <option value="qcow2">qcow2</option>
+          <option value="raw">raw</option>
+          <option value="iso">iso</option>
+          <option value="vmdk">vmdk</option>
+          <option value="vhd">vhd</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>OS Distro (optional, e.g. ubuntu, centos, windows)</label>
+        <input type="text" id="upImgOs" placeholder="ubuntu">
+      </div>
+      <div class="form-group">
+        <label>Visibility</label>
+        <select id="upImgVisibility">
+          <option value="private">Private — this project only</option>
+          <option value="public">Public — all projects (admin only)</option>
+        </select>
+        <div id="upImgVisNote" style="font-size:.75rem; color: var(--text-dim); margin-top:.3rem;"></div>
+      </div>
+      <div id="upImgProgressWrap" style="display:none; margin-top: .8rem;">
+        <div style="background: var(--bg-input, #17181c); border-radius: 6px; overflow: hidden; height: 10px;">
+          <div id="upImgProgressBar" style="height: 100%; width: 0%; background: var(--accent, #e11d2e); transition: width .2s;"></div>
+        </div>
+        <div id="upImgProgressText" style="font-size:.75rem; color: var(--text-dim); margin-top:.3rem;">0%</div>
+      </div>
+      <div id="upImgStatus" style="font-size:.85rem; margin-top:.6rem;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="cancelUploadImgBtn" style="flex:0; padding: .6rem 1rem;">Cancel</button>
+      <button class="btn btn-primary" id="submitUploadImgBtn" style="flex:0; padding: .6rem 1.2rem;">Upload</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════ REBOOT NODE MODAL ═══════════════ -->
 <div id="rebootNodeModal" class="modal-overlay hidden">
   <div class="modal-card" style="width: 400px;">
@@ -1813,13 +1877,14 @@
 <div id="nodeSshModal" class="modal-overlay hidden">
   <div class="modal-card" style="width: 500px;">
     <div class="modal-header">
-      <h3>SSH Config: <span id="sshModalHostname">...</span></h3>
+      <h3>Access: <span id="sshModalHostname">...</span></h3>
       <button class="modal-close" onclick="closeNodeSshModal()">✕</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label>SSH Management IP / Host</label>
-        <input type="text" id="nodeSshHost" placeholder="e.g. 192.168.1.10">
+        <label>SSH Address</label>
+        <select id="nodeSshHostSelect" onchange="toggleSshHostCustom()"></select>
+        <input type="text" id="nodeSshHost" placeholder="e.g. 192.168.1.10" style="margin-top:.5rem;">
       </div>
       <div class="form-group">
         <label>SSH User</label>
@@ -1829,10 +1894,15 @@
       <div class="form-group">
         <label>Auth Method</label>
         <select id="nodeSshAuthMethod" onchange="toggleSshAuthFields()">
-          <option value="password">Password</option>
-          <option value="key">Private Key</option>
+          <option value="cluster" id="nodeSshClusterOption">Cluster Key (stored)</option>
+          <option value="password">Username / Password</option>
+          <option value="key">Private Key (paste)</option>
         </select>
       </div>
+
+      <p id="nodeSshClusterHint" class="form-group" style="font-size:.8rem; color:var(--text-dim); margin-top:-.5rem;">
+        Connects using the key/credentials saved in <strong>Global Cluster SSH</strong> settings — no secret needed here.
+      </p>
 
       <div id="nodeSshPassGroup" class="form-group">
         <label>SSH Password</label>
@@ -1849,7 +1919,8 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="testNodeSsh()" style="margin-right:auto;">Test / Help</button>
       <button class="btn btn-secondary" onclick="closeNodeSshModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveNodeSsh()">Save Config</button>
+      <button class="btn btn-secondary" onclick="saveNodeSsh()">Save Config</button>
+      <button class="btn btn-primary" id="nodeSshConnectBtn" onclick="connectFromSshModal()">Connect</button>
     </div>
   </div>
 </div>
@@ -2504,7 +2575,7 @@
   </div>
   <div class="modal-footer" style="padding: 1rem 1.5rem; background: var(--bg-sidebar); display: flex; justify-content: space-between;">
     <div>
-      <button class="btn btn-secondary" onclick="openNodeSshModal(currentNodeDetails?.hostname || currentNodeDetails?.name || currentNodeDetails?.id)" style="margin-right: 0.5rem;"><span class="ri">⚙</span> Node SSH</button>
+      <button class="btn btn-secondary" onclick="openNodeAccess(currentNodeDetails?.id, currentNodeDetails?.hostname || currentNodeDetails?.name || currentNodeDetails?.id)" style="margin-right: 0.5rem;"><span class="ri">⚙</span> Access</button>
       <button class="btn btn-primary" onclick="currentSshNode = (currentNodeDetails?.hostname || currentNodeDetails?.name || currentNodeDetails?.id); openTerminal()"><span class="ri">🖥</span> Console</button>
     </div>
     <button class="btn btn-secondary" onclick="closeNodeDrawer()">Close</button>
@@ -2746,6 +2817,7 @@ async function doLogin() {
       projectId:    data.projectId || '',
       userDomain:   data.userDomain,
       projectDomain: data.projectDomain,
+      isAdmin:      !!data.isAdmin,
     };
 
     // show app
@@ -2789,6 +2861,15 @@ if (fwdBaseUrl && fwdUser && fwdPass) {
   // Auto-connect
   doLogin();
 }
+
+// Forward the live session to the marketplace page so it auto-connects
+document.getElementById('marketplaceLink').addEventListener('click', () => {
+  if (!session) return;
+  localStorage.setItem('vhiBaseUrl', session.baseUrl);
+  localStorage.setItem('vhiUser', session.username);
+  localStorage.setItem('vhiPassword', session.password);
+  localStorage.setItem('vhiProject', session.project);
+});
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
   session = null;
@@ -3899,7 +3980,7 @@ window.currentEditingPortId = currentEditingPortId;
 
 async function loadNodes() {
   setRefreshing('nodeRefresh', true);
-  document.getElementById('nodeBody').innerHTML = skeletonRows(7);
+  document.getElementById('nodeBody').innerHTML = skeletonRows(8);
   try {
     const data = await apiGet('/api/vhi/nodes');
     _nodes = data.nodes || [];
@@ -3947,6 +4028,7 @@ function renderNodes(query) {
       <td>${isCompute ? barHtml(cpuPct) : '–'} <span class="text-muted">${isCompute ? `${n.vcpus_used}/${cpuTotal}` : ''}</span></td>
       <td>${isCompute ? barHtml(ramPct) : '–'} <span class="text-muted">${isCompute ? `${Math.round((n.memory_mb-n.free_ram_mb)/1024)}/${Math.round(n.memory_mb/1024)} GB` : ''}</span></td>
       <td class="text-dim">${n.hypervisor_type || (isCompute ? '–' : 'controller')}</td>
+      <td><button class="btn btn-secondary" style="padding:.35rem .8rem; font-size:.75rem; white-space:nowrap;" onclick="event.stopPropagation(); openNodeAccess('${nodeId}', '${n.hypervisor_hostname || nodeId}')"><span class="ri">⚙</span> Access</button></td>
     </tr>`;
   });
   const filtered = filterRows(rows, query);
@@ -4142,14 +4224,15 @@ async function doRebootNode() {
   let creds = {};
   if (saved) {
     try {
+      const config = JSON.parse(saved);
       const isNodeSpecific = !!localStorage.getItem(getNodeSshKey(hostname));
-      creds = {
-        host: isNodeSpecific ? (config.host || hostname) : hostname,
-        username: config.username,
-        password: config.authMethod === 'password' ? config.password : undefined,
-        privateKey: config.authMethod === 'key' ? config.privateKey : undefined,
-        passphrase: config.authMethod === 'key' ? config.passphrase : undefined
-      };
+      // Only trust currentNodeDetails' routed IP if it is actually this node.
+      const detailsMatch = currentNodeDetails &&
+        [currentNodeDetails.hostname, currentNodeDetails.name, currentNodeDetails.id].includes(hostname);
+      const nodeAddr = detailsMatch ? (getNodeRoutedIp(currentNodeDetails) || hostname) : hostname;
+      creds = buildSshCreds(config, nodeAddr);
+      // A global config's host is the cluster management IP, not this node.
+      if (!isNodeSpecific) creds.host = nodeAddr;
     } catch(e) { console.error('Failed to parse node SSH config', e); }
   }
 
@@ -4188,7 +4271,13 @@ async function openGlobalSshModal() {
   isGlobalSsh = true;
   currentSshNode = "CLUSTER_GLOBAL";
   document.getElementById('sshModalHostname').textContent = "Cluster Global";
-  
+  // The global config IS the stored cluster credential — 'cluster' auth is not a valid choice here.
+  document.getElementById('nodeSshClusterOption').hidden = true;
+  // Global mode has no node to enumerate: free-text address, no dropdown, no Connect.
+  document.getElementById('nodeSshHostSelect').classList.add('hidden');
+  document.getElementById('nodeSshHost').classList.remove('hidden');
+  document.getElementById('nodeSshConnectBtn').classList.add('hidden');
+
   let config = {};
   // 1. Try server-side first
   try {
@@ -4207,7 +4296,8 @@ async function openGlobalSshModal() {
   if (config.host || config.username) {
     document.getElementById('nodeSshHost').value = config.host || '';
     document.getElementById('nodeSshUser').value = config.username || 'root';
-    document.getElementById('nodeSshAuthMethod').value = config.authMethod || 'password';
+    const method = config.authMethod === 'cluster' ? 'password' : (config.authMethod || 'password');
+    document.getElementById('nodeSshAuthMethod').value = method;
     document.getElementById('nodeSshPassword').value = config.password || '';
     document.getElementById('nodeSshKey').value = config.privateKey || '';
     document.getElementById('nodeSshPassphrase').value = config.passphrase || '';
@@ -4229,41 +4319,42 @@ function openNodeSshModal(hostname) {
   isGlobalSsh = false;
   currentSshNode = hostname;
   document.getElementById('sshModalHostname').textContent = hostname;
-  
+  document.getElementById('nodeSshClusterOption').hidden = false;
+  document.getElementById('nodeSshHostSelect').classList.remove('hidden');
+  document.getElementById('nodeSshConnectBtn').classList.remove('hidden');
+  document.getElementById('nodeSshHost').value = '';
+
+  let savedConfig = null;
   const saved = localStorage.getItem(getNodeSshKey(hostname));
   if (saved) {
-    try {
-      const config = JSON.parse(saved);
-      document.getElementById('nodeSshHost').value = config.host || '';
-      document.getElementById('nodeSshUser').value = config.username || 'root';
-      document.getElementById('nodeSshAuthMethod').value = config.authMethod || 'password';
-      document.getElementById('nodeSshPassword').value = config.password || '';
-      document.getElementById('nodeSshKey').value = config.privateKey || '';
-      document.getElementById('nodeSshPassphrase').value = config.passphrase || '';
-    } catch(e) {}
+    try { savedConfig = JSON.parse(saved); } catch(e) {}
+  }
+
+  // Address dropdown: the node's IPs by network, defaulting to the
+  // Management/Public (routed) IP — not the internal .vstoragedomain hostname.
+  populateSshHostOptions(currentNodeDetails, hostname, savedConfig?.host || null);
+
+  if (savedConfig) {
+    document.getElementById('nodeSshUser').value = savedConfig.username || 'root';
+    document.getElementById('nodeSshAuthMethod').value = savedConfig.authMethod || 'cluster';
+    document.getElementById('nodeSshPassword').value = savedConfig.password || '';
+    document.getElementById('nodeSshKey').value = savedConfig.privateKey || '';
+    document.getElementById('nodeSshPassphrase').value = savedConfig.passphrase || '';
   } else {
-    // If no node-specific, try to pre-fill from global
+    // No node-specific config: default to the key stored on the cluster,
+    // pre-filling the user from the global config if present.
+    let globalUser = 'root';
     const globalSaved = localStorage.getItem(getGlobalSshKey());
     if (globalSaved) {
-      try {
-        const config = JSON.parse(globalSaved);
-        document.getElementById('nodeSshHost').value = hostname; // use hostname/IP for this node
-        document.getElementById('nodeSshUser').value = config.username || 'root';
-        document.getElementById('nodeSshAuthMethod').value = config.authMethod || 'password';
-        document.getElementById('nodeSshPassword').value = config.password || '';
-        document.getElementById('nodeSshKey').value = config.privateKey || '';
-        document.getElementById('nodeSshPassphrase').value = config.passphrase || '';
-      } catch(e) {}
-    } else {
-      document.getElementById('nodeSshHost').value = hostname;
-      document.getElementById('nodeSshUser').value = 'root';
-      document.getElementById('nodeSshAuthMethod').value = 'password';
-      document.getElementById('nodeSshPassword').value = '';
-      document.getElementById('nodeSshKey').value = '';
-      document.getElementById('nodeSshPassphrase').value = '';
+      try { globalUser = JSON.parse(globalSaved).username || 'root'; } catch(e) {}
     }
+    document.getElementById('nodeSshUser').value = globalUser;
+    document.getElementById('nodeSshAuthMethod').value = 'cluster';
+    document.getElementById('nodeSshPassword').value = '';
+    document.getElementById('nodeSshKey').value = '';
+    document.getElementById('nodeSshPassphrase').value = '';
   }
-  
+
   toggleSshAuthFields();
   document.getElementById('nodeSshModal').classList.remove('hidden');
 }
@@ -4277,12 +4368,113 @@ function toggleSshAuthFields() {
   const method = document.getElementById('nodeSshAuthMethod').value;
   document.getElementById('nodeSshPassGroup').classList.toggle('hidden', method !== 'password');
   document.getElementById('nodeSshKeyGroup').classList.toggle('hidden', method !== 'key');
+  document.getElementById('nodeSshClusterHint').classList.toggle('hidden', method !== 'cluster');
+}
+
+// Pick the node's reachable SSH address: prefer the explicit external IP, then an
+// interface on a Management/Public (routed) logical network, then any routable IP.
+function getNodeRoutedIp(details) {
+  if (!details) return null;
+  if (details.external_ip) return details.external_ip;
+  const nets = (details.networks || []).filter(n => (n.ips || []).length > 0);
+  if (!nets.length) return null;
+  const byTraffic = re => nets.find(n => (n.traffic_types || []).some(t => re.test(t)));
+  const byName = re => nets.find(n => re.test(n.name || ''));
+  const pick =
+    byTraffic(/ssh|admin|management/i) ||
+    byName(/management|public/i) ||
+    byTraffic(/public/i);
+  if (pick) return pick.ips[0];
+  // Last resort: any non-RFC1918 address, else the first IP we have.
+  const isPrivate = ip => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.|169\.254\.)/.test(ip);
+  for (const n of nets) {
+    const pub = (n.ips || []).find(ip => !isPrivate(ip));
+    if (pub) return pub;
+  }
+  return nets[0].ips[0];
+}
+
+// Fill the SSH address dropdown with every IP we know for this node,
+// labeled by logical network, plus the hostname and a Custom escape hatch.
+function populateSshHostOptions(details, hostname, savedHost) {
+  const sel = document.getElementById('nodeSshHostSelect');
+  const seen = new Set();
+  const opts = [];
+  if (details?.external_ip) {
+    seen.add(details.external_ip);
+    opts.push({ value: details.external_ip, label: `${details.external_ip} — External` });
+  }
+  (details?.networks || []).forEach(net => (net.ips || []).forEach(ip => {
+    if (seen.has(ip)) return;
+    seen.add(ip);
+    const traffic = (net.traffic_types || []).length ? ` (${net.traffic_types.join(', ')})` : '';
+    opts.push({ value: ip, label: `${ip} — ${net.name || 'Unknown'}${traffic}` });
+  }));
+  if (hostname && !seen.has(hostname)) {
+    seen.add(hostname);
+    opts.push({ value: hostname, label: `${hostname} — hostname` });
+  }
+  opts.push({ value: '__custom__', label: 'Custom…' });
+  sel.innerHTML = opts.map(o => `<option value="${o.value.replace(/"/g, '&quot;')}">${o.label}</option>`).join('');
+
+  const routed = getNodeRoutedIp(details);
+  if (savedHost && seen.has(savedHost)) {
+    sel.value = savedHost;
+  } else if (savedHost) {
+    sel.value = '__custom__';
+    document.getElementById('nodeSshHost').value = savedHost;
+  } else if (routed && seen.has(routed)) {
+    sel.value = routed;
+  }
+  toggleSshHostCustom();
+}
+
+function toggleSshHostCustom() {
+  const custom = document.getElementById('nodeSshHostSelect').value === '__custom__';
+  document.getElementById('nodeSshHost').classList.toggle('hidden', !custom);
+}
+
+// Current SSH address: the dropdown selection, or the text input for Custom/global mode.
+function getSshHostValue() {
+  if (isGlobalSsh) return document.getElementById('nodeSshHost').value.trim();
+  const sel = document.getElementById('nodeSshHostSelect');
+  return sel.value === '__custom__' ? document.getElementById('nodeSshHost').value.trim() : sel.value;
+}
+
+// Entry point for the per-node Access button: make sure we have the node's
+// addresses (networks/IPs) before opening the modal.
+async function openNodeAccess(nodeId, hostname) {
+  const matches = currentNodeDetails &&
+    [currentNodeDetails.hostname, currentNodeDetails.name, currentNodeDetails.id].includes(hostname);
+  if (!matches) {
+    toast('Loading node addresses…', 'inf');
+    try {
+      currentNodeDetails = await apiGet(`/api/vhi/nodes/${nodeId || hostname}`);
+    } catch (e) {
+      console.warn('Could not load node details for Access modal:', e.message);
+      currentNodeDetails = null;
+    }
+  }
+  openNodeSshModal(hostname);
+}
+
+// Build the creds payload for the backend. For 'cluster' auth we send no secret —
+// the server merges the key/password stored in the cluster-global SSH config.
+function buildSshCreds(config, fallbackHost) {
+  const method = config.authMethod || 'password';
+  return {
+    host: config.host || fallbackHost,
+    username: config.username || 'root',
+    password: method === 'password' ? config.password : undefined,
+    privateKey: method === 'key' ? config.privateKey : undefined,
+    passphrase: method === 'key' ? config.passphrase : undefined
+  };
 }
 
 async function saveNodeSsh() {
   if (!currentSshNode) return;
   const config = {
-    host: document.getElementById('nodeSshHost').value.trim(),
+    host: getSshHostValue(),
     username: document.getElementById('nodeSshUser').value.trim(),
     authMethod: document.getElementById('nodeSshAuthMethod').value,
     password: document.getElementById('nodeSshPassword').value,
@@ -4315,7 +4507,7 @@ async function saveNodeSsh() {
 async function testNodeSsh() {
   if (!currentSshNode) return;
   const config = {
-    host: document.getElementById('nodeSshHost').value.trim(),
+    host: getSshHostValue(),
     username: document.getElementById('nodeSshUser').value.trim(),
     authMethod: document.getElementById('nodeSshAuthMethod').value,
     password: document.getElementById('nodeSshPassword').value,
@@ -4325,13 +4517,7 @@ async function testNodeSsh() {
   
   toast('Testing SSH & vinfra help…', 'inf');
   try {
-    const res = await apiPost(`/api/vhi/nodes/${currentSshNode}/action`, { action: 'help', creds: {
-      host: config.host,
-      username: config.username,
-      password: config.authMethod === 'password' ? config.password : undefined,
-      privateKey: config.authMethod === 'key' ? config.privateKey : undefined,
-      passphrase: config.authMethod === 'key' ? config.passphrase : undefined
-    }});
+    const res = await apiPost(`/api/vhi/nodes/${currentSshNode}/action`, { action: 'help', creds: buildSshCreds(config, currentSshNode) });
     if (res.help) {
       alert(`vinfra node help output:\n\n${res.help}`);
     } else {
@@ -4344,8 +4530,10 @@ async function testNodeSsh() {
 
 window.openGlobalSshModal = openGlobalSshModal;
 window.openNodeSshModal = openNodeSshModal;
+window.openNodeAccess = openNodeAccess;
 window.closeNodeSshModal = closeNodeSshModal;
 window.toggleSshAuthFields = toggleSshAuthFields;
+window.toggleSshHostCustom = toggleSshHostCustom;
 window.saveNodeSsh = saveNodeSsh;
 window.testNodeSsh = testNodeSsh;
 document.getElementById('confirmRebootBtn').addEventListener('click', doRebootNode);
@@ -4359,29 +4547,49 @@ let terminalWs = null;
 function openTerminal() {
   if (!currentSshNode) return;
   const hostname = currentSshNode;
-  document.getElementById('terminalHostname').textContent = hostname;
-  
+
   let saved = localStorage.getItem(getNodeSshKey(hostname));
   if (!saved) {
     // fallback to global
     saved = localStorage.getItem(getGlobalSshKey());
   }
 
-  if (!saved) {
-    toast('No SSH credentials configured! Use "Global SSH" button.', 'err');
+  // No local config is fine: send the node address with no secret and the
+  // server will connect with the key stored in the cluster-global SSH config.
+  const isNodeSpecific = !!localStorage.getItem(getNodeSshKey(hostname));
+  const config = saved ? JSON.parse(saved) : { authMethod: 'cluster' };
+  const nodeAddr = getNodeRoutedIp(currentNodeDetails) || hostname;
+  const creds = buildSshCreds(config, nodeAddr);
+  // A global config's host is the cluster management IP, not this node.
+  if (!isNodeSpecific) creds.host = nodeAddr;
+
+  openTerminalWithCreds(hostname, creds);
+}
+
+// Connect straight from the Access modal using whatever is currently in the form
+// (no save required) — the terminal targets the address picked in the dropdown.
+function connectFromSshModal() {
+  if (!currentSshNode || isGlobalSsh) return;
+  const hostname = currentSshNode;
+  const config = {
+    host: getSshHostValue(),
+    username: document.getElementById('nodeSshUser').value.trim(),
+    authMethod: document.getElementById('nodeSshAuthMethod').value,
+    password: document.getElementById('nodeSshPassword').value,
+    privateKey: document.getElementById('nodeSshKey').value,
+    passphrase: document.getElementById('nodeSshPassphrase').value
+  };
+  if (!config.host) {
+    toast('Pick an SSH address first.', 'err');
     return;
   }
-  
-  const isNodeSpecific = !!localStorage.getItem(getNodeSshKey(hostname));
-  const config = JSON.parse(saved);
-  const creds = {
-    host: isNodeSpecific ? (config.host || hostname) : hostname,
-    username: config.username,
-    password: config.authMethod === 'password' ? config.password : undefined,
-    privateKey: config.authMethod === 'key' ? config.privateKey : undefined,
-    passphrase: config.authMethod === 'key' ? config.passphrase : undefined
-  };
+  closeNodeSshModal();
+  currentSshNode = hostname; // closeNodeSshModal clears it
+  openTerminalWithCreds(hostname, buildSshCreds(config, hostname));
+}
 
+function openTerminalWithCreds(hostname, creds) {
+  document.getElementById('terminalHostname').textContent = hostname;
   const container = document.getElementById('terminalContainer');
   container.innerHTML = '<div style="color:var(--accent-blue)">Connecting to SSH...</div>';
   
@@ -4449,6 +4657,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 window.openTerminal = openTerminal;
+window.connectFromSshModal = connectFromSshModal;
 window.closeTerminal = closeTerminal;
 
 async function openClusterTerminal() {
@@ -5022,20 +5231,147 @@ async function loadImages() {
 
 function renderImages(query) {
   const tbody = document.getElementById('imgBody');
+  const isAdmin = !!session?.isAdmin;
   const rows = _imgs.map(img => {
     const os = img.os_distro || img['os-distro'] || '–';
+    const isPublic = img.visibility === 'public';
+    // Making an image public is admin-only (Glance publicize_image policy)
+    const visBtn = isPublic
+      ? (isAdmin ? `<button class="act-btn" onclick="setImageVisibility('${img.id}','private')">Make Private</button>` : '')
+      : (isAdmin
+          ? `<button class="act-btn" onclick="setImageVisibility('${img.id}','public')">Make Public</button>`
+          : `<button class="act-btn" disabled style="opacity:.45; cursor:not-allowed;" title="Only administrators can publish images to all projects">Make Public</button>`);
     return `<tr>
       <td><strong>${img.name || '–'}</strong></td>
       <td>${statusBadge(img.status)}</td>
       <td class="text-dim">${os}</td>
       <td class="text-dim">${fmtBytes(img.size)}</td>
       <td class="text-dim">${img.disk_format || '–'}</td>
-      <td>${img.visibility === 'public' ? '<span class="badge badge-active">Public</span>' : '<span class="badge badge-default">Private</span>'}</td>
+      <td>${isPublic ? '<span class="badge badge-active">Public</span>' : '<span class="badge badge-default">Private</span>'}</td>
+      <td>${visBtn} <button class="act-btn act-danger" onclick="deleteImageRow('${img.id}', this)">Delete</button></td>
     </tr>`;
   });
   const filtered = filterRows(rows, query);
   tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🗂', 'No images found');
 }
+
+async function setImageVisibility(imageId, visibility) {
+  try {
+    await apiPatch('/api/vhi/images/' + imageId, { visibility });
+    toast(`Image is now ${visibility}`, 'ok');
+    loadImages();
+  } catch (err) {
+    toast(/403/.test(err.message)
+      ? 'Not permitted: only administrators can make images public.'
+      : 'Visibility change failed: ' + err.message, 'err');
+  }
+}
+
+async function deleteImageRow(imageId, btn) {
+  const img = _imgs.find(i => i.id === imageId);
+  if (!confirm(`Delete image “${img?.name || imageId}”? VMs already booted from it keep running, but it can no longer be deployed.`)) return;
+  btn.disabled = true;
+  try {
+    await apiDelete('/api/vhi/images/' + imageId);
+    toast('Image deleted', 'ok');
+    loadImages();
+  } catch (err) {
+    btn.disabled = false;
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+// ── IMAGE UPLOAD ──────────────────────────────────────────────────────────
+
+const upImgModal = document.getElementById('uploadImgModal');
+document.getElementById('imgUploadBtn').addEventListener('click', () => {
+  document.getElementById('upImgFile').value = '';
+  document.getElementById('upImgName').value = '';
+  document.getElementById('upImgOs').value = '';
+  document.getElementById('upImgStatus').textContent = '';
+  document.getElementById('upImgProgressWrap').style.display = 'none';
+  const visSel = document.getElementById('upImgVisibility');
+  const visNote = document.getElementById('upImgVisNote');
+  if (session?.isAdmin) {
+    visSel.querySelector('option[value=public]').disabled = false;
+    visNote.textContent = '';
+  } else {
+    visSel.value = 'private';
+    visSel.querySelector('option[value=public]').disabled = true;
+    visNote.textContent = 'Only administrators can publish images to all projects.';
+  }
+  upImgModal.classList.remove('hidden');
+});
+document.getElementById('closeUploadImgModal').addEventListener('click', () => upImgModal.classList.add('hidden'));
+document.getElementById('cancelUploadImgBtn').addEventListener('click', () => upImgModal.classList.add('hidden'));
+
+// Auto-fill name + disk format from the chosen file
+document.getElementById('upImgFile').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const nameEl = document.getElementById('upImgName');
+  if (!nameEl.value) nameEl.value = f.name.replace(/\.(qcow2|img|iso|raw|vmdk|vhdx?)$/i, '');
+  const ext = (f.name.match(/\.(\w+)$/) || [])[1]?.toLowerCase();
+  const fmtMap = { qcow2: 'qcow2', img: 'qcow2', iso: 'iso', raw: 'raw', vmdk: 'vmdk', vhd: 'vhd', vhdx: 'vhd' };
+  if (fmtMap[ext]) document.getElementById('upImgFormat').value = fmtMap[ext];
+});
+
+document.getElementById('submitUploadImgBtn').addEventListener('click', async () => {
+  const file = document.getElementById('upImgFile').files[0];
+  const name = document.getElementById('upImgName').value.trim();
+  const statusEl = document.getElementById('upImgStatus');
+  statusEl.style.color = '';
+  if (!file) { statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Choose an image file first.'; return; }
+  if (!name) { statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Image name is required.'; return; }
+
+  const btn = document.getElementById('submitUploadImgBtn');
+  btn.disabled = true; btn.textContent = 'Uploading…';
+  try {
+    // 1. Create the image record (queued)
+    statusEl.textContent = 'Creating image record…';
+    const created = await apiPost('/api/vhi/images', {
+      name,
+      disk_format: document.getElementById('upImgFormat').value,
+      os_distro: document.getElementById('upImgOs').value.trim() || undefined,
+      visibility: document.getElementById('upImgVisibility').value,
+    });
+    const imageId = created.image.id;
+
+    // 2. Stream the file with progress (XHR gives us upload progress events)
+    statusEl.textContent = `Uploading ${(file.size / 1073741824).toFixed(2)} GB…`;
+    document.getElementById('upImgProgressWrap').style.display = 'block';
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', '/api/vhi/images/' + imageId + '/file');
+      const h = authHeaders();
+      delete h['Content-Type'];
+      Object.entries(h).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.upload.onprogress = (ev) => {
+        if (!ev.lengthComputable) return;
+        const pct = Math.round(ev.loaded / ev.total * 100);
+        document.getElementById('upImgProgressBar').style.width = pct + '%';
+        document.getElementById('upImgProgressText').textContent =
+          `${pct}% — ${(ev.loaded / 1048576).toFixed(0)} / ${(ev.total / 1048576).toFixed(0)} MB`;
+      };
+      xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status}): ${xhr.responseText.slice(0, 200)}`));
+      xhr.onerror = () => reject(new Error('Upload failed: network error'));
+      xhr.send(file);
+    });
+
+    statusEl.style.color = 'var(--success)';
+    statusEl.textContent = 'Upload complete — image is now active.';
+    toast(`Image “${name}” uploaded`, 'ok');
+    setTimeout(() => { upImgModal.classList.add('hidden'); loadImages(); }, 1200);
+  } catch (err) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = /403/.test(err.message)
+      ? 'Not permitted: only administrators can create public images. Switch visibility to Private.'
+      : err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Upload';
+  }
+});
 
 // ── PROJECTS ──────────────────────────────────────────────────────────────
 

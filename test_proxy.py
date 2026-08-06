@@ -1,9 +1,10 @@
+import os
 import json
 import requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-base_url = "https://172.16.218.7"
+base_url = os.getenv("VHI_BASE_URL", "https://172.16.218.7")
 auth_url = f"{base_url}:5000/v3/auth/tokens"
 
 auth_data = {
@@ -13,8 +14,8 @@ auth_data = {
             "password": {
                 "user": {
                     "domain": {"name": "Default"},
-                    "name": "admin",
-                    "password": "Password123!"
+                    "name": os.getenv("VHI_USER", "admin"),
+                    "password": os.getenv("VHI_PASSWORD", "")
                 }
             }
         },

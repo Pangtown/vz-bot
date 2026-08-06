@@ -118,6 +118,18 @@ export async function createServer(options = {}) {
     payload.networks = [{ uuid: payload.networks }];
   }
 
+  // Post-provision script via cloud-init: Nova expects base64 user_data (max 65535 bytes)
+  if (options.user_data) {
+    const encoded = Buffer.from(String(options.user_data), 'utf8').toString('base64');
+    if (encoded.length > 65535) {
+      throw new Error('user_data too large: cloud-init payload must be under 64 KB');
+    }
+    payload.user_data = encoded;
+    // Deliver user_data via config drive so cloud-init works even on networks
+    // where the Nova metadata service (169.254.169.254) is unreachable.
+    payload.config_drive = true;
+  }
+
   // Default to Boot from Volume (block_device_mapping_v2) if an image or volume specs are provided
   // to avoid MaxRetriesExceeded scheduling errors on compute nodes without ephemeral storage.
   if (volumeSize || volumeType || imageRef) {

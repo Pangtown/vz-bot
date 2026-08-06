@@ -8,8 +8,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "cli:vhi": "node src/cli-vhi.js",
-    "test": "node test/utils.test.js",
-    "test:utils": "node test/utils.test.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:utils": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "codebase:backup": "node src/backup-cli.js create",
     "codebase:list": "node src/backup-cli.js list",
     "codebase:restore": "node src/backup-cli.js restore"

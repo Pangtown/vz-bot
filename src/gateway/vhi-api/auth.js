@@ -86,12 +86,15 @@ export async function handleAuth(req, res) {
     try { tokenData = await r.json(); } catch (_) {}
 
     const projectId = tokenData?.token?.project?.id || '';
+    const roles = tokenData?.token?.roles || [];
+    const isAdmin = roles.some((r) => r.name === 'admin');
 
     logger.info(`Authentication successful for user ${username}`, { projectId });
     return json(res, 200, {
       ok: true,
       token,
       projectId,
+      isAdmin,
       baseUrl:  fullBase,
       username,
       project,

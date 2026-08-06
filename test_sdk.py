@@ -1,20 +1,21 @@
+import os
 import sys
 import openstack
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-base_url = "https://172.16.218.7"
+base_url = os.getenv("VHI_BASE_URL", "https://172.16.218.7")
 auth_url = f"{base_url}:5000/v3"
 
 try:
     print("Connecting via openstacksdk...")
     conn = openstack.connect(
         auth_url=auth_url,
-        project_name="admin",
-        username="admin",
-        password="Password123!",
-        user_domain_name="Default",
-        project_domain_name="Default",
+        project_name=os.getenv("VHI_PROJECT_NAME", "admin"),
+        username=os.getenv("VHI_USER", "admin"),
+        password=os.getenv("VHI_PASSWORD", ""),
+        user_domain_name=os.getenv("VHI_DOMAIN_NAME", "Default"),
+        project_domain_name=os.getenv("VHI_DOMAIN_NAME", "Default"),
         verify=False
     )
     

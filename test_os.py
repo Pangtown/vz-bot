@@ -1,3 +1,4 @@
+import os
 import logging
 import openstack
 import urllib3
@@ -11,12 +12,12 @@ logging.basicConfig(level=logging.DEBUG)
 
 try:
     conn = openstack.connect(
-        auth_url="https://172.16.218.7:5000/v3",
-        project_name="admin",
-        username="admin",
-        password="Nexpass8188!",
-        user_domain_name="Default",
-        project_domain_name="Default",
+        auth_url=os.getenv("VHI_BASE_URL", "https://172.16.218.7") + ":5000/v3",
+        project_name=os.getenv("VHI_PROJECT_NAME", "admin"),
+        username=os.getenv("VHI_USER", "admin"),
+        password=os.getenv("VHI_PASSWORD", ""),
+        user_domain_name=os.getenv("VHI_DOMAIN_NAME", "Default"),
+        project_domain_name=os.getenv("VHI_DOMAIN_NAME", "Default"),
         verify=False
     )
     print("Servers:", list(conn.compute.servers()))
