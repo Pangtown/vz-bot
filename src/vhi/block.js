@@ -6,7 +6,10 @@ import { getClient } from './client.js';
 import { getContextValue } from '../gateway/context.js';
 
 const getBaseUrl = () => {
-  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL') || 'https://172.16.218.7';
+  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL');
+  if (!base) {
+    throw new Error('VHI Base URL is not configured. Please provide vhiBaseUrl in context or set VHI_BASE_URL.');
+  }
   return base.replace(/\/$/, '');
 };
 

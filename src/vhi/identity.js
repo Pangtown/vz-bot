@@ -7,7 +7,10 @@ import { getContextValue } from '../gateway/context.js';
 import { registerInsecureHost } from '../utils/tls.js';
 
 const getBaseUrl = () => {
-  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL') || 'https://172.16.218.7';
+  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL');
+  if (!base) {
+    throw new Error('VHI Base URL is not configured. Please provide vhiBaseUrl in context or set VHI_BASE_URL.');
+  }
   // Every VHI API call flows through here — allow this host's self-signed cert
   registerInsecureHost(base);
   return base.replace(/\/$/, '');

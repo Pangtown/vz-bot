@@ -5,9 +5,18 @@ import { logger } from '../../utils/index.js';
 
 export async function handleNetworks(req, res, ctx) {
   try {
-    const [networks, subnets] = await runWithContext(ctx, () =>
+    const url = new URL(req.url || '', `http://${req.headers?.host || 'localhost'}`);
+    const showAll = url.searchParams.get('all') === 'true';
+    const [rawNetworks, subnets] = await runWithContext(ctx, () =>
       Promise.all([listNetworks(), listSubnets()])
     );
+    // Virtuozzo Infrastructure System (V/IS) hides internal OpenStack Neutron L3 HA VRRP networks
+    const networks = showAll
+      ? rawNetworks
+      : rawNetworks.filter(n => {
+          const name = (n.name || '').toLowerCase();
+          return !name.startsWith('ha network');
+        });
     return json(res, 200, { networks, subnets });
   } catch (err) {
     logger.error(`handleNetworks error: ${err.message}`, { error: err.message });

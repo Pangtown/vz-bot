@@ -2,6 +2,22 @@ import { Client } from 'ssh2';
 import { getContextValue } from '../gateway/context.js';
 import { loadGlobalSshConfig } from '../monitoring/ssh-storage.js';
 
+const ALLOWED_RAW_COMMANDS = new Set(['/sbin/ip', '/sbin/reboot', 'reboot']);
+
+export function validateVinfraArgs(args) {
+    if (!Array.isArray(args) || args.length === 0) {
+        throw new Error('Command arguments must be a non-empty array.');
+    }
+    const first = String(args[0]).trim();
+    if (first.startsWith('/') || first === 'reboot') {
+        if (!ALLOWED_RAW_COMMANDS.has(first)) {
+            throw new Error(`Execution of raw binary '${first}' is prohibited.`);
+        }
+        return { isRaw: true };
+    }
+    return { isRaw: false };
+}
+
 export async function runVinfraCommand(args, creds = {}) {
     let host = creds.host || getContextValue('vhiSshHost', 'VHI_SSH_HOST');
     let username = creds.username || getContextValue('vhiSshUser', 'VHI_SSH_USER') || 'root';
@@ -83,8 +99,7 @@ export async function runVinfraCommand(args, creds = {}) {
             
             const quotedArgs = args.map(a => `'${String(a).replace(/'/g, "'\\''")}'`).join(' ');
             
-            // If the first argument is an absolute path or 'reboot', treat as raw command
-            const isRaw = args[0].startsWith('/') || args[0] === 'reboot';
+            const { isRaw } = validateVinfraArgs(args);
             const command = isRaw 
               ? `${envVars.join('; ')}; ${quotedArgs}`
               : `${envVars.join('; ')}; vinfra ${quotedArgs} -f json`;
@@ -247,8 +262,8 @@ async function runVinfraBatchChunk(commands, creds = {}) {
             if (vhiPassword) envVars.push(`export VINFRA_PASSWORD='${vhiPassword.replace(/'/g, "'\\''")}'`);
 
             const subcmds = commands.map(args => {
+                const { isRaw } = validateVinfraArgs(args);
                 const quotedArgs = args.map(a => `'${String(a).replace(/'/g, "'\\''")}'`).join(' ');
-                const isRaw = args[0].startsWith('/') || args[0] === 'reboot';
                 return isRaw ? quotedArgs : `vinfra ${quotedArgs} -f json`;
             });
 

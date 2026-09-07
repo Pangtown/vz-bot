@@ -1,4 +1,4 @@
-import { extractContext, json } from './vhi-api/helpers.js';
+import { extractContext, json, verifyWebPassword } from './vhi-api/helpers.js';
 import { handleAuth } from './vhi-api/auth.js';
 import { handleMarketplaceScripts } from './vhi-api/marketplace.js';
 import { handleServers, handleServerGet, handleServerDelete, handleServerAction, handleCreateServer, handleFlavors, handleNodes, handleNodeGet, handleNodeAction, handleImages, handleCreateImage, handleUploadImage, handleUpdateImage, handleDeleteImage, handleServerInterfaces, handleServerVolumes } from './vhi-api/compute.js';
@@ -15,6 +15,11 @@ export async function handleVhiApi(req, res) {
   const m = req.method || 'GET';
   const url = req.url || '';
   const p = url.split('?')[0].replace(/\/$/, '');
+
+  if (!verifyWebPassword(req)) {
+    json(res, 401, { error: 'Unauthorized: Invalid or missing web password' });
+    return true;
+  }
 
   if (m === 'POST' && p === '/api/vhi/auth') {
     await handleAuth(req, res);

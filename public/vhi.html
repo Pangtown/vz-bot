@@ -2660,7 +2660,12 @@ function filterRows(rows, query) {
 // ── session headers ───────────────────────────────────────────────────────
 
 function authHeaders() {
-  if (!session) return {};
+  const webPw = localStorage.getItem('webPassword') || '';
+  const baseHeaders = {
+    'Content-Type': 'application/json',
+    ...(webPw ? { 'X-Web-Password': webPw } : {}),
+  };
+  if (!session) return baseHeaders;
   
   // Use cluster-scoped SSH config if available
   let sshConfig = {};
@@ -2670,7 +2675,7 @@ function authHeaders() {
   } catch(e) {}
 
   return {
-    'Content-Type': 'application/json',
+    ...baseHeaders,
     'X-VHI-Base-URL':    session.baseUrl,
     'X-VHI-User':        session.username,
     'X-VHI-Password':    session.password,
@@ -4281,7 +4286,7 @@ async function openGlobalSshModal() {
   let config = {};
   // 1. Try server-side first
   try {
-    const res = await fetch('/api/vhi/settings/ssh');
+    const res = await fetch('/api/vhi/settings/ssh', { headers: authHeaders() });
     if (res.ok) config = await res.json();
   } catch (e) { console.warn('Failed to fetch server-side SSH settings', e); }
 
@@ -4293,22 +4298,33 @@ async function openGlobalSshModal() {
     }
   }
 
+  window._serverSshConfig = config;
+  const pwInput = document.getElementById('nodeSshPassword');
+  const keyInput = document.getElementById('nodeSshKey');
+  const passPhraseInput = document.getElementById('nodeSshPassphrase');
+
   if (config.host || config.username) {
     document.getElementById('nodeSshHost').value = config.host || '';
     document.getElementById('nodeSshUser').value = config.username || 'root';
     const method = config.authMethod === 'cluster' ? 'password' : (config.authMethod || 'password');
     document.getElementById('nodeSshAuthMethod').value = method;
-    document.getElementById('nodeSshPassword').value = config.password || '';
-    document.getElementById('nodeSshKey').value = config.privateKey || '';
-    document.getElementById('nodeSshPassphrase').value = config.passphrase || '';
+    pwInput.value = config.password || '';
+    pwInput.placeholder = config.hasPassword ? '•••••••• (configured on server)' : 'Password';
+    keyInput.value = config.privateKey || '';
+    keyInput.placeholder = config.hasPrivateKey ? '[Private Key Configured on Server]' : 'Paste OpenSSH / RSA Private Key (PEM format)';
+    passPhraseInput.value = config.passphrase || '';
+    passPhraseInput.placeholder = config.hasPassphrase ? '•••••••• (passphrase configured)' : 'Optional Passphrase';
   } else {
     // defaults
     document.getElementById('nodeSshHost').value = '';
     document.getElementById('nodeSshUser').value = 'root';
     document.getElementById('nodeSshAuthMethod').value = 'password';
-    document.getElementById('nodeSshPassword').value = '';
-    document.getElementById('nodeSshKey').value = '';
-    document.getElementById('nodeSshPassphrase').value = '';
+    pwInput.value = '';
+    pwInput.placeholder = 'Password';
+    keyInput.value = '';
+    keyInput.placeholder = 'Paste OpenSSH / RSA Private Key (PEM format)';
+    passPhraseInput.value = '';
+    passPhraseInput.placeholder = 'Optional Passphrase';
   }
   
   toggleSshAuthFields();
@@ -4473,13 +4489,21 @@ function buildSshCreds(config, fallbackHost) {
 
 async function saveNodeSsh() {
   if (!currentSshNode) return;
+  const serverCfg = window._serverSshConfig || {};
+  const enteredPw = document.getElementById('nodeSshPassword').value;
+  const enteredKey = document.getElementById('nodeSshKey').value;
+  const enteredPassphrase = document.getElementById('nodeSshPassphrase').value;
+
   const config = {
     host: getSshHostValue(),
     username: document.getElementById('nodeSshUser').value.trim(),
     authMethod: document.getElementById('nodeSshAuthMethod').value,
-    password: document.getElementById('nodeSshPassword').value,
-    privateKey: document.getElementById('nodeSshKey').value,
-    passphrase: document.getElementById('nodeSshPassphrase').value
+    password: enteredPw,
+    hasPassword: !!serverCfg.hasPassword && !enteredPw,
+    privateKey: enteredKey,
+    hasPrivateKey: !!serverCfg.hasPrivateKey && !enteredKey,
+    passphrase: enteredPassphrase,
+    hasPassphrase: !!serverCfg.hasPassphrase && !enteredPassphrase
   };
   
   if (isGlobalSsh) {
@@ -4487,7 +4511,7 @@ async function saveNodeSsh() {
     try {
       await fetch('/api/vhi/settings/ssh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       });
     } catch (e) {
@@ -5173,7 +5197,7 @@ async function loadNetworks() {
   document.getElementById('netBody').innerHTML = skeletonRows(5);
   try {
     const data = await apiGet('/api/vhi/networks');
-    _nets = data.networks || [];
+    _nets = (data.networks || []).filter(n => !(n.name || '').toLowerCase().startsWith('ha network'));
     _subnets = data.subnets || [];
     renderNetworks('');
     hookSearch('netSearch', renderNetworks);
@@ -5194,8 +5218,10 @@ function renderNetworks(query) {
     const subs = _subnets
       .filter(s => (n.subnets || []).includes(s.id))
       .map(s => s.cidr).join(', ') || '–';
+    const isSystem = n.name === 'lb-mgmt-net' || (n.tags && n.tags.includes('system'));
+    const sysBadge = isSystem ? '<span class="badge" style="background:rgba(255,255,255,0.12); color:var(--text-dim); font-size:0.68rem; margin-left:0.35rem; padding:0.1rem 0.35rem; border-radius:3px;">System</span>' : '';
     return `<tr>
-      <td><strong>${n.name || '–'}</strong><br><span class="mono">${n.id?.slice(0,8)}…</span></td>
+      <td><strong>${n.name || '–'}</strong>${sysBadge}<br><span class="mono">${n.id?.slice(0,8)}…</span></td>
       <td>${statusBadge(n.status)}</td>
       <td>${n['router:external'] ? '<span class="badge badge-active">External</span>' : '–'}</td>
       <td>${n.admin_state_up ? '<span class="badge badge-active">Up</span>' : '<span class="badge badge-error">Down</span>'}</td>

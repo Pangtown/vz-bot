@@ -1,6 +1,6 @@
 {
   "https://172.16.218.7": {
-    "host": "172.16.218.7",
+    "host": "",
     "username": "root",
     "password": "",
     "authMethod": "password"
