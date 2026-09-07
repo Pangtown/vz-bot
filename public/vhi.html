@@ -1587,26 +1587,144 @@
           <h2>Networks</h2>
           <span class="panel-badge" id="netCount">Loading…</span>
           <div class="panel-actions">
+            <button class="act-btn act-start" id="btnCreateNet" style="padding:.4rem .9rem; margin-right:.5rem;" onclick="openCreateNetModal()">
+              <span class="ri">+</span> Create
+            </button>
             <button class="tbl-refresh" id="netRefresh"><span class="ri">↻</span> Refresh</button>
           </div>
         </div>
-        <div class="table-card">
-          <div class="table-toolbar">
-            <input type="search" class="search-input" id="netSearch" placeholder="Search networks…">
+        <div class="sub-tabs" id="netSubTabs">
+          <div class="sub-tab active" data-nettab="networks">Networks</div>
+          <div class="sub-tab" data-nettab="sgs">Security Groups</div>
+          <div class="sub-tab" data-nettab="fips">Floating IPs</div>
+          <div class="sub-tab" data-nettab="routers">Routers</div>
+          <div class="sub-tab" data-nettab="ports">Ports</div>
+        </div>
+        <div class="tab-content-panel active" id="tab-net-networks">
+          <div class="table-card">
+            <div class="table-toolbar">
+              <input type="search" class="search-input" id="netSearch" placeholder="Search networks…">
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>External</th>
+                  <th>Admin State</th>
+                  <th>Subnets</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="netBody">
+                <tr class="skeleton-row"><td colspan="6"><div class="skeleton"></div></td></tr>
+              </tbody>
+            </table>
           </div>
+        </div>
+        <div class="tab-content-panel" id="tab-net-sgs">
+          <div class="table-card">
+            <div class="table-toolbar" style="display:flex; justify-content:space-between; gap:1rem;">
+              <input type="search" class="search-input" id="sgSearch" placeholder="Search security groups…">
+              <button class="act-btn act-start" style="padding:.4rem .9rem;" onclick="openCreateSgModal()">+ Create</button>
+            </div>
+            <table>
+              <thead><tr><th>Name</th><th>Description</th><th>Rules</th><th style="text-align:right;">Actions</th></tr></thead>
+              <tbody id="sgBody"><tr class="skeleton-row"><td colspan="4"><div class="skeleton"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-content-panel" id="tab-net-fips">
+          <div class="table-card">
+            <div class="table-toolbar" style="display:flex; justify-content:space-between; gap:1rem;">
+              <input type="search" class="search-input" id="fipSearch" placeholder="Search floating IPs…">
+              <button class="act-btn act-start" style="padding:.4rem .9rem;" onclick="openCreateFipModal()">+ Allocate</button>
+            </div>
+            <table>
+              <thead><tr><th>IP address</th><th>Status</th><th>Network</th><th>Assigned to</th><th style="text-align:right;">Actions</th></tr></thead>
+              <tbody id="fipBody"><tr class="skeleton-row"><td colspan="5"><div class="skeleton"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-content-panel" id="tab-net-routers">
+          <div class="table-card">
+            <div class="table-toolbar" style="display:flex; justify-content:space-between; gap:1rem;">
+              <input type="search" class="search-input" id="rtrSearch" placeholder="Search routers…">
+              <button class="act-btn act-start" style="padding:.4rem .9rem;" onclick="openCreateRouterModal()">+ Add router</button>
+            </div>
+            <table>
+              <thead><tr><th>Name</th><th>Status</th><th>External network</th><th>SNAT</th><th style="text-align:right;">Actions</th></tr></thead>
+              <tbody id="rtrBody"><tr class="skeleton-row"><td colspan="5"><div class="skeleton"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-content-panel" id="tab-net-ports">
+          <div class="table-card">
+            <div class="table-toolbar">
+              <input type="search" class="search-input" id="portSearch" placeholder="Search ports…">
+            </div>
+            <table>
+              <thead><tr><th>ID</th><th>Status</th><th>MAC</th><th>IP address</th><th>Device owner</th></tr></thead>
+              <tbody id="portBody"><tr class="skeleton-row"><td colspan="5"><div class="skeleton"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── FLAVORS ── -->
+      <div class="panel" id="panel-flavors">
+        <div class="panel-header">
+          <h2>Flavors</h2>
+          <span class="panel-badge" id="flavorCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="act-btn act-start" style="padding:.4rem .9rem; margin-right:.5rem;" onclick="openCreateFlavorModal()">+ Create</button>
+            <button class="tbl-refresh" id="flavorRefresh" onclick="loadFlavors(true)"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar"><input type="search" class="search-input" id="flavorSearch" placeholder="Search flavors…"></div>
           <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>External</th>
-                <th>Admin State</th>
-                <th>Subnets</th>
-              </tr>
-            </thead>
-            <tbody id="netBody">
-              <tr class="skeleton-row"><td colspan="5"><div class="skeleton"></div></td></tr>
-            </tbody>
+            <thead><tr><th>Name</th><th>vCPU</th><th>RAM</th><th>Disk</th><th>Public</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="flavorBody"><tr class="skeleton-row"><td colspan="6"><div class="skeleton"></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── SSH KEYS ── -->
+      <div class="panel" id="panel-sshkeys">
+        <div class="panel-header">
+          <h2>SSH Keys</h2>
+          <span class="panel-badge" id="keypairCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="act-btn act-start" style="padding:.4rem .9rem; margin-right:.5rem;" onclick="openCreateKeypairModal()">+ Create</button>
+            <button class="tbl-refresh" id="kpRefresh" onclick="loadKeypairs()"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar"><input type="search" class="search-input" id="kpSearch" placeholder="Search keys…"></div>
+          <table>
+            <thead><tr><th>Name</th><th>Fingerprint</th><th>Type</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="kpBody"><tr class="skeleton-row"><td colspan="4"><div class="skeleton"></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── SCHEDULER ── -->
+      <div class="panel" id="panel-scheduler">
+        <div class="panel-header">
+          <h2>Scheduler</h2>
+          <span class="panel-badge" id="jobCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="act-btn act-start" style="padding:.4rem .9rem; margin-right:.5rem;" onclick="openCreateJobModal()">+ New job</button>
+            <button class="tbl-refresh" id="jobRefresh" onclick="loadJobs()"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <p style="color:var(--text-dim); font-size:.85rem; margin:-.6rem 0 1rem;">Run start/stop/reboot or volume snapshots on a cron, interval, or one-shot schedule. Jobs use the cluster credentials from this session and keep running while vz-bot is up. Ask the AI assistant to create jobs by name.</p>
+        <div class="table-card">
+          <div class="table-toolbar"><input type="search" class="search-input" id="jobSearch" placeholder="Search jobs…"></div>
+          <table>
+            <thead><tr><th>Name</th><th>Action</th><th>Target</th><th>Schedule</th><th>Last run</th><th>Enabled</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="jobBody"><tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr></tbody>
           </table>
         </div>
       </div>
