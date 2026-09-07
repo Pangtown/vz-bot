@@ -83,7 +83,6 @@ export async function handleVhiApi(req, res) {
       const volumeAttachMatch = p.match(/^\/api\/vhi\/servers\/([^/]+)\/volumes(?:\/([^/]+))?$/);
       if (volumeAttachMatch) { await handleServerVolumes(req, res, ctx, volumeAttachMatch[1], volumeAttachMatch[2]); return true; }
 
-      if (m === 'GET' && p === '/api/vhi/flavors') { await handleFlavors(req, res, ctx); return true; }
       if (m === 'GET' && p === '/api/vhi/nodes') { await handleNodes(req, res, ctx); return true; }
 
       const nodeGetMatch = p.match(/^\/api\/vhi\/nodes\/([^/]+)$/);

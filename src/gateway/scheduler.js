@@ -9,7 +9,7 @@ import * as billingMeter from '../monitoring/billing-meter.js';
 import * as billingStorage from '../monitoring/billing-storage.js';
 import { runAuditPoll } from '../monitoring/audit-poller.js';
 import { runAlertPoll } from '../monitoring/alert-poller.js';
-import { getLastValidContext } from './context.js';
+import { tickDueJobs } from './jobs.js';
 
 let healthJob = null;
 let lastHealthResult = null;
@@ -102,6 +102,15 @@ export function start(config = {}) {
     }, 15000);
     console.log(`Scheduler: audit & alert poll every 5 min`);
   }
+
+  cron.schedule('* * * * *', async () => {
+    try {
+      await tickDueJobs();
+    } catch (e) {
+      console.error('User job tick error:', e.message);
+    }
+  });
+  console.log('Scheduler: user jobs tick every minute');
 }
 
 /**

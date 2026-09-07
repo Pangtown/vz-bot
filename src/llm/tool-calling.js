@@ -182,16 +182,68 @@ export function getToolDefinitions() {
     },
     {
       name: 'create_network',
-      description: 'Create a new network in VHI.',
+      description: 'Create a new network in VHI. Optionally include cidr to also create a subnet.',
       input_schema: {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'Name of the network' },
+          cidr: { type: 'string', description: 'Optional subnet CIDR, e.g. 192.168.10.0/24' },
           admin_state_up: { type: 'boolean', description: 'Whether admin state is up', default: true },
           shared: { type: 'boolean', description: 'Whether the network is shared across projects', default: false },
           external: { type: 'boolean', description: 'Whether this is an external/public network', default: false }
         },
         required: ['name']
+      }
+    },
+    {
+      name: 'delete_network',
+      description: 'Delete a network by Name or ID.',
+      input_schema: {
+        type: 'object',
+        properties: { network_id: { type: 'string', description: 'Network Name or ID' } },
+        required: ['network_id']
+      }
+    },
+    {
+      name: 'list_subnets',
+      description: 'List subnets, optionally filtered by network.',
+      input_schema: {
+        type: 'object',
+        properties: { network_id: { type: 'string', description: 'Optional network Name or ID' } }
+      }
+    },
+    {
+      name: 'create_subnet',
+      description: 'Create a subnet on a network.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          network_id: { type: 'string', description: 'Network Name or ID' },
+          cidr: { type: 'string', description: 'CIDR e.g. 10.0.0.0/24' },
+          name: { type: 'string' }
+        },
+        required: ['network_id', 'cidr']
+      }
+    },
+    {
+      name: 'list_scheduled_jobs',
+      description: 'List scheduled automation jobs (start/stop/reboot VM or snapshot a volume).',
+      input_schema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'create_scheduled_job',
+      description: 'Create a scheduled job on the current cluster. Actions: start_vm, stop_vm, reboot_vm, snapshot_volume.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          action: { type: 'string', enum: ['start_vm', 'stop_vm', 'reboot_vm', 'snapshot_volume'] },
+          targetId: { type: 'string', description: 'VM or volume Name or ID' },
+          target_name: { type: 'string' },
+          cron: { type: 'string', description: '5-field cron, e.g. 0 2 * * *' },
+          minutes: { type: 'number', description: 'Interval in minutes if not using cron' }
+        },
+        required: ['name', 'action', 'targetId']
       }
     },
     {
