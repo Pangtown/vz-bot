@@ -133,6 +133,10 @@ export async function createServer(options = {}) {
     payload.config_drive = true;
   }
 
+  if (options.key_name) {
+    payload.key_name = options.key_name;
+  }
+
   // Default to Boot from Volume (block_device_mapping_v2) if an image or volume specs are provided
   // to avoid MaxRetriesExceeded scheduling errors on compute nodes without ephemeral storage.
   if (volumeSize || volumeType || imageRef) {
@@ -226,6 +230,76 @@ export async function listFlavors() {
   }
   const data = await res.json();
   return data.flavors || [];
+}
+
+export async function createFlavor(options = {}) {
+  const client = await getClient();
+  const payload = {
+    name: options.name,
+    ram: Number(options.ram),
+    vcpus: Number(options.vcpus),
+    disk: Number(options.disk) || 0,
+    'os-flavor-access:is_public': options.is_public !== false,
+  };
+  const res = await client.fetch(await computeUrl('/flavors'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ flavor: payload }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute createFlavor failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.flavor || null;
+}
+
+export async function deleteFlavor(flavorId) {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl(`/flavors/${flavorId}`), { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text();
+    throw new Error(`VHI Compute deleteFlavor failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
+export async function listKeypairs() {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl('/os-keypairs'));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute listKeypairs failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return (data.keypairs || []).map((k) => k.keypair || k);
+}
+
+export async function createKeypair(options = {}) {
+  const client = await getClient();
+  const body = { name: options.name };
+  if (options.public_key) body.public_key = options.public_key;
+  const res = await client.fetch(await computeUrl('/os-keypairs'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keypair: body }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute createKeypair failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.keypair || null;
+}
+
+export async function deleteKeypair(name) {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl(`/os-keypairs/${encodeURIComponent(name)}`), { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text();
+    throw new Error(`VHI Compute deleteKeypair failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
 }
 
 export async function listHypervisors() {

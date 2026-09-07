@@ -1,5 +1,5 @@
 import { runWithContext } from '../context.js';
-import { listServers, getServer, serverAction, startServer, stopServer, rebootServer, deleteServer, createServer, listFlavors, getRemoteConsole } from '../../vhi/compute.js';
+import { listServers, getServer, serverAction, startServer, stopServer, rebootServer, deleteServer, createServer, listFlavors, createFlavor, deleteFlavor, listKeypairs, createKeypair, deleteKeypair, getRemoteConsole } from '../../vhi/compute.js';
 import { listImages, createImage, uploadImageData, updateImageVisibility, deleteImage } from '../../vhi/image.js';
 import { listPorts, listNetworks, updatePort } from '../../vhi/network.js';
 import { listInterfaces, attachInterface, detachInterface, getHypervisor } from '../../vhi/compute.js';
@@ -82,10 +82,52 @@ export async function handleCreateServer(req, res, ctx) {
 
 export async function handleFlavors(req, res, ctx) {
   try {
+    if ((req.method || 'GET') === 'POST') {
+      const body = await readBody(req);
+      if (!body.name || !body.ram || !body.vcpus) {
+        return json(res, 400, { error: 'name, ram, and vcpus are required' });
+      }
+      const flavor = await runWithContext(ctx, () => createFlavor(body));
+      return json(res, 200, { flavor });
+    }
     const flavors = await runWithContext(ctx, () => listFlavors());
     return json(res, 200, { flavors });
   } catch (err) {
     logger.error(`handleFlavors error: ${err.message}`, { error: err.message });
+    return json(res, 502, { error: err.message });
+  }
+}
+
+export async function handleFlavorDelete(req, res, ctx, id) {
+  try {
+    await runWithContext(ctx, () => deleteFlavor(id));
+    return json(res, 200, { ok: true });
+  } catch (err) {
+    logger.error(`handleFlavorDelete error: ${err.message}`);
+    return json(res, 502, { error: err.message });
+  }
+}
+
+export async function handleKeypairs(req, res, ctx, name) {
+  try {
+    const m = req.method || 'GET';
+    if (m === 'GET') {
+      const keypairs = await runWithContext(ctx, () => listKeypairs());
+      return json(res, 200, { keypairs });
+    }
+    if (m === 'POST') {
+      const body = await readBody(req);
+      if (!body.name) return json(res, 400, { error: 'name is required' });
+      const keypair = await runWithContext(ctx, () => createKeypair(body));
+      return json(res, 200, { keypair });
+    }
+    if (m === 'DELETE' && name) {
+      await runWithContext(ctx, () => deleteKeypair(decodeURIComponent(name)));
+      return json(res, 200, { ok: true });
+    }
+    return json(res, 405, { error: 'Method not allowed' });
+  } catch (err) {
+    logger.error(`handleKeypairs error: ${err.message}`);
     return json(res, 502, { error: err.message });
   }
 }

@@ -1,11 +1,12 @@
 import { extractContext, json, verifyWebPassword } from './vhi-api/helpers.js';
 import { handleAuth } from './vhi-api/auth.js';
 import { handleMarketplaceScripts } from './vhi-api/marketplace.js';
-import { handleServers, handleServerGet, handleServerDelete, handleServerAction, handleCreateServer, handleFlavors, handleNodes, handleNodeGet, handleNodeAction, handleImages, handleCreateImage, handleUploadImage, handleUpdateImage, handleDeleteImage, handleServerInterfaces, handleServerVolumes } from './vhi-api/compute.js';
-import { handleNetworks, handleSecurityGroups, handlePortGet } from './vhi-api/network.js';
+import { handleServers, handleServerGet, handleServerDelete, handleServerAction, handleCreateServer, handleFlavors, handleFlavorDelete, handleKeypairs, handleNodes, handleNodeGet, handleNodeAction, handleImages, handleCreateImage, handleUploadImage, handleUpdateImage, handleDeleteImage, handleServerInterfaces, handleServerVolumes } from './vhi-api/compute.js';
+import { handleNetworks, handleNetworkDelete, handleSubnetCreate, handleSubnetDelete, handleSecurityGroups, handleSecurityGroupDelete, handleSecurityGroupRule, handleSecurityGroupRuleDelete, handleFloatingIPs, handleRouters, handleRouterInterface, handlePorts, handlePortGet, handlePortUpdate } from './vhi-api/network.js';
 import { handleVolumeTypes, handleVolumes, handleVolumeGet, handleVolumeUpdate, handleVolumeDelete, handleVolumeExtend, handleVolumeRetype, handleSnapshots, handleSnapshotAction } from './vhi-api/block.js';
 import { handleProjects, handleUsers } from './vhi-api/identity.js';
 import { handleHealthStatus, handleBillingStatus, handleBillingRefresh, handleBillingExport, handleAuditLogs, handleAuditRefresh, handleGetSshSettings, handlePostSshSettings } from './vhi-api/monitoring.js';
+import { handleJobs, handleJobRun } from './vhi-api/jobs.js';
 import { searchAlerts } from '../monitoring/alert-storage.js';
 import { runAlertPoll } from '../monitoring/alert-poller.js';
 import { loadGlobalSshConfig } from '../monitoring/ssh-storage.js';
@@ -91,11 +92,49 @@ export async function handleVhiApi(req, res) {
       const nodeActionMatch = p.match(/^\/api\/vhi\/nodes\/([^/]+)\/action$/);
       if (m === 'POST' && nodeActionMatch) { await handleNodeAction(req, res, ctx, nodeActionMatch[1]); return true; }
 
-      if (m === 'GET' && p === '/api/vhi/networks') { await handleNetworks(req, res, ctx); return true; }
-      if (m === 'GET' && p === '/api/vhi/security-groups') { await handleSecurityGroups(req, res, ctx); return true; }
-      
+      if (p === '/api/vhi/networks') { await handleNetworks(req, res, ctx); return true; }
+      const netDel = p.match(/^\/api\/vhi\/networks\/([^/]+)$/);
+      if (m === 'DELETE' && netDel) { await handleNetworkDelete(req, res, ctx, netDel[1]); return true; }
+      if (m === 'POST' && p === '/api/vhi/subnets') { await handleSubnetCreate(req, res, ctx); return true; }
+      const subDel = p.match(/^\/api\/vhi\/subnets\/([^/]+)$/);
+      if (m === 'DELETE' && subDel) { await handleSubnetDelete(req, res, ctx, subDel[1]); return true; }
+
+      if (p === '/api/vhi/security-groups') { await handleSecurityGroups(req, res, ctx); return true; }
+      const sgDel = p.match(/^\/api\/vhi\/security-groups\/([^/]+)$/);
+      if (m === 'DELETE' && sgDel) { await handleSecurityGroupDelete(req, res, ctx, sgDel[1]); return true; }
+      const sgRule = p.match(/^\/api\/vhi\/security-groups\/([^/]+)\/rules$/);
+      if (m === 'POST' && sgRule) { await handleSecurityGroupRule(req, res, ctx, sgRule[1]); return true; }
+      const sgRuleDel = p.match(/^\/api\/vhi\/security-group-rules\/([^/]+)$/);
+      if (m === 'DELETE' && sgRuleDel) { await handleSecurityGroupRuleDelete(req, res, ctx, sgRuleDel[1]); return true; }
+
+      if (p === '/api/vhi/floating-ips') { await handleFloatingIPs(req, res, ctx); return true; }
+      const fipMatch = p.match(/^\/api\/vhi\/floating-ips\/([^/]+)$/);
+      if (fipMatch) { await handleFloatingIPs(req, res, ctx, fipMatch[1]); return true; }
+
+      if (p === '/api/vhi/routers') { await handleRouters(req, res, ctx); return true; }
+      const rtrMatch = p.match(/^\/api\/vhi\/routers\/([^/]+)$/);
+      if (rtrMatch && (m === 'DELETE' || m === 'GET')) { await handleRouters(req, res, ctx, rtrMatch[1]); return true; }
+      const rtrIf = p.match(/^\/api\/vhi\/routers\/([^/]+)\/(add|remove)-interface$/);
+      if (m === 'POST' && rtrIf) { await handleRouterInterface(req, res, ctx, rtrIf[1], rtrIf[2]); return true; }
+
+      if (m === 'GET' && p === '/api/vhi/ports') { await handlePorts(req, res, ctx); return true; }
       const portMatch = p.match(/^\/api\/vhi\/ports\/([^/]+)$/);
       if (m === 'GET' && portMatch) { await handlePortGet(req, res, ctx, portMatch[1]); return true; }
+      if (m === 'PATCH' && portMatch) { await handlePortUpdate(req, res, ctx, portMatch[1]); return true; }
+
+      if (p === '/api/vhi/flavors') { await handleFlavors(req, res, ctx); return true; }
+      const flvDel = p.match(/^\/api\/vhi\/flavors\/([^/]+)$/);
+      if (m === 'DELETE' && flvDel) { await handleFlavorDelete(req, res, ctx, flvDel[1]); return true; }
+
+      if (p === '/api/vhi/keypairs') { await handleKeypairs(req, res, ctx); return true; }
+      const kpDel = p.match(/^\/api\/vhi\/keypairs\/([^/]+)$/);
+      if (m === 'DELETE' && kpDel) { await handleKeypairs(req, res, ctx, kpDel[1]); return true; }
+
+      if (p === '/api/vhi/jobs') { await handleJobs(req, res, ctx); return true; }
+      const jobRun = p.match(/^\/api\/vhi\/jobs\/([^/]+)\/run$/);
+      if (m === 'POST' && jobRun) { await handleJobRun(req, res, ctx, jobRun[1]); return true; }
+      const jobMatch = p.match(/^\/api\/vhi\/jobs\/([^/]+)$/);
+      if (jobMatch) { await handleJobs(req, res, ctx, jobMatch[1]); return true; }
 
       if (p === '/api/vhi/volumes') { await handleVolumes(req, res, ctx); return true; }
       if (p === '/api/vhi/volume-types') { await handleVolumeTypes(req, res, ctx); return true; }
