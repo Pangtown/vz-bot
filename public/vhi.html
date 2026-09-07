@@ -3091,8 +3091,9 @@ async function doLogin() {
     const clusterHost = host.replace(/https?:\/\//, '').split(/[:/]/)[0];
     document.getElementById('loginOverlay').classList.add('hidden');
     document.getElementById('appShell').classList.add('visible');
-    document.getElementById('clusterName').textContent = clusterHost;
     document.getElementById('clusterDot').style.background = 'var(--success)';
+    rememberClusterInSwitcher();
+    refreshClusterSwitcher();
 
     loadAll();
   } catch (err) {
@@ -3181,6 +3182,10 @@ document.querySelectorAll('.nav-item').forEach(item => {
       panelChatMsgs.scrollTop = panelChatMsgs.scrollHeight;
       setTimeout(() => panelChatInput.focus(), 50);
     }
+    if (item.dataset.panel === 'networks') { loadNetworks(); loadSecurityGroups(); loadFloatingIPs(); loadRouters(); loadPortsList(); }
+    if (item.dataset.panel === 'flavors') loadFlavors(true);
+    if (item.dataset.panel === 'sshkeys') loadKeypairs();
+    if (item.dataset.panel === 'scheduler') loadJobs();
   });
 });
 
@@ -3194,7 +3199,9 @@ function setRefreshing(btnId, on) {
 document.getElementById('vmRefresh').addEventListener('click', loadVMs);
 document.getElementById('nodeRefresh').addEventListener('click', loadNodes);
 document.getElementById('volRefresh').addEventListener('click', () => { loadVolumes(); loadSnapshots(); });
-document.getElementById('netRefresh').addEventListener('click', loadNetworks);
+document.getElementById('netRefresh').addEventListener('click', () => {
+  loadNetworks(); loadSecurityGroups(); loadFloatingIPs(); loadRouters(); loadPortsList();
+});
 document.getElementById('imgRefresh').addEventListener('click', loadImages);
 document.getElementById('auditRefresh').addEventListener('click', () => { triggerAuditRefresh(); });
 
@@ -3236,6 +3243,11 @@ function loadAll() {
   loadProjects();
   loadUsers();
   loadSecurityGroups();
+  loadFloatingIPs();
+  loadRouters();
+  loadPortsList();
+  loadKeypairs();
+  loadJobs();
   loadHealthStatus();
   loadBillingStatus();
   loadAuditLogs();
@@ -3333,12 +3345,30 @@ async function loadVolumeTypes() {
   } catch(e) { console.error('Failed to load volume types:', e); }
 }
 
-async function loadFlavors() {
+async function loadFlavors(render) {
   try {
     const data = await apiGet('/api/vhi/flavors');
     _flavors = data.flavors || [];
     _flavors.sort((a,b) => a.vcpus - b.vcpus || a.ram - b.ram);
+    if (render) renderFlavors('');
   } catch(e) { console.error('Failed to load flavors:', e); }
+}
+
+function renderFlavors(query) {
+  const tbody = document.getElementById('flavorBody');
+  if (!tbody) return;
+  const rows = _flavors.map(f => `<tr>
+    <td><strong>${esc(f.name)}</strong></td>
+    <td>${f.vcpus}</td>
+    <td>${f.ram} MiB</td>
+    <td>${f.disk} GiB</td>
+    <td>${f['os-flavor-access:is_public'] !== false ? '<span class="badge badge-active">Public</span>' : 'Private'}</td>
+    <td style="text-align:right;"><button class="act-btn act-danger" onclick="deleteFlavorRow('${f.id}', this)">Delete</button></td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('📐', 'No flavors found');
+  const c = document.getElementById('flavorCount');
+  if (c) c.textContent = `${_flavors.length} flavors`;
 }
 
 // ── CREATE VM MODAL ───────────────────────────────────────────────────────
@@ -3365,6 +3395,11 @@ function openVmModal() {
   
   vmMNetwork.innerHTML = '<option value="">Select Network...</option>' + 
     _nets.map(n => `<option value="${n.id}">${n.name || n.id}</option>`).join('');
+  const kpSel = document.getElementById('newVmKeypair');
+  if (kpSel) {
+    kpSel.innerHTML = '<option value="">None</option>' +
+      (_keypairs || []).map(k => `<option value="${esc(k.name)}">${esc(k.name)}</option>`).join('');
+  }
   
   vmMDiskSize.value = 60;
   
