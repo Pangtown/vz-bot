@@ -372,13 +372,19 @@
       padding: .9rem 1.2rem;
       border-top: 1px solid #333;
       display: flex; align-items: center; gap: .6rem;
-      font-size: .8rem; color: #888; cursor: default;
+      font-size: .8rem; color: #888;
     }
     .sidebar-footer .cluster-dot {
       width: 8px; height: 8px; border-radius: 50%;
       background: var(--success); flex-shrink: 0;
     }
     .sidebar-footer .cluster-name { color: #ccc; font-weight: 500; }
+    .cluster-switcher {
+      flex: 1; min-width: 0;
+      background: transparent; border: 1px solid #444;
+      color: #ccc; font-size: .75rem; font-weight: 500;
+      border-radius: 4px; padding: .25rem .4rem;
+    }
     .sidebar-divider {
       border: none; border-top: 1px solid #333;
       margin: .4rem 0;
@@ -793,6 +799,7 @@
       font-size: 0.75rem;
       color: var(--text-dim);
       margin: 0;
+    }
     /* ── Migrations & Clouds Styles ───────────────────────── */
     .sub-tabs {
       display: flex;
@@ -1136,6 +1143,10 @@
         <span class="nav-icon">🤖</span>
         <span class="nav-label">AI Assistant</span>
       </div>
+      <div class="nav-item" data-panel="scheduler">
+        <span class="nav-icon">⏱</span>
+        <span class="nav-label">Scheduler</span>
+      </div>
 
       <!-- Compute -->
       <div class="sidebar-section">Compute</div>
@@ -1143,6 +1154,14 @@
         <span class="nav-icon">🖥</span>
         <span class="nav-label">Virtual Machines</span>
         <span class="nav-badge" id="vmBadge">–</span>
+      </div>
+      <div class="nav-item" data-panel="flavors">
+        <span class="nav-icon">📐</span>
+        <span class="nav-label">Flavors</span>
+      </div>
+      <div class="nav-item" data-panel="sshkeys">
+        <span class="nav-icon">🔑</span>
+        <span class="nav-label">SSH Keys</span>
       </div>
       <div class="nav-item" data-panel="nodes">
         <span class="nav-icon">📦</span>
@@ -1191,7 +1210,9 @@
       <!-- Cluster footer -->
       <div class="sidebar-footer">
         <div class="cluster-dot" id="clusterDot"></div>
-        <span class="cluster-name" id="clusterName">Not connected</span>
+        <select class="cluster-switcher" id="clusterSwitcher" title="Switch cluster">
+          <option value="">Not connected</option>
+        </select>
       </div>
     </nav>
 
