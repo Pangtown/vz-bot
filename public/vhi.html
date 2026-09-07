@@ -225,6 +225,41 @@
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(227,0,15,.2);
     }
+    .form-group input[type="date"],
+    .form-group input[type="time"] {
+      color-scheme: dark;
+      min-height: 42px;
+    }
+    .dt-row {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: .75rem;
+    }
+    .dt-quick {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      margin-top: .6rem;
+    }
+    .dt-quick button {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: #ccc;
+      border-radius: 6px;
+      padding: .32rem .65rem;
+      font: inherit;
+      font-size: .75rem;
+      cursor: pointer;
+    }
+    .dt-quick button:hover {
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .dt-preview {
+      margin-top: .55rem;
+      font-size: .8rem;
+      color: var(--text-dim);
+    }
 
     .advanced-toggle {
       background: none; border: none; cursor: pointer;
@@ -828,6 +863,61 @@
       color: var(--text);
       border-bottom-color: var(--accent);
     }
+    .view-hidden { display: none !important; }
+    .domain-back {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-dim); font: inherit; font-size: .85rem;
+      margin-bottom: .75rem; padding: 0;
+    }
+    .domain-back:hover { color: var(--accent); }
+    .settings-kv {
+      display: grid; grid-template-columns: 160px 1fr; gap: .65rem 1rem;
+      max-width: 640px;
+    }
+    .settings-kv .form-group { margin-bottom: 0; }
+    .crumb-sep { color: var(--text-muted); margin: 0 .45rem; font-weight: 400; }
+    .tag-system {
+      display: inline-block; margin-left: .4rem; padding: .1rem .4rem;
+      border-radius: 4px; font-size: .68rem; font-weight: 700;
+      background: rgba(52, 152, 219, .16); color: #5dade2;
+      border: 1px solid rgba(52, 152, 219, .32); letter-spacing: .15px;
+      vertical-align: middle;
+    }
+    .state-cell { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #27ae60; flex-shrink: 0; }
+    .status-dot.off { background: #888; }
+    .name-cell { display: flex; align-items: center; gap: .45rem; }
+    .name-cell .row-ico { opacity: .75; font-size: .95rem; }
+    .url-clip { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+    tbody tr.selected { background: var(--bg-medium); }
+    .dom-settings-layout { display: grid; grid-template-columns: 210px 1fr; gap: 1.25rem; min-height: 280px; }
+    .dom-settings-nav { display: flex; flex-direction: column; gap: 2px; padding-top: .15rem; }
+    .dom-settings-nav button {
+      background: none; border: none; text-align: left; color: var(--text-dim);
+      padding: .5rem .75rem; border-radius: 4px; cursor: pointer;
+      font: inherit; font-size: .88rem;
+    }
+    .dom-settings-nav button:hover { background: var(--bg-light); color: var(--text); }
+    .dom-settings-nav button.active { background: var(--bg-light); color: var(--text); font-weight: 600; }
+    .dom-set-pane { display: none; }
+    .dom-set-pane.active { display: block; }
+    .idp-box {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1rem 1.15rem; background: var(--bg-card);
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    }
+    .idp-box h4 { font-size: .95rem; font-weight: 600; margin: 0; }
+    .drawer-actions { display: flex; flex-wrap: wrap; gap: .45rem; margin-bottom: 1.1rem; }
+    .drawer-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.1rem; }
+    .drawer-tab {
+      padding: .55rem .9rem; cursor: pointer; color: var(--text-dim);
+      font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+      border-bottom: 3px solid transparent;
+    }
+    .drawer-tab:hover { color: var(--text); }
+    .drawer-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+    .drawer-pane { display: none; }
+    .drawer-pane.active { display: block; }
     .tab-content-panel {
       display: none;
     }
@@ -1197,15 +1287,10 @@
 
       <!-- Settings -->
       <div class="sidebar-section">Settings</div>
-      <div class="nav-item" data-panel="projects">
-        <span class="nav-icon">🏢</span>
-        <span class="nav-label">Projects</span>
-        <span class="nav-badge" id="projBadge">–</span>
-      </div>
-      <div class="nav-item" data-panel="users">
-        <span class="nav-icon">👥</span>
-        <span class="nav-label">Users</span>
-        <span class="nav-badge" id="userBadge">–</span>
+      <div class="nav-item" data-panel="domains">
+        <span class="nav-icon">🏛</span>
+        <span class="nav-label">Projects and users</span>
+        <span class="nav-badge" id="domainBadge">–</span>
       </div>
       <!-- Cluster footer -->
       <div class="sidebar-footer">
@@ -1525,61 +1610,179 @@
         </div>
       </div>
 
-      <!-- ── PROJECTS ── -->
-      <div class="panel" id="panel-projects">
-        <div class="panel-header">
-          <h2>Projects</h2>
-          <span class="panel-badge" id="projCount">Loading…</span>
-          <div class="panel-actions">
-            <button class="tbl-refresh" id="projRefresh"><span class="ri">↻</span> Refresh</button>
+      <!-- ── PROJECTS AND USERS (domains) ── -->
+      <div class="panel" id="panel-domains">
+        <div id="domainListView">
+          <div class="panel-header">
+            <h2>Projects and users</h2>
+            <span class="panel-badge" id="domainCount">Loading…</span>
+            <div class="panel-actions">
+              <button class="act-btn act-start" style="padding:.4rem .9rem; margin-right:.5rem;" onclick="openCreateDomainModal()">
+                <span class="ri">+</span> Create domain
+              </button>
+              <button class="tbl-refresh" id="domainRefresh"><span class="ri">↻</span> Refresh</button>
+            </div>
+          </div>
+          <div class="table-card">
+            <div class="table-toolbar">
+              <input type="search" class="search-input" id="domainSearch" placeholder="Search domains…">
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Domain name</th>
+                  <th>State</th>
+                  <th>Description</th>
+                  <th>Branding</th>
+                  <th>Domain URL</th>
+                </tr>
+              </thead>
+              <tbody id="domainBody">
+                <tr class="skeleton-row"><td colspan="5"><div class="skeleton"></div></td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
-        <div class="table-card">
-          <div class="table-toolbar">
-            <input type="search" class="search-input" id="projSearch" placeholder="Search projects…">
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>ID</th>
-                <th>Enabled</th>
-                <th>Domain ID</th>
-              </tr>
-            </thead>
-            <tbody id="projBody">
-              <tr class="skeleton-row"><td colspan="4"><div class="skeleton"></div></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
 
-      <!-- ── USERS ── -->
-      <div class="panel" id="panel-users">
-        <div class="panel-header">
-          <h2>Users</h2>
-          <span class="panel-badge" id="userCount">Loading…</span>
-          <div class="panel-actions">
-            <button class="tbl-refresh" id="userRefresh"><span class="ri">↻</span> Refresh</button>
+        <div id="domainDetailView" class="view-hidden">
+          <div class="panel-header">
+            <h2 style="display:flex; align-items:center; font-weight:600;">
+              <button type="button" class="domain-back" style="margin:0;" onclick="closeDomainDetail()">Projects and users</button>
+              <span class="crumb-sep">›</span>
+              <span id="domainDetailTitle">Domain</span>
+            </h2>
+            <span class="panel-badge" id="domainDetailBadge">–</span>
+            <div class="panel-actions">
+              <button class="tbl-refresh" id="domainDetailRefresh"><span class="ri">↻</span> Refresh</button>
+            </div>
           </div>
-        </div>
-        <div class="table-card">
-          <div class="table-toolbar">
-            <input type="search" class="search-input" id="userSearch" placeholder="Search users…">
+          <div class="sub-tabs" id="domainSubTabs">
+            <div class="sub-tab active" data-domtab="users">Domain users</div>
+            <div class="sub-tab" data-domtab="groups">Domain groups</div>
+            <div class="sub-tab" data-domtab="projects">Projects</div>
+            <div class="sub-tab" data-domtab="settings">Settings</div>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Enabled</th>
-                <th>ID</th>
-                <th>Domain ID</th>
-              </tr>
-            </thead>
-            <tbody id="userBody">
-              <tr class="skeleton-row"><td colspan="4"><div class="skeleton"></div></td></tr>
-            </tbody>
-          </table>
+          <div class="tab-content-panel active" id="tab-dom-users">
+            <div class="table-card">
+              <div class="table-toolbar" style="display:flex; justify-content:space-between; gap:1rem;">
+                <input type="search" class="search-input" id="userSearch" placeholder="Search users…">
+                <button class="act-btn act-start" style="padding:.4rem .9rem;" onclick="openCreateUserModal()">+ Create user</button>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Login</th>
+                    <th>State</th>
+                    <th>Type</th>
+                    <th>Email</th>
+                    <th>Description</th>
+                    <th>Role</th>
+                  </tr>
+                </thead>
+                <tbody id="userBody">
+                  <tr class="skeleton-row"><td colspan="6"><div class="skeleton"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tab-content-panel" id="tab-dom-groups">
+            <div class="table-card">
+              <div class="table-toolbar" style="display:flex; justify-content:space-between; gap:1rem;">
+                <input type="search" class="search-input" id="groupSearch" placeholder="Search groups…">
+                <button class="act-btn act-start" style="padding:.4rem .9rem;" onclick="openCreateGroupModal()">+ Create group</button>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>ID</th>
+                  </tr>
+                </thead>
+                <tbody id="groupBody">
+                  <tr class="skeleton-row"><td colspan="3"><div class="skeleton"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tab-content-panel" id="tab-dom-projects">
+            <div class="table-card">
+              <div class="table-toolbar">
+                <input type="search" class="search-input" id="projSearch" placeholder="Search projects…">
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                  </tr>
+                </thead>
+                <tbody id="projBody">
+                  <tr class="skeleton-row"><td colspan="1"><div class="skeleton"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tab-content-panel" id="tab-dom-settings">
+            <div class="table-card" style="padding:1.25rem 1.4rem;">
+              <div class="dom-settings-layout">
+                <nav class="dom-settings-nav" id="domSettingsNav">
+                  <button type="button" class="active" data-domset="idp">Identity provider</button>
+                  <button type="button" data-domset="branding">Branding theme</button>
+                  <button type="button" data-domset="tfa">Two-factor authentication</button>
+                  <button type="button" data-domset="hotplug">CPU and RAM hot plug</button>
+                  <button type="button" data-domset="s3">S3 access</button>
+                  <button type="button" data-domset="backup">Compute backup service</button>
+                  <button type="button" data-domset="general">General</button>
+                </nav>
+                <div>
+                  <div class="dom-set-pane active" id="domset-idp">
+                    <p class="text-dim" style="margin-bottom:1rem; line-height:1.45;">Connection to the identity provider is made through the OpenID Connect protocol.</p>
+                    <div class="idp-box">
+                      <h4>Identity provider</h4>
+                      <button class="act-btn act-start" style="padding:.4rem .9rem;" onclick="openIdpModal()">+ Add</button>
+                    </div>
+                  </div>
+                  <div class="dom-set-pane" id="domset-branding">
+                    <p class="text-dim" style="margin-bottom:.8rem;">Self-service portal theme for this domain.</p>
+                    <div class="settings-kv">
+                      <div class="form-group"><label>Theme</label></div>
+                      <div class="form-group"><input type="text" id="domBrandTheme" readonly></div>
+                    </div>
+                  </div>
+                  <div class="dom-set-pane" id="domset-tfa">
+                    <p class="text-dim">Two-factor authentication for domain users is configured on the cluster identity service. Enforce 2FA in the original VHI panel if your license includes it.</p>
+                  </div>
+                  <div class="dom-set-pane" id="domset-hotplug">
+                    <p class="text-dim">CPU and RAM hot plug lets running virtual machines add vCPU and memory without a reboot, when the guest OS supports it.</p>
+                  </div>
+                  <div class="dom-set-pane" id="domset-s3">
+                    <p class="text-dim">S3 access for this domain is managed under Storage services on the cluster. Domain users receive keys from that service, not from identity.</p>
+                  </div>
+                  <div class="dom-set-pane" id="domset-backup">
+                    <p class="text-dim">Compute backup for this domain is provided by the cluster backup service. Enable it in Compute backup settings on the VHI cluster.</p>
+                  </div>
+                  <div class="dom-set-pane" id="domset-general">
+                    <div class="settings-kv">
+                      <div class="form-group"><label>Name</label></div>
+                      <div class="form-group"><input type="text" id="domSetName" readonly></div>
+                      <div class="form-group"><label>ID</label></div>
+                      <div class="form-group"><input type="text" id="domSetId" readonly class="mono"></div>
+                      <div class="form-group"><label>Enabled</label></div>
+                      <div class="form-group" style="display:flex; align-items:center;">
+                        <input type="checkbox" id="domSetEnabled" style="width:auto; margin-right:.5rem;">
+                        <span class="text-dim" style="font-size:.85rem;">Domain can authenticate users and own projects</span>
+                      </div>
+                      <div class="form-group"><label>Description</label></div>
+                      <div class="form-group"><input type="text" id="domSetDesc" placeholder="Optional description"></div>
+                    </div>
+                    <div style="margin-top:1.2rem;">
+                      <button class="btn btn-primary" style="width:auto; padding:.55rem 1.1rem;" onclick="saveDomainSettings()">Save settings</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2212,11 +2415,98 @@
       </div>
       <div class="form-group" id="jobCronWrap"><label>Cron (min hour day month weekday)</label><input type="text" id="newJobCron" value="0 2 * * *"></div>
       <div class="form-group hidden" id="jobIntervalWrap"><label>Minutes</label><input type="number" id="newJobMinutes" value="60" min="1"></div>
-      <div class="form-group hidden" id="jobOnceWrap"><label>When</label><input type="datetime-local" id="newJobAt"></div>
+      <div class="form-group hidden" id="jobOnceWrap">
+        <label>When</label>
+        <div class="dt-row">
+          <div>
+            <label for="newJobDate" style="text-transform:none; letter-spacing:0; font-weight:500;">Date</label>
+            <input type="date" id="newJobDate" onchange="updateJobOncePreview()">
+          </div>
+          <div>
+            <label for="newJobTime" style="text-transform:none; letter-spacing:0; font-weight:500;">Time</label>
+            <input type="time" id="newJobTime" step="60" onchange="updateJobOncePreview()">
+          </div>
+        </div>
+        <div class="dt-quick">
+          <button type="button" onclick="setJobOncePreset('15m')">In 15 min</button>
+          <button type="button" onclick="setJobOncePreset('1h')">In 1 hour</button>
+          <button type="button" onclick="setJobOncePreset('tomorrow9')">Tomorrow 9:00</button>
+          <button type="button" onclick="setJobOncePreset('2am')">Next 2:00 AM</button>
+        </div>
+        <div class="dt-preview" id="jobOncePreview">Pick a date and time, or use a shortcut.</div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('createJobModal')">Cancel</button>
       <button class="btn btn-primary" onclick="submitCreateJob()">Create job</button>
+    </div>
+  </div>
+</div>
+
+<div id="createDomainModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 480px;">
+    <div class="modal-header"><h3>Create domain</h3><button class="modal-close" onclick="closeModal('createDomainModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Domain name</label><input type="text" id="newDomainName" placeholder="Demo"></div>
+      <div class="form-group"><label>Description</label><input type="text" id="newDomainDesc" placeholder="Optional"></div>
+      <div class="form-group" style="display:flex; align-items:center; gap:.5rem;">
+        <input type="checkbox" id="newDomainEnabled" checked style="width:auto;">
+        <label for="newDomainEnabled" style="margin:0; text-transform:none; letter-spacing:0;">Enabled</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createDomainModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateDomain()">Create domain</button>
+    </div>
+  </div>
+</div>
+
+<div id="createUserModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 480px;">
+    <div class="modal-header"><h3>Create user</h3><button class="modal-close" onclick="closeModal('createUserModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Login</label><input type="text" id="newUserName" placeholder="jsmith"></div>
+      <div class="form-group"><label>Password</label><input type="password" id="newUserPassword" autocomplete="new-password"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="newUserEmail" placeholder="Optional"></div>
+      <div class="form-group"><label>Description</label><input type="text" id="newUserDesc" placeholder="Optional"></div>
+      <div class="form-group"><label>Role</label>
+        <select id="newUserRole">
+          <option value="">No role assignment</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createUserModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateUser()">Create user</button>
+    </div>
+  </div>
+</div>
+
+<div id="createGroupModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 480px;">
+    <div class="modal-header"><h3>Create group</h3><button class="modal-close" onclick="closeModal('createGroupModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Name</label><input type="text" id="newGroupName" placeholder="operators"></div>
+      <div class="form-group"><label>Description</label><input type="text" id="newGroupDesc" placeholder="Optional"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createGroupModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateGroup()">Create group</button>
+    </div>
+  </div>
+</div>
+
+<div id="idpModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 520px;">
+    <div class="modal-header"><h3>Add identity provider</h3><button class="modal-close" onclick="closeModal('idpModal')">✕</button></div>
+    <div class="modal-body">
+      <p class="text-dim" style="margin-bottom:1rem; line-height:1.45;">OpenID Connect federation is configured on the VHI cluster, not through Keystone’s domain API. Record the issuer here for reference; this console does not write the IdP.</p>
+      <div class="form-group"><label>Issuer URL</label><input type="text" id="idpIssuer" placeholder="https://idp.example.com"></div>
+      <div class="form-group"><label>Client ID</label><input type="text" id="idpClientId"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('idpModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitIdpNote()">Save note</button>
     </div>
   </div>
 </div>
@@ -2846,6 +3136,41 @@
   </div>
 </div>
 
+<div id="projectDrawer" class="info-drawer">
+  <div class="drawer-header">
+    <div>
+      <h2 id="projDetName" style="font-size:1.25rem; font-weight:700;">Project</h2>
+    </div>
+    <button class="chat-close" onclick="closeProjectDrawer()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-actions">
+      <button class="act-btn" onclick="editProjectFromDrawer()">Edit</button>
+      <button class="act-btn" onclick="manageProjectUsers()">Manage users</button>
+      <button class="act-btn" onclick="showProjectDrawerTab('quotas')">Edit quotas</button>
+      <button class="act-btn" id="projDisableBtn" onclick="toggleProjectEnabled()">Disable</button>
+      <button class="act-btn" onclick="deleteProjectFromDrawer()">Delete</button>
+    </div>
+    <div class="drawer-tabs">
+      <div class="drawer-tab active" data-projtab="properties" onclick="showProjectDrawerTab('properties')">Properties</div>
+      <div class="drawer-tab" data-projtab="users" onclick="showProjectDrawerTab('users')" id="projUsersTab">Users (0)</div>
+      <div class="drawer-tab" data-projtab="quotas" onclick="showProjectDrawerTab('quotas')">Quotas</div>
+    </div>
+    <div class="drawer-pane active" id="projpane-properties">
+      <div class="detail-grid" id="projDetProps"></div>
+    </div>
+    <div class="drawer-pane" id="projpane-users">
+      <div id="projDetUsers"></div>
+    </div>
+    <div class="drawer-pane" id="projpane-quotas">
+      <p class="text-dim">Project compute and storage quotas are not wired in this console yet. Use Edit quotas on the VHI cluster panel to change limits.</p>
+    </div>
+  </div>
+  <div class="modal-footer" style="padding: 1rem 1.5rem; background: var(--bg-sidebar);">
+    <button class="btn btn-secondary" onclick="closeProjectDrawer()">Close</button>
+  </div>
+</div>
+
 <!-- ═══════════════ JAVASCRIPT ═══════════════ -->
 <script>
 'use strict';
@@ -3211,6 +3536,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
     if (item.dataset.panel === 'flavors') loadFlavors(true);
     if (item.dataset.panel === 'sshkeys') loadKeypairs();
     if (item.dataset.panel === 'scheduler') loadJobs();
+    if (item.dataset.panel === 'domains') { closeProjectDrawer(); closeDomainDetail(); loadDomains(); }
   });
 });
 
@@ -3244,6 +3570,10 @@ function hookSearch(inputId, renderFn) {
 // ── DATA STORES ───────────────────────────────────────────────────────────
 let _vms = [], _nodes = [], _vols = [], _nets = [], _subnets = [], _imgs = [], _flavors = [], _volTypes = [], _projs = [], _users = [], _sgs = [];
 let _keypairs = [], _fips = [], _routers = [], _ports = [], _jobs = [];
+let _domains = [], _groups = [];
+let _activeDomain = null;
+let _domainProjects = [], _domainUsers = [], _roleAssignments = [];
+let _selectedProject = null;
 
 // ── LOAD ALL ──────────────────────────────────────────────────────────────
 
@@ -3269,6 +3599,7 @@ function loadAll() {
   loadVolumeTypes();
   loadProjects();
   loadUsers();
+  loadDomains();
   loadSecurityGroups();
   loadFloatingIPs();
   loadRouters();
@@ -5062,36 +5393,14 @@ async function loadVolumes() {
     const currentLabel = host + (session?.project ? ' · ' + session.project : '');
 
     const data = await apiGet('/api/vhi/volumes');
-    _vols = (data.volumes || []).map(v => ({
-      ...v,
-      _clusterId: currentId,
-      _clusterLabel: currentLabel,
-    }));
-
-    const otherClusters = (typeof readSavedClusters === 'function' ? readSavedClusters() : [])
-      .filter(c => c && c.password && c.baseUrl && c.id !== currentId);
-    if (otherClusters.length) {
-      const extras = await Promise.all(otherClusters.map(async (c) => {
-        try {
-          const extra = await apiGetForCluster('/api/vhi/volumes', c);
-          const extraHost = String(c.baseUrl || '').replace(/https?:\/\//, '').split(/[:/]/)[0];
-          const label = extraHost + (c.project ? ' · ' + c.project : '');
-          return (extra.volumes || []).map(v => ({ ...v, _clusterId: c.id, _clusterLabel: label }));
-        } catch (err) {
-          console.warn('Volumes fetch failed for', c.baseUrl, err.message);
-          return [];
-        }
+    const hiddenStatus = new Set(['deleted', 'error_deleting']);
+    _vols = (data.volumes || [])
+      .filter(v => !hiddenStatus.has(String(v.status || '').toLowerCase()))
+      .map(v => ({
+        ...v,
+        _clusterId: currentId,
+        _clusterLabel: currentLabel,
       }));
-      const seen = new Set(_vols.map(v => (v._clusterId || '') + ':' + v.id));
-      for (const list of extras) {
-        for (const v of list) {
-          const key = (v._clusterId || '') + ':' + v.id;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          _vols.push(v);
-        }
-      }
-    }
 
     renderVolumes('');
     hookSearch('volSearch', renderVolumes);
@@ -6044,6 +6353,55 @@ function syncJobScheduleFields() {
   document.getElementById('jobCronWrap').classList.toggle('hidden', kind !== 'cron');
   document.getElementById('jobIntervalWrap').classList.toggle('hidden', kind !== 'interval');
   document.getElementById('jobOnceWrap').classList.toggle('hidden', kind !== 'once');
+  if (kind === 'once') {
+    const dateEl = document.getElementById('newJobDate');
+    const timeEl = document.getElementById('newJobTime');
+    if (!dateEl.value || !timeEl.value) setJobOncePreset('15m');
+    else updateJobOncePreview();
+  }
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+function fillJobOnceFromDate(d) {
+  document.getElementById('newJobDate').value = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  document.getElementById('newJobTime').value = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const dateInput = document.getElementById('newJobDate');
+  const today = new Date();
+  dateInput.min = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
+  updateJobOncePreview();
+}
+function getJobOnceDate() {
+  const date = document.getElementById('newJobDate')?.value;
+  const time = document.getElementById('newJobTime')?.value;
+  if (!date || !time) return null;
+  const d = new Date(`${date}T${time}`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+function updateJobOncePreview() {
+  const el = document.getElementById('jobOncePreview');
+  if (!el) return;
+  const d = getJobOnceDate();
+  if (!d) {
+    el.textContent = 'Pick a date and time, or use a shortcut.';
+    return;
+  }
+  const local = d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  el.textContent = d.getTime() < Date.now()
+    ? `That time is in the past (${local}). Choose a future time.`
+    : `Runs at ${local} (local time).`;
+}
+function setJobOncePreset(kind) {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  if (kind === '15m') d.setMinutes(d.getMinutes() + 15);
+  else if (kind === '1h') d.setHours(d.getHours() + 1);
+  else if (kind === 'tomorrow9') {
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0);
+  } else if (kind === '2am') {
+    d.setHours(2, 0, 0, 0);
+    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+  }
+  fillJobOnceFromDate(d);
 }
 function fillJobTargets() {
   const action = document.getElementById('newJobAction').value;
@@ -6078,9 +6436,10 @@ async function submitCreateJob() {
   if (kind === 'cron') schedule.expr = document.getElementById('newJobCron').value.trim();
   if (kind === 'interval') schedule.minutes = Number(document.getElementById('newJobMinutes').value) || 60;
   if (kind === 'once') {
-    const at = document.getElementById('newJobAt').value;
-    if (!at) return toast('Pick a date and time', 'warn');
-    schedule.at = new Date(at).toISOString();
+    const d = getJobOnceDate();
+    if (!d) return toast('Pick a date and time', 'warn');
+    if (d.getTime() < Date.now() - 30000) return toast('Choose a future date and time', 'warn');
+    schedule.at = d.toISOString();
   }
   try {
     await apiPost('/api/vhi/jobs', { name, action, targetId, targetName, schedule });
@@ -6225,6 +6584,8 @@ window.deleteKeypairRow = deleteKeypairRow;
 window.openCreateJobModal = openCreateJobModal;
 window.submitCreateJob = submitCreateJob;
 window.syncJobScheduleFields = syncJobScheduleFields;
+window.setJobOncePreset = setJobOncePreset;
+window.updateJobOncePreview = updateJobOncePreview;
 window.runJobNow = runJobNow;
 window.toggleJob = toggleJob;
 window.deleteJobRow = deleteJobRow;
@@ -6396,78 +6757,518 @@ document.getElementById('submitUploadImgBtn').addEventListener('click', async ()
   }
 });
 
-// ── PROJECTS ──────────────────────────────────────────────────────────────
+// ── DOMAINS / IDENTITY ────────────────────────────────────────────────────
+
+function domainNameById(id) {
+  if (!id) return '–';
+  const d = (_domains || []).find(x => x.id === id);
+  if (d) return d.name || id;
+  if (id === 'default') return 'Default';
+  return id.slice(0, 8) + '…';
+}
+
+function isSystemDomain(d) {
+  const name = (d && d.name || '').toLowerCase();
+  return name === 'default' || (d && d.id === 'default');
+}
+
+const HIDDEN_SERVICE_DOMAINS = new Set(['heat', 'magnum']);
+
+function isHiddenServiceDomain(d) {
+  return HIDDEN_SERVICE_DOMAINS.has((d && d.name || '').toLowerCase());
+}
+
+function domainBranding(d) {
+  return isSystemDomain(d) ? 'Default' : 'Personal';
+}
+
+function domainLoginUrl() {
+  const raw = (session && session.baseUrl) || localStorage.getItem('vhiBaseUrl') || '';
+  const host = String(raw).replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+  return host ? 'https://' + host + ':8800/login' : '–';
+}
+
+function enabledState(on) {
+  return '<span class="state-cell"><span class="status-dot' + (on ? '' : ' off') + '"></span>' + (on ? 'Enabled' : 'Disabled') + '</span>';
+}
+
+function assignmentLabel(a) {
+  const n = ((a && a.role && a.role.name) || '').toLowerCase();
+  if (a && a.scope && a.scope.domain) {
+    if (n.includes('admin')) return 'Domain administrator';
+    return (a.role && a.role.name) || 'Domain role';
+  }
+  if (n.includes('member')) return 'Project member';
+  if (n.includes('admin')) return 'Project administrator';
+  return (a && a.role && a.role.name) || '—';
+}
+
+function rolesForUser(userId) {
+  const names = [];
+  for (const a of _roleAssignments || []) {
+    if (!(a.user && a.user.id === userId)) continue;
+    names.push(assignmentLabel(a));
+  }
+  return [...new Set(names)].join(', ') || '—';
+}
+
+function userType(u) {
+  if (u && (u.federated || u.idp_id || (u.extra && u.extra.idp_id))) return 'Federated';
+  return 'Local';
+}
+
+function fmtWhen(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString();
+}
+
+function activateDomainTab(name) {
+  document.querySelectorAll('#domainSubTabs .sub-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.domtab === name);
+  });
+  document.querySelectorAll('#panel-domains .tab-content-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('tab-dom-' + name);
+  if (panel) panel.classList.add('active');
+}
+
+function fillDomainSettingsForm(domain) {
+  if (!domain) return;
+  const nameEl = document.getElementById('domSetName');
+  const idEl = document.getElementById('domSetId');
+  const enEl = document.getElementById('domSetEnabled');
+  const descEl = document.getElementById('domSetDesc');
+  const brandEl = document.getElementById('domBrandTheme');
+  if (nameEl) nameEl.value = domain.name || '';
+  if (idEl) idEl.value = domain.id || '';
+  if (enEl) enEl.checked = domain.enabled !== false;
+  if (descEl) descEl.value = domain.description || '';
+  if (brandEl) brandEl.value = domainBranding(domain);
+}
+
+async function loadDomains() {
+  setRefreshing('domainRefresh', true);
+  const tbody = document.getElementById('domainBody');
+  if (tbody) tbody.innerHTML = skeletonRows(5);
+  try {
+    const data = await apiGet('/api/vhi/domains');
+    _domains = (data.domains || []).filter(d => !isHiddenServiceDomain(d));
+    renderDomains('');
+    hookSearch('domainSearch', renderDomains);
+    const badge = document.getElementById('domainBadge');
+    const count = document.getElementById('domainCount');
+    if (badge) badge.textContent = _domains.length;
+    if (count) count.textContent = `${_domains.length} domains`;
+  } catch (err) {
+    if (tbody) tbody.innerHTML = emptyState('⚠️', 'Could not load domains: ' + err.message);
+    toast('Projects and users: ' + err.message, 'err');
+  } finally {
+    setRefreshing('domainRefresh', false);
+  }
+}
+
+function renderDomains(query) {
+  const tbody = document.getElementById('domainBody');
+  if (!tbody) return;
+  const loginUrl = domainLoginUrl();
+  const rows = (_domains || []).map(d => {
+    const sys = isSystemDomain(d) ? '<span class="tag-system">System</span>' : '';
+    const desc = d.description ? escapeHtml(d.description) : 'N/A';
+    return `<tr onclick="openDomainDetail('${d.id}')" style="cursor:pointer;">
+      <td><div class="name-cell"><span class="row-ico">🌐</span><strong>${escapeHtml(d.name || '–')}</strong>${sys}</div></td>
+      <td>${enabledState(d.enabled !== false)}</td>
+      <td class="text-dim">${desc}</td>
+      <td>${escapeHtml(domainBranding(d))}</td>
+      <td class="text-dim"><span class="url-clip" title="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</span></td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🏛', 'No domains found');
+}
+
+function closeDomainDetail() {
+  _activeDomain = null;
+  closeProjectDrawer();
+  const detail = document.getElementById('domainDetailView');
+  const list = document.getElementById('domainListView');
+  if (detail) detail.classList.add('view-hidden');
+  if (list) list.classList.remove('view-hidden');
+}
+
+async function openDomainDetail(id) {
+  const domain = (_domains || []).find(d => d.id === id);
+  _activeDomain = domain || { id };
+  document.getElementById('domainListView').classList.add('view-hidden');
+  document.getElementById('domainDetailView').classList.remove('view-hidden');
+  document.getElementById('domainDetailTitle').textContent = _activeDomain.name || id;
+  document.getElementById('domainDetailBadge').textContent = _activeDomain.enabled !== false ? 'Enabled' : 'Disabled';
+  fillDomainSettingsForm(_activeDomain);
+  activateDomainTab('users');
+  await loadDomainResources();
+}
+
+async function loadDomainResources() {
+  if (!_activeDomain) return;
+  const id = _activeDomain.id;
+  setRefreshing('domainDetailRefresh', true);
+  try {
+    const [proj, users, groups, detail, roles] = await Promise.all([
+      apiGet('/api/vhi/projects?domain_id=' + encodeURIComponent(id)),
+      apiGet('/api/vhi/users?domain_id=' + encodeURIComponent(id)),
+      apiGet('/api/vhi/groups?domain_id=' + encodeURIComponent(id)).catch(() => ({ groups: [] })),
+      apiGet('/api/vhi/domains/' + encodeURIComponent(id)).catch(() => null),
+      apiGet('/api/vhi/role-assignments?domain_id=' + encodeURIComponent(id) + '&include_projects=1').catch(() => ({ role_assignments: [] })),
+    ]);
+    if (detail && detail.domain) {
+      _activeDomain = detail.domain;
+      document.getElementById('domainDetailTitle').textContent = _activeDomain.name || id;
+      document.getElementById('domainDetailBadge').textContent = _activeDomain.enabled !== false ? 'Enabled' : 'Disabled';
+      fillDomainSettingsForm(_activeDomain);
+    }
+    _domainProjects = proj.projects || [];
+    _domainUsers = users.users || [];
+    _groups = groups.groups || [];
+    _roleAssignments = roles.role_assignments || [];
+    renderDomainProjects('');
+    renderDomainUsers('');
+    renderDomainGroups('');
+    hookSearch('projSearch', renderDomainProjects);
+    hookSearch('userSearch', renderDomainUsers);
+    hookSearch('groupSearch', renderDomainGroups);
+    if (_selectedProject) {
+      const fresh = _domainProjects.find(p => p.id === _selectedProject.id);
+      if (fresh) fillProjectDrawer(fresh);
+    }
+  } catch (err) {
+    toast('Could not load domain: ' + err.message, 'err');
+  } finally {
+    setRefreshing('domainDetailRefresh', false);
+  }
+}
+
+function renderDomainProjects(query) {
+  const tbody = document.getElementById('projBody');
+  if (!tbody) return;
+  const sel = _selectedProject && _selectedProject.id;
+  const rows = (_domainProjects || []).map(p => `<tr class="${p.id === sel ? 'selected' : ''}" onclick="openProjectDrawer('${p.id}')" style="cursor:pointer;">
+    <td><div class="name-cell"><span class="row-ico">💼</span><strong>${escapeHtml(p.name || '–')}</strong></div></td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🏢', 'No projects in this domain');
+}
+
+function renderDomainUsers(query) {
+  const tbody = document.getElementById('userBody');
+  if (!tbody) return;
+  const rows = (_domainUsers || []).map(u => `<tr>
+    <td><div class="name-cell"><span class="row-ico">👤</span><strong>${escapeHtml(u.name || '–')}</strong></div></td>
+    <td>${enabledState(u.enabled !== false)}</td>
+    <td>${escapeHtml(userType(u))}</td>
+    <td class="text-dim">${escapeHtml(u.email || '—')}</td>
+    <td class="text-dim">${escapeHtml(u.description || '—')}</td>
+    <td>${escapeHtml(rolesForUser(u.id))}</td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('👥', 'No users in this domain');
+}
+
+function renderDomainGroups(query) {
+  const tbody = document.getElementById('groupBody');
+  if (!tbody) return;
+  const rows = (_groups || []).map(g => `<tr>
+    <td><strong>${escapeHtml(g.name || '–')}</strong></td>
+    <td class="text-dim">${escapeHtml(g.description || '—')}</td>
+    <td class="mono text-dim">${escapeHtml(g.id)}</td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('👤', 'No groups in this domain');
+}
+
+async function saveDomainSettings() {
+  if (!_activeDomain) return;
+  try {
+    await apiPatch('/api/vhi/domains/' + encodeURIComponent(_activeDomain.id), {
+      enabled: document.getElementById('domSetEnabled').checked,
+      description: document.getElementById('domSetDesc').value.trim(),
+    });
+    toast('Domain settings saved', 'ok');
+    await loadDomains();
+    await loadDomainResources();
+  } catch (err) {
+    toast('Save failed: ' + err.message, 'err');
+  }
+}
+
+function openCreateDomainModal() {
+  document.getElementById('newDomainName').value = '';
+  document.getElementById('newDomainDesc').value = '';
+  document.getElementById('newDomainEnabled').checked = true;
+  openModal('createDomainModal');
+}
+
+async function submitCreateDomain() {
+  const name = document.getElementById('newDomainName').value.trim();
+  if (!name) { toast('Domain name is required', 'err'); return; }
+  try {
+    await apiPost('/api/vhi/domains', {
+      name,
+      description: document.getElementById('newDomainDesc').value.trim(),
+      enabled: document.getElementById('newDomainEnabled').checked,
+    });
+    closeModal('createDomainModal');
+    toast('Domain created', 'ok');
+    await loadDomains();
+  } catch (err) {
+    toast('Create domain failed: ' + err.message, 'err');
+  }
+}
+
+async function openCreateUserModal() {
+  if (!_activeDomain) return;
+  document.getElementById('newUserName').value = '';
+  document.getElementById('newUserPassword').value = '';
+  document.getElementById('newUserEmail').value = '';
+  document.getElementById('newUserDesc').value = '';
+  const sel = document.getElementById('newUserRole');
+  sel.innerHTML = '<option value="">No role assignment</option>';
+  try {
+    const data = await apiGet('/api/vhi/roles');
+    (data.roles || []).forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.id;
+      opt.textContent = r.name;
+      sel.appendChild(opt);
+    });
+  } catch (_) { /* roles list is optional */ }
+  openModal('createUserModal');
+}
+
+async function submitCreateUser() {
+  if (!_activeDomain) return;
+  const name = document.getElementById('newUserName').value.trim();
+  const password = document.getElementById('newUserPassword').value;
+  if (!name) { toast('Login is required', 'err'); return; }
+  if (!password) { toast('Password is required', 'err'); return; }
+  try {
+    const res = await apiPost('/api/vhi/users', {
+      name,
+      password,
+      email: document.getElementById('newUserEmail').value.trim(),
+      description: document.getElementById('newUserDesc').value.trim(),
+      domain_id: _activeDomain.id,
+      role_id: document.getElementById('newUserRole').value || undefined,
+    });
+    closeModal('createUserModal');
+    if (res.role_error) toast('User created, but role was not assigned: ' + res.role_error, 'err');
+    else toast('User created', 'ok');
+    await loadDomainResources();
+  } catch (err) {
+    toast('Create user failed: ' + err.message, 'err');
+  }
+}
+
+function openCreateGroupModal() {
+  if (!_activeDomain) return;
+  document.getElementById('newGroupName').value = '';
+  document.getElementById('newGroupDesc').value = '';
+  openModal('createGroupModal');
+}
+
+async function submitCreateGroup() {
+  if (!_activeDomain) return;
+  const name = document.getElementById('newGroupName').value.trim();
+  if (!name) { toast('Group name is required', 'err'); return; }
+  try {
+    await apiPost('/api/vhi/groups', {
+      name,
+      description: document.getElementById('newGroupDesc').value.trim(),
+      domain_id: _activeDomain.id,
+    });
+    closeModal('createGroupModal');
+    toast('Group created', 'ok');
+    await loadDomainResources();
+  } catch (err) {
+    toast('Create group failed: ' + err.message, 'err');
+  }
+}
+
+function openIdpModal() {
+  document.getElementById('idpIssuer').value = '';
+  document.getElementById('idpClientId').value = '';
+  openModal('idpModal');
+}
+
+function submitIdpNote() {
+  closeModal('idpModal');
+  toast('OpenID Connect IdP is configured on the VHI cluster; this console cannot write federation yet', 'ok');
+}
+
+function projectUsersFor(projectId) {
+  const seen = new Set();
+  const out = [];
+  for (const a of _roleAssignments || []) {
+    if (!(a.scope && a.scope.project && a.scope.project.id === projectId)) continue;
+    const uid = a.user && a.user.id;
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    const u = (_domainUsers || []).find(x => x.id === uid);
+    out.push({
+      id: uid,
+      name: (a.user && a.user.name) || (u && u.name) || uid,
+      role: assignmentLabel(a),
+    });
+  }
+  return out;
+}
+
+function fillProjectDrawer(p) {
+  _selectedProject = p;
+  document.getElementById('projDetName').textContent = p.name || 'Project';
+  const disableBtn = document.getElementById('projDisableBtn');
+  if (disableBtn) disableBtn.textContent = p.enabled === false ? 'Enable' : 'Disable';
+  const users = projectUsersFor(p.id);
+  const tab = document.getElementById('projUsersTab');
+  if (tab) tab.textContent = 'Users (' + users.length + ')';
+  document.getElementById('projDetProps').innerHTML =
+    '<div class="detail-label">Name</div><div class="detail-val">' + escapeHtml(p.name || '–') + '</div>' +
+    '<div class="detail-label">Description</div><div class="detail-val">' + escapeHtml(p.description || '—') + '</div>' +
+    '<div class="detail-label">State</div><div class="detail-val">' + enabledState(p.enabled !== false) + '</div>' +
+    '<div class="detail-label">ID</div><div class="detail-val mono">' + escapeHtml(p.id) + '</div>' +
+    '<div class="detail-label">Creation time</div><div class="detail-val">' + escapeHtml(fmtWhen(p.created_at)) + '</div>';
+  document.getElementById('projDetUsers').innerHTML = users.length
+    ? '<table><thead><tr><th>Login</th><th>Role</th></tr></thead><tbody>' +
+      users.map(u => '<tr><td>' + escapeHtml(u.name) + '</td><td>' + escapeHtml(u.role) + '</td></tr>').join('') +
+      '</tbody></table>'
+    : '<p class="text-dim">No users assigned to this project.</p>';
+}
+
+function openProjectDrawer(id) {
+  const p = (_domainProjects || []).find(x => x.id === id);
+  if (!p) return;
+  fillProjectDrawer(p);
+  showProjectDrawerTab('properties');
+  document.getElementById('projectDrawer').classList.add('open');
+  renderDomainProjects(document.getElementById('projSearch')?.value || '');
+}
+
+function closeProjectDrawer() {
+  _selectedProject = null;
+  const drawer = document.getElementById('projectDrawer');
+  if (drawer) drawer.classList.remove('open');
+  const tbody = document.getElementById('projBody');
+  if (tbody) tbody.querySelectorAll('tr.selected').forEach(tr => tr.classList.remove('selected'));
+}
+
+function showProjectDrawerTab(name) {
+  document.querySelectorAll('#projectDrawer .drawer-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.projtab === name);
+  });
+  document.querySelectorAll('#projectDrawer .drawer-pane').forEach(p => p.classList.remove('active'));
+  const pane = document.getElementById('projpane-' + name);
+  if (pane) pane.classList.add('active');
+}
+
+async function editProjectFromDrawer() {
+  if (!_selectedProject) return;
+  const next = prompt('Project description', _selectedProject.description || '');
+  if (next === null) return;
+  try {
+    await apiPatch('/api/vhi/projects/' + encodeURIComponent(_selectedProject.id), { description: next });
+    toast('Project updated', 'ok');
+    await loadDomainResources();
+  } catch (err) {
+    toast('Update failed: ' + err.message, 'err');
+  }
+}
+
+function manageProjectUsers() {
+  closeProjectDrawer();
+  activateDomainTab('users');
+}
+
+async function toggleProjectEnabled() {
+  if (!_selectedProject) return;
+  const enable = _selectedProject.enabled === false;
+  const label = enable ? 'Enable' : 'Disable';
+  if (!confirm(label + ' project "' + _selectedProject.name + '"?')) return;
+  try {
+    await apiPatch('/api/vhi/projects/' + encodeURIComponent(_selectedProject.id), { enabled: enable });
+    toast('Project ' + (enable ? 'enabled' : 'disabled'), 'ok');
+    await loadDomainResources();
+  } catch (err) {
+    toast(label + ' failed: ' + err.message, 'err');
+  }
+}
+
+async function deleteProjectFromDrawer() {
+  if (!_selectedProject) return;
+  if (!confirm('Delete project "' + _selectedProject.name + '"? This cannot be undone.')) return;
+  try {
+    await apiDelete('/api/vhi/projects/' + encodeURIComponent(_selectedProject.id));
+    toast('Project deleted', 'ok');
+    closeProjectDrawer();
+    await loadDomainResources();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
 
 async function loadProjects() {
-  setRefreshing('projRefresh', true);
-  document.getElementById('projBody').innerHTML = skeletonRows(4);
   try {
     const data = await apiGet('/api/vhi/projects');
     _projs = data.projects || [];
-    renderProjects('');
-    hookSearch('projSearch', renderProjects);
-    document.getElementById('projBadge').textContent = _projs.length;
-    document.getElementById('projCount').textContent = `${_projs.length} projects`;
     if (_vols.length) renderVolumes(document.getElementById('volSearch')?.value || '');
   } catch (err) {
-    document.getElementById('projBody').innerHTML = emptyState('⚠️', 'Could not load projects: ' + err.message);
-    toast('Projects: ' + err.message, 'err');
-  } finally {
-    setRefreshing('projRefresh', false);
+    console.warn('Failed to load projects:', err.message);
   }
 }
 
-function renderProjects(query) {
-  const tbody = document.getElementById('projBody');
-  const rows = (_projs || []).map(p => {
-    return `<tr>
-      <td><strong>${p.name || '–'}</strong></td>
-      <td class="mono">${p.id}</td>
-      <td>${p.enabled ? '<span class="badge badge-active">True</span>' : '<span class="badge badge-default">False</span>'}</td>
-      <td class="mono text-dim">${p.domain_id || '–'}</td>
-    </tr>`;
-  });
-  const filtered = filterRows(rows, query);
-  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🏢', 'No projects found');
-}
-
-document.getElementById('projRefresh').addEventListener('click', loadProjects);
-
-// ── USERS ─────────────────────────────────────────────────────────────────
-
 async function loadUsers() {
-  setRefreshing('userRefresh', true);
-  document.getElementById('userBody').innerHTML = skeletonRows(4);
   try {
     const data = await apiGet('/api/vhi/users');
     _users = data.users || [];
-    renderUsers('');
-    hookSearch('userSearch', renderUsers);
-    document.getElementById('userBadge').textContent = _users.length;
-    document.getElementById('userCount').textContent = `${_users.length} users`;
   } catch (err) {
-    document.getElementById('userBody').innerHTML = emptyState('⚠️', 'Could not load users: ' + err.message);
-    toast('Users: ' + err.message, 'err');
-  } finally {
-    setRefreshing('userRefresh', false);
+    console.warn('Failed to load users:', err.message);
   }
 }
 
-function renderUsers(query) {
-  const tbody = document.getElementById('userBody');
-  const rows = (_users || []).map(u => {
-    return `<tr>
-      <td><strong>${u.name || '–'}</strong></td>
-      <td>${u.enabled ? '<span class="badge badge-active">True</span>' : '<span class="badge badge-default">False</span>'}</td>
-      <td class="mono">${u.id}</td>
-      <td class="mono text-dim">${u.domain_id || '–'}</td>
-    </tr>`;
+document.getElementById('domainRefresh')?.addEventListener('click', loadDomains);
+document.getElementById('domainDetailRefresh')?.addEventListener('click', loadDomainResources);
+document.querySelectorAll('#domainSubTabs .sub-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    activateDomainTab(tab.dataset.domtab);
+    if (tab.dataset.domtab !== 'projects') closeProjectDrawer();
   });
-  const filtered = filterRows(rows, query);
-  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('👥', 'No users found');
-}
+});
+document.querySelectorAll('#domSettingsNav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#domSettingsNav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.dom-set-pane').forEach(p => p.classList.remove('active'));
+    const pane = document.getElementById('domset-' + btn.dataset.domset);
+    if (pane) pane.classList.add('active');
+  });
+});
 
-document.getElementById('userRefresh').addEventListener('click', loadUsers);
+window.openDomainDetail = openDomainDetail;
+window.closeDomainDetail = closeDomainDetail;
+window.saveDomainSettings = saveDomainSettings;
+window.openCreateDomainModal = openCreateDomainModal;
+window.submitCreateDomain = submitCreateDomain;
+window.openCreateUserModal = openCreateUserModal;
+window.submitCreateUser = submitCreateUser;
+window.openCreateGroupModal = openCreateGroupModal;
+window.submitCreateGroup = submitCreateGroup;
+window.openIdpModal = openIdpModal;
+window.submitIdpNote = submitIdpNote;
+window.openProjectDrawer = openProjectDrawer;
+window.closeProjectDrawer = closeProjectDrawer;
+window.showProjectDrawerTab = showProjectDrawerTab;
+window.editProjectFromDrawer = editProjectFromDrawer;
+window.manageProjectUsers = manageProjectUsers;
+window.toggleProjectEnabled = toggleProjectEnabled;
+window.deleteProjectFromDrawer = deleteProjectFromDrawer;
 
 // ── OVERVIEW TIMESTAMP ────────────────────────────────────────────────────
 function updateOverviewTs() {

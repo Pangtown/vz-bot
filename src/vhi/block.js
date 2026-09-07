@@ -28,18 +28,6 @@ async function blockUrl(path = '', resourceType = 'volumes') {
   return `${base}:${port}${prefix}${path}`;
 }
 
-function mergeById(primary, extra) {
-  const seen = new Set((primary || []).map((v) => v && v.id).filter(Boolean));
-  const out = [...(primary || [])];
-  for (const item of extra || []) {
-    if (item?.id && !seen.has(item.id)) {
-      seen.add(item.id);
-      out.push(item);
-    }
-  }
-  return out;
-}
-
 async function listBlockCollection(resourceType, extraParams = {}) {
   const client = await getClient();
   const collected = [];
@@ -77,12 +65,7 @@ async function listBlockCollection(resourceType, extraParams = {}) {
 }
 
 export async function listVolumes() {
-  const scoped = await listBlockCollection('volumes');
-  try {
-    return mergeById(scoped, await listBlockCollection('volumes', { all_tenants: '1' }));
-  } catch {
-    return scoped;
-  }
+  return listBlockCollection('volumes');
 }
 
 export async function listVolumeTypes() {
@@ -272,12 +255,7 @@ export async function detachVolume(serverId, attachmentId) {
 // ── Snapshots ─────────────────────────────────────────────────────────────
 
 export async function listSnapshots() {
-  const scoped = await listBlockCollection('snapshots');
-  try {
-    return mergeById(scoped, await listBlockCollection('snapshots', { all_tenants: '1' }));
-  } catch {
-    return scoped;
-  }
+  return listBlockCollection('snapshots');
 }
 
 export async function createSnapshot(name, volumeId, description = '') {

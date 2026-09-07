@@ -86,26 +86,146 @@ export function getIdentityUrl(path = '') {
   return `${base}:${port}/v3${path}`;
 }
 
-export async function listProjects() {
+async function identityFetch(path, opts = {}) {
   const { getClient } = await import('./client.js');
   const client = await getClient();
-  const res = await client.fetch(getIdentityUrl('/projects'));
+  const res = await client.fetch(getIdentityUrl(path), opts);
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`VHI Identity listProjects failed (${res.status}): ${text.slice(0, 300)}`);
+    throw new Error(`VHI Identity ${opts.method || 'GET'} ${path} failed (${res.status}): ${text.slice(0, 300)}`);
   }
-  const data = await res.json();
+  if (res.status === 204) return null;
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('json')) return null;
+  return res.json();
+}
+
+function withQuery(path, params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+  });
+  const s = qs.toString();
+  return s ? `${path}?${s}` : path;
+}
+
+export async function listDomains() {
+  const data = await identityFetch('/domains');
+  return data.domains || [];
+}
+
+export async function getDomain(id) {
+  const data = await identityFetch(`/domains/${encodeURIComponent(id)}`);
+  return data.domain || null;
+}
+
+export async function updateDomain(id, options = {}) {
+  const data = await identityFetch(`/domains/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ domain: options }),
+  });
+  return data?.domain || null;
+}
+
+export async function listProjects(options = {}) {
+  const data = await identityFetch(withQuery('/projects', { domain_id: options.domain_id }));
   return data.projects || [];
 }
 
-export async function listUsers() {
-  const { getClient } = await import('./client.js');
-  const client = await getClient();
-  const res = await client.fetch(getIdentityUrl('/users'));
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`VHI Identity listUsers failed (${res.status}): ${text.slice(0, 300)}`);
-  }
-  const data = await res.json();
+export async function listUsers(options = {}) {
+  const data = await identityFetch(withQuery('/users', { domain_id: options.domain_id }));
   return data.users || [];
+}
+
+export async function listGroups(options = {}) {
+  const data = await identityFetch(withQuery('/groups', { domain_id: options.domain_id }));
+  return data.groups || [];
+}
+
+export async function createDomain(options = {}) {
+  const data = await identityFetch('/domains', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      domain: {
+        name: options.name,
+        description: options.description || '',
+        enabled: options.enabled !== false,
+      },
+    }),
+  });
+  return data?.domain || null;
+}
+
+export async function createUser(options = {}) {
+  const user = {
+    name: options.name,
+    domain_id: options.domain_id,
+    enabled: options.enabled !== false,
+  };
+  if (options.password) user.password = options.password;
+  if (options.email) user.email = options.email;
+  if (options.description) user.description = options.description;
+  const data = await identityFetch('/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user }),
+  });
+  return data?.user || null;
+}
+
+export async function createGroup(options = {}) {
+  const data = await identityFetch('/groups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      group: {
+        name: options.name,
+        domain_id: options.domain_id,
+        description: options.description || '',
+      },
+    }),
+  });
+  return data?.group || null;
+}
+
+export async function listRoleAssignments(options = {}) {
+  const data = await identityFetch(withQuery('/role_assignments', {
+    'scope.domain.id': options.domain_id,
+    'scope.project.id': options.project_id,
+    include_names: true,
+  }));
+  return data.role_assignments || [];
+}
+
+export async function listRoles() {
+  const data = await identityFetch('/roles');
+  return data.roles || [];
+}
+
+export async function assignRole(options = {}) {
+  const userId = encodeURIComponent(options.user_id);
+  const roleId = encodeURIComponent(options.role_id);
+  const path = options.project_id
+    ? `/projects/${encodeURIComponent(options.project_id)}/users/${userId}/roles/${roleId}`
+    : `/domains/${encodeURIComponent(options.domain_id)}/users/${userId}/roles/${roleId}`;
+  await identityFetch(path, { method: 'PUT' });
+}
+
+export async function updateProject(id, options = {}) {
+  const patch = {};
+  if (options.name !== undefined) patch.name = options.name;
+  if (options.description !== undefined) patch.description = options.description;
+  if (options.enabled !== undefined) patch.enabled = !!options.enabled;
+  const data = await identityFetch(`/projects/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project: patch }),
+  });
+  return data?.project || null;
+}
+
+export async function deleteProject(id) {
+  await identityFetch(`/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }

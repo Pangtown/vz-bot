@@ -1011,3 +1011,5 @@
 {"vCpu":39,"ramGb":"94.7","storageGb":683,"networkTraffic":"1.43 GB Tx / 2.32 GB Rx","timestamp":"2026-09-07T07:00:01.606Z"}
 {"vCpu":39,"ramGb":"94.7","storageGb":683,"networkTraffic":"3.88 GB Tx / 7.97 GB Rx","timestamp":"2026-09-07T15:00:01.788Z"}
 {"vCpu":39,"ramGb":"94.7","storageGb":683,"networkTraffic":"4.10 GB Tx / 15.53 GB Rx","timestamp":"2026-09-07T16:00:01.898Z"}
+{"vCpu":39,"ramGb":"94.7","storageGb":600,"networkTraffic":"5.82 GB Tx / 11.37 GB Rx","timestamp":"2026-09-07T17:00:00.418Z"}
+{"vCpu":39,"ramGb":"94.7","storageGb":600,"networkTraffic":"1.54 GB Tx / 14.63 GB Rx","timestamp":"2026-09-07T18:00:01.156Z"}

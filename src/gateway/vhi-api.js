@@ -4,7 +4,7 @@ import { handleMarketplaceScripts } from './vhi-api/marketplace.js';
 import { handleServers, handleServerGet, handleServerDelete, handleServerAction, handleCreateServer, handleFlavors, handleFlavorDelete, handleKeypairs, handleNodes, handleNodeGet, handleNodeAction, handleImages, handleCreateImage, handleUploadImage, handleUpdateImage, handleDeleteImage, handleServerInterfaces, handleServerVolumes } from './vhi-api/compute.js';
 import { handleNetworks, handleNetworkDelete, handleSubnetCreate, handleSubnetDelete, handleSecurityGroups, handleSecurityGroupDelete, handleSecurityGroupRule, handleSecurityGroupRuleDelete, handleFloatingIPs, handleRouters, handleRouterInterface, handlePorts, handlePortGet, handlePortUpdate } from './vhi-api/network.js';
 import { handleVolumeTypes, handleVolumes, handleVolumeGet, handleVolumeUpdate, handleVolumeDelete, handleVolumeExtend, handleVolumeRetype, handleSnapshots, handleSnapshotAction } from './vhi-api/block.js';
-import { handleProjects, handleUsers } from './vhi-api/identity.js';
+import { handleProjects, handleProjectItem, handleUsers, handleDomains, handleGroups, handleRoles, handleRoleAssignments } from './vhi-api/identity.js';
 import { handleHealthStatus, handleBillingStatus, handleBillingRefresh, handleBillingExport, handleAuditLogs, handleAuditRefresh, handleGetSshSettings, handlePostSshSettings } from './vhi-api/monitoring.js';
 import { handleJobs, handleJobRun } from './vhi-api/jobs.js';
 import { searchAlerts } from '../monitoring/alert-storage.js';
@@ -167,7 +167,15 @@ export async function handleVhiApi(req, res) {
       if (m === 'DELETE' && imgMatch) { await handleDeleteImage(req, res, ctx, imgMatch[1]); return true; }
 
       if (m === 'GET' && p === '/api/vhi/projects') { await handleProjects(req, res, ctx); return true; }
-      if (m === 'GET' && p === '/api/vhi/users') { await handleUsers(req, res, ctx); return true; }
+      const projectMatch = p.match(/^\/api\/vhi\/projects\/([^/]+)$/);
+      if (projectMatch) { await handleProjectItem(req, res, ctx, decodeURIComponent(projectMatch[1])); return true; }
+      if (p === '/api/vhi/users') { await handleUsers(req, res, ctx); return true; }
+      if (p === '/api/vhi/groups') { await handleGroups(req, res, ctx); return true; }
+      if (m === 'GET' && p === '/api/vhi/roles') { await handleRoles(req, res, ctx); return true; }
+      if (m === 'GET' && p === '/api/vhi/role-assignments') { await handleRoleAssignments(req, res, ctx); return true; }
+      if (p === '/api/vhi/domains') { await handleDomains(req, res, ctx); return true; }
+      const domainMatch = p.match(/^\/api\/vhi\/domains\/([^/]+)$/);
+      if (domainMatch) { await handleDomains(req, res, ctx, decodeURIComponent(domainMatch[1])); return true; }
 
       if (m === 'GET' && p === '/api/vhi/settings/ssh') { await handleGetSshSettings(req, res, ctx); return true; }
       if (m === 'POST' && p === '/api/vhi/settings/ssh') { await handlePostSshSettings(req, res, ctx); return true; }
