@@ -31,32 +31,20 @@ process.on('unhandledRejection', (reason) => {
   logger.error(`Unhandled rejection (service kept alive): ${msg}`, { reason });
 });
 
-let chatPageHtml = null;
 async function getChatPage() {
-  if (chatPageHtml) return chatPageHtml;
-  chatPageHtml = await readFile(join(__dirname, '..', 'public', 'index.html'), 'utf8');
-  return chatPageHtml;
+  return readFile(join(__dirname, '..', 'public', 'index.html'), 'utf8');
 }
 
-let vhiPageHtml = null;
 async function getVhiPage() {
-  if (vhiPageHtml) return vhiPageHtml;
-  vhiPageHtml = await readFile(join(__dirname, '..', 'public', 'vhi.html'), 'utf8');
-  return vhiPageHtml;
+  return readFile(join(__dirname, '..', 'public', 'vhi.html'), 'utf8');
 }
 
-let clustersPageHtml = null;
 async function getClustersPage() {
-  if (clustersPageHtml) return clustersPageHtml;
-  clustersPageHtml = await readFile(join(__dirname, '..', 'public', 'clusters.html'), 'utf8');
-  return clustersPageHtml;
+  return readFile(join(__dirname, '..', 'public', 'clusters.html'), 'utf8');
 }
 
-let marketplacePageHtml = null;
 async function getMarketplacePage() {
-  if (marketplacePageHtml) return marketplacePageHtml;
-  marketplacePageHtml = await readFile(join(__dirname, '..', 'public', 'marketplace.html'), 'utf8');
-  return marketplacePageHtml;
+  return readFile(join(__dirname, '..', 'public', 'marketplace.html'), 'utf8');
 }
 
 const app = async (req, res) => {

@@ -223,9 +223,14 @@ let images = [], flavors = [], networks = [], scripts = [];
 let deployImage = null, editingScriptId = null;
 
 function authHeaders() {
-  if (!session) return { 'Content-Type': 'application/json' };
-  return {
+  const webPw = localStorage.getItem('webPassword') || '';
+  const headers = {
     'Content-Type': 'application/json',
+    ...(webPw ? { 'X-Web-Password': webPw } : {}),
+  };
+  if (!session) return headers;
+  return {
+    ...headers,
     'X-VHI-Base-URL':   session.baseUrl,
     'X-VHI-User':       session.username,
     'X-VHI-Password':   session.password,

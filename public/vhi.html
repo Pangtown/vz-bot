@@ -1485,17 +1485,19 @@
           <table>
             <thead>
               <tr>
-                <th style="min-width: 280px; width: 35%;">Name</th>
+                <th style="min-width: 280px; width: 30%;">Name</th>
                 <th>Status</th>
                 <th>Size (GB)</th>
-                <th>Type</th>
+                <th>Policy</th>
+                <th>Project</th>
+                <th>Cluster</th>
                 <th>Bootable</th>
                 <th>Attached To</th>
                 <th style="text-align: right; width: 330px;">Actions</th>
               </tr>
             </thead>
             <tbody id="volBody">
-              <tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr>
+              <tr class="skeleton-row"><td colspan="9"><div class="skeleton"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -2944,6 +2946,7 @@ function authHeaders() {
     'X-VHI-Project':     session.project,
     'X-VHI-Project-ID':  session.projectId || '',
     'X-VHI-Domain':      session.userDomain,
+    'X-VHI-Project-Domain': session.projectDomain || session.userDomain || 'Default',
     'X-VHI-SSH-Host':     sshConfig.host || '',
     'X-VHI-SSH-User':     sshConfig.username || 'root',
     'X-VHI-SSH-Password': sshConfig.password || '',
@@ -2954,6 +2957,29 @@ function authHeaders() {
 
 async function apiGet(path) {
   const r = await fetch(path, { headers: authHeaders() });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+async function apiGetForCluster(path, cluster) {
+  if (!cluster) return apiGet(path);
+  const webPw = localStorage.getItem('webPassword') || '';
+  const r = await fetch(path, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(webPw ? { 'X-Web-Password': webPw } : {}),
+      'X-VHI-Base-URL': cluster.baseUrl,
+      'X-VHI-User': cluster.username,
+      'X-VHI-Password': cluster.password,
+      'X-VHI-Project': cluster.project || 'admin',
+      'X-VHI-Project-ID': cluster.projectId || '',
+      'X-VHI-Domain': cluster.userDomain || 'Default',
+      'X-VHI-Project-Domain': cluster.projectDomain || cluster.userDomain || 'Default',
+    },
+  });
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));
     throw new Error(d.error || `HTTP ${r.status}`);
@@ -3088,7 +3114,6 @@ async function doLogin() {
     };
 
     // show app
-    const clusterHost = host.replace(/https?:\/\//, '').split(/[:/]/)[0];
     document.getElementById('loginOverlay').classList.add('hidden');
     document.getElementById('appShell').classList.add('visible');
     document.getElementById('clusterDot').style.background = 'var(--success)';
@@ -3218,6 +3243,7 @@ function hookSearch(inputId, renderFn) {
 
 // ── DATA STORES ───────────────────────────────────────────────────────────
 let _vms = [], _nodes = [], _vols = [], _nets = [], _subnets = [], _imgs = [], _flavors = [], _volTypes = [], _projs = [], _users = [], _sgs = [];
+let _keypairs = [], _fips = [], _routers = [], _ports = [], _jobs = [];
 
 // ── LOAD ALL ──────────────────────────────────────────────────────────────
 
@@ -3226,6 +3252,7 @@ async function loadSecurityGroups() {
     const data = await apiGet('/api/vhi/security-groups');
     allSecurityGroups = data.security_groups || [];
     _sgs = [...allSecurityGroups];
+    renderSgs('');
   } catch (err) {
     console.warn('Failed to load security groups:', err.message);
   }
@@ -3238,7 +3265,7 @@ function loadAll() {
   loadSnapshots();
   loadNetworks();
   loadImages();
-  loadFlavors();
+  loadFlavors(true);
   loadVolumeTypes();
   loadProjects();
   loadUsers();
@@ -3357,13 +3384,13 @@ async function loadFlavors(render) {
 function renderFlavors(query) {
   const tbody = document.getElementById('flavorBody');
   if (!tbody) return;
-  const rows = _flavors.map(f => `<tr>
-    <td><strong>${esc(f.name)}</strong></td>
+    const rows = _flavors.map(f => `<tr>
+    <td><strong>${escapeHtml(f.name)}</strong></td>
     <td>${f.vcpus}</td>
     <td>${f.ram} MiB</td>
     <td>${f.disk} GiB</td>
     <td>${f['os-flavor-access:is_public'] !== false ? '<span class="badge badge-active">Public</span>' : 'Private'}</td>
-    <td style="text-align:right;"><button class="act-btn act-danger" onclick="deleteFlavorRow('${f.id}', this)">Delete</button></td>
+    <td style="text-align:right;"><button class="act-btn act-danger" onclick="deleteFlavorRow('${f.id}')">Delete</button></td>
   </tr>`);
   const filtered = filterRows(rows, query);
   tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('📐', 'No flavors found');
@@ -3398,7 +3425,7 @@ function openVmModal() {
   const kpSel = document.getElementById('newVmKeypair');
   if (kpSel) {
     kpSel.innerHTML = '<option value="">None</option>' +
-      (_keypairs || []).map(k => `<option value="${esc(k.name)}">${esc(k.name)}</option>`).join('');
+        (_keypairs || []).map(k => `<option value="${escapeHtml(k.name)}">${escapeHtml(k.name)}</option>`).join('');
   }
   
   vmMDiskSize.value = 60;
@@ -3446,6 +3473,8 @@ async function submitVmForm() {
         delete_on_termination: true
       }]
     };
+    const keyName = document.getElementById('newVmKeypair')?.value;
+    if (keyName) payload.key_name = keyName;
 
     const res = await fetch('/api/vhi/servers', {
       method: 'POST',
@@ -5024,10 +5053,53 @@ window.openClusterTerminal = openClusterTerminal;
 
 async function loadVolumes() {
   setRefreshing('volRefresh', true);
-  document.getElementById('volBody').innerHTML = skeletonRows(7);
+  document.getElementById('volBody').innerHTML = skeletonRows(9);
   try {
-    const data = await apiGet('/api/vhi/volumes');
-    _vols = data.volumes || [];
+    const clusters = (typeof readSavedClusters === 'function' ? readSavedClusters() : [])
+      .filter(c => c && c.password && c.baseUrl);
+    const currentId = (typeof clusterIdFromSession === 'function' && session)
+      ? clusterIdFromSession(session)
+      : '';
+    const targets = clusters.length
+      ? clusters
+      : (session ? [{
+          id: currentId || 'current',
+          baseUrl: session.baseUrl,
+          username: session.username,
+          password: session.password,
+          project: session.project,
+          projectId: session.projectId,
+          userDomain: session.userDomain,
+          projectDomain: session.projectDomain,
+        }] : []);
+
+    const results = await Promise.all(targets.map(async (c) => {
+      try {
+        const data = await apiGetForCluster('/api/vhi/volumes', c);
+        const host = String(c.baseUrl || '').replace(/https?:\/\//, '').split(/[:/]/)[0];
+        const label = host + (c.project ? ' · ' + c.project : '');
+        return (data.volumes || []).map(v => ({
+          ...v,
+          _clusterId: c.id,
+          _clusterLabel: label,
+        }));
+      } catch (err) {
+        console.warn('Volumes fetch failed for', c.baseUrl, err.message);
+        return [];
+      }
+    }));
+
+    const seen = new Set();
+    _vols = [];
+    for (const list of results) {
+      for (const v of list) {
+        const key = (v._clusterId || '') + ':' + v.id;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        _vols.push(v);
+      }
+    }
+
     renderVolumes('');
     hookSearch('volSearch', renderVolumes);
     document.getElementById('volBadge').textContent = _vols.length;
@@ -5055,9 +5127,24 @@ async function loadVolumes() {
   }
 }
 
+function volumeProjectId(v) {
+  return v['os-vol-tenant-attr:tenant_id'] || v.tenant_id || v.project_id || '';
+}
+function volumeProjectName(v) {
+  const id = volumeProjectId(v);
+  const p = (_projs || []).find(x => x.id === id);
+  return (p && p.name) || id.slice(0, 8) || '–';
+}
+
 function renderVolumes(query) {
   const tbody = document.getElementById('volBody');
-  const items = query ? _vols.filter(v => (v.name||'').toLowerCase().includes(query.toLowerCase()) || v.id.includes(query)) : _vols;
+  const items = query ? _vols.filter(v => {
+    const q = query.toLowerCase();
+    return (v.name||'').toLowerCase().includes(q)
+      || (v.id||'').includes(query)
+      || (v._clusterLabel||'').toLowerCase().includes(q)
+      || volumeProjectName(v).toLowerCase().includes(q);
+  }) : _vols;
   
   tbody.innerHTML = items.map(v => {
     const attached = (v.attachments || []).map(a => `<span class="badge" title="${a.server_id}">${a.server_id?.slice(0,8)}</span>`).join(' ') || '<span class="text-dim">—</span>';
@@ -5067,21 +5154,23 @@ function renderVolumes(query) {
     return `<tr>
       <td style="word-break: break-all; min-width: 280px;">
         <a href="javascript:void(0)" onclick="openVolDetails('${v.id}')" style="color:var(--text); text-decoration:none;">
-          <div style="font-weight:600; color:var(--text);">${v.name || '—'}</div>
+          <div style="font-weight:600; color:var(--text);">${escapeHtml(v.name || '—')}</div>
         </a>
         <div class="mono" style="font-size:0.75rem; color:var(--text-dim);">${v.id?.slice(0,8)}...</div>
       </td>
       <td>${statusBadge(v.status)}</td>
       <td>${v.size ?? '–'} GB</td>
-      <td class="text-dim" style="font-size:0.85rem;">${v.volume_type || '—'}</td>
+      <td class="text-dim" style="font-size:0.85rem;">${escapeHtml(v.volume_type || '—')}</td>
+      <td class="text-dim">${escapeHtml(volumeProjectName(v))}</td>
+      <td class="text-dim">${escapeHtml(v._clusterLabel || '—')}</td>
       <td>${v.bootable === 'true' || v.bootable === true ? '<span style="color:var(--accent)">Yes</span>' : 'No'}</td>
       <td class="mono text-dim">${attached}</td>
       <td style="text-align: right; white-space: nowrap; width: 330px;">
         <div class="row-actions">
-           ${isAvailable ? `<button class="act-btn act-start" onclick="openAttachVolToList('${v.id}', '${v.name}')"><span class="ri">🔗</span> Attach</button>` : ''}
+           ${isAvailable ? `<button class="act-btn act-start" onclick="openAttachVolToList('${v.id}', '${escapeHtml(v.name || '')}')"><span class="ri">🔗</span> Attach</button>` : ''}
            ${isInUse ? `<button class="act-btn act-stop" onclick="quickDetachVol('${v.id}')"><span class="ri">🔓</span> Detach</button>` : ''}
-           <button class="act-btn act-console" onclick="openSnapVolModal('${v.id}', '${v.name}')"><span class="ri">📸</span> Snapshot</button>
-           <button class="act-btn act-danger" onclick="quickDeleteVol('${v.id}', '${v.name}')"><span class="ri">🗑️</span> Delete</button>
+           <button class="act-btn act-console" onclick="openSnapVolModal('${v.id}', '${escapeHtml(v.name || '')}')"><span class="ri">📸</span> Snapshot</button>
+           <button class="act-btn act-danger" onclick="quickDeleteVol('${v.id}', '${escapeHtml(v.name || '')}')"><span class="ri">🗑️</span> Delete</button>
         </div>
       </td>
     </tr>`;
@@ -5518,16 +5607,634 @@ function renderNetworks(query) {
     const isSystem = n.name === 'lb-mgmt-net' || (n.tags && n.tags.includes('system'));
     const sysBadge = isSystem ? '<span class="badge" style="background:rgba(255,255,255,0.12); color:var(--text-dim); font-size:0.68rem; margin-left:0.35rem; padding:0.1rem 0.35rem; border-radius:3px;">System</span>' : '';
     return `<tr>
-      <td><strong>${n.name || '–'}</strong>${sysBadge}<br><span class="mono">${n.id?.slice(0,8)}…</span></td>
+      <td><strong>${escapeHtml(n.name || '–')}</strong>${sysBadge}<br><span class="mono">${n.id?.slice(0,8)}…</span></td>
       <td>${statusBadge(n.status)}</td>
       <td>${n['router:external'] ? '<span class="badge badge-active">External</span>' : '–'}</td>
       <td>${n.admin_state_up ? '<span class="badge badge-active">Up</span>' : '<span class="badge badge-error">Down</span>'}</td>
       <td class="mono text-dim">${subs}</td>
+      <td style="text-align:right;">${isSystem ? '' : `<button class="act-btn act-danger" onclick="deleteNetworkRow('${n.id}')">Delete</button>`}</td>
     </tr>`;
   });
   const filtered = filterRows(rows, query);
   tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🌐', 'No networks found');
 }
+
+function netNameById(id) {
+  if (!id) return '–';
+  const n = _nets.find(x => x.id === id);
+  return n ? (n.name || id.slice(0, 8) + '…') : String(id).slice(0, 8) + '…';
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('hidden');
+}
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('hidden');
+}
+
+document.querySelectorAll('#netSubTabs .sub-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#netSubTabs .sub-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('#panel-networks .tab-content-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const panel = document.getElementById('tab-net-' + tab.dataset.nettab);
+    if (panel) panel.classList.add('active');
+  });
+});
+
+async function deleteNetworkRow(id) {
+  const n = _nets.find(x => x.id === id);
+  const name = (n && n.name) || id;
+  if (!confirm(`Delete network "${name}"? Subnets on this network are removed with it.`)) return;
+  try {
+    await apiDelete('/api/vhi/networks/' + id);
+    toast('Network deleted', 'ok');
+    loadNetworks();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+function openCreateNetModal() {
+  document.getElementById('newNetName').value = '';
+  document.getElementById('newNetCidr').value = '';
+  document.getElementById('newNetExternal').checked = false;
+  openModal('createNetModal');
+}
+async function submitCreateNet() {
+  const name = document.getElementById('newNetName').value.trim();
+  const cidr = document.getElementById('newNetCidr').value.trim();
+  if (!name) return toast('Name is required', 'warn');
+  try {
+    await apiPost('/api/vhi/networks', {
+      name,
+      cidr: cidr || undefined,
+      external: document.getElementById('newNetExternal').checked,
+    });
+    closeModal('createNetModal');
+    toast('Network created', 'ok');
+    loadNetworks();
+  } catch (err) {
+    toast('Create failed: ' + err.message, 'err');
+  }
+}
+
+function renderSgs(query) {
+  const tbody = document.getElementById('sgBody');
+  if (!tbody) return;
+  const rows = (_sgs || []).map(sg => {
+    const rules = (sg.security_group_rules || []).length;
+    return `<tr>
+      <td><strong>${escapeHtml(sg.name || '–')}</strong><br><span class="mono">${sg.id?.slice(0,8)}…</span></td>
+      <td class="text-dim">${escapeHtml(sg.description || '–')}</td>
+      <td>${rules}</td>
+      <td style="text-align:right;"><button class="act-btn act-danger" onclick="deleteSgRow('${sg.id}')">Delete</button></td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🛡', 'No security groups found');
+}
+
+function openCreateSgModal() {
+  document.getElementById('newSgName').value = '';
+  document.getElementById('newSgDesc').value = '';
+  openModal('createSgModal');
+}
+async function submitCreateSg() {
+  const name = document.getElementById('newSgName').value.trim();
+  if (!name) return toast('Name is required', 'warn');
+  try {
+    await apiPost('/api/vhi/security-groups', { name, description: document.getElementById('newSgDesc').value.trim() });
+    closeModal('createSgModal');
+    toast('Security group created', 'ok');
+    loadSecurityGroups();
+  } catch (err) {
+    toast('Create failed: ' + err.message, 'err');
+  }
+}
+async function deleteSgRow(id) {
+  const sg = (_sgs || []).find(x => x.id === id);
+  const name = (sg && sg.name) || id;
+  if (!confirm(`Delete security group "${name}"?`)) return;
+  try {
+    await apiDelete('/api/vhi/security-groups/' + id);
+    toast('Security group deleted', 'ok');
+    loadSecurityGroups();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+async function loadFloatingIPs() {
+  const tbody = document.getElementById('fipBody');
+  if (tbody) tbody.innerHTML = skeletonRows(5);
+  try {
+    const data = await apiGet('/api/vhi/floating-ips');
+    _fips = data.floatingips || [];
+    renderFips('');
+  } catch (err) {
+    if (tbody) tbody.innerHTML = emptyState('⚠️', 'Could not load floating IPs: ' + err.message);
+  }
+}
+function renderFips(query) {
+  const tbody = document.getElementById('fipBody');
+  if (!tbody) return;
+  const rows = (_fips || []).map(f => {
+    const assigned = f.fixed_ip_address || f.port_id || '';
+    return `<tr>
+      <td class="mono"><strong>${escapeHtml(f.floating_ip_address || '–')}</strong></td>
+      <td>${statusBadge(f.status)}</td>
+      <td>${escapeHtml(netNameById(f.floating_network_id))}</td>
+      <td class="text-dim">${escapeHtml(assigned || 'Unassigned')}</td>
+      <td style="text-align:right;">
+        ${f.port_id ? `<button class="act-btn" onclick="disassociateFip('${f.id}')">Disassociate</button>` : ''}
+        <button class="act-btn act-danger" onclick="deleteFipRow('${f.id}')">Release</button>
+      </td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🌐', 'No floating IPs');
+}
+function openCreateFipModal() {
+  const ext = _nets.filter(n => n['router:external']);
+  document.getElementById('newFipNetwork').innerHTML = ext.length
+    ? ext.map(n => `<option value="${n.id}">${escapeHtml(n.name || n.id)}</option>`).join('')
+    : '<option value="">No external networks</option>';
+  const vmPorts = (_ports || []).filter(p => (p.device_owner || '').startsWith('compute:'));
+  document.getElementById('newFipPort').innerHTML = '<option value="">Unassigned</option>' +
+    vmPorts.map(p => {
+      const ip = (p.fixed_ips && p.fixed_ips[0] && p.fixed_ips[0].ip_address) || '';
+      return `<option value="${p.id}">${escapeHtml((p.device_owner || 'port') + ' ' + ip)}</option>`;
+    }).join('');
+  openModal('createFipModal');
+}
+async function submitCreateFip() {
+  const floating_network_id = document.getElementById('newFipNetwork').value;
+  if (!floating_network_id) return toast('Select an external network', 'warn');
+  const port_id = document.getElementById('newFipPort').value;
+  try {
+    await apiPost('/api/vhi/floating-ips', { floating_network_id, port_id: port_id || undefined });
+    closeModal('createFipModal');
+    toast('Floating IP allocated', 'ok');
+    loadFloatingIPs();
+  } catch (err) {
+    toast('Allocate failed: ' + err.message, 'err');
+  }
+}
+async function disassociateFip(id) {
+  try {
+    await apiPatch('/api/vhi/floating-ips/' + id, { port_id: null });
+    toast('Floating IP disassociated', 'ok');
+    loadFloatingIPs();
+  } catch (err) {
+    toast('Disassociate failed: ' + err.message, 'err');
+  }
+}
+async function deleteFipRow(id) {
+  if (!confirm('Release this floating IP?')) return;
+  try {
+    await apiDelete('/api/vhi/floating-ips/' + id);
+    toast('Floating IP released', 'ok');
+    loadFloatingIPs();
+  } catch (err) {
+    toast('Release failed: ' + err.message, 'err');
+  }
+}
+
+async function loadRouters() {
+  const tbody = document.getElementById('rtrBody');
+  if (tbody) tbody.innerHTML = skeletonRows(5);
+  try {
+    const data = await apiGet('/api/vhi/routers');
+    _routers = data.routers || [];
+    renderRouters('');
+  } catch (err) {
+    if (tbody) tbody.innerHTML = emptyState('⚠️', 'Could not load routers: ' + err.message);
+  }
+}
+function renderRouters(query) {
+  const tbody = document.getElementById('rtrBody');
+  if (!tbody) return;
+  const rows = (_routers || []).map(r => {
+    const extId = r.external_gateway_info && r.external_gateway_info.network_id;
+    const snat = r.external_gateway_info
+      ? (r.external_gateway_info.enable_snat !== false ? 'Enabled' : 'Disabled')
+      : '–';
+    return `<tr>
+      <td><strong>${escapeHtml(r.name || '–')}</strong></td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${escapeHtml(netNameById(extId))}</td>
+      <td>${snat}</td>
+      <td style="text-align:right;">
+        <button class="act-btn" onclick="addRouterIface('${r.id}')">Interface</button>
+        <button class="act-btn act-danger" onclick="deleteRouterRow('${r.id}')">Delete</button>
+      </td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🔀', 'No routers');
+}
+function openCreateRouterModal() {
+  document.getElementById('newRtrName').value = '';
+  const ext = _nets.filter(n => n['router:external']);
+  document.getElementById('newRtrExt').innerHTML = '<option value="">None</option>' +
+    ext.map(n => `<option value="${n.id}">${escapeHtml(n.name || n.id)}</option>`).join('');
+  openModal('createRouterModal');
+}
+async function submitCreateRouter() {
+  const name = document.getElementById('newRtrName').value.trim();
+  if (!name) return toast('Name is required', 'warn');
+  const extId = document.getElementById('newRtrExt').value;
+  const body = { name };
+  if (extId) body.external_gateway_info = { network_id: extId };
+  try {
+    await apiPost('/api/vhi/routers', body);
+    closeModal('createRouterModal');
+    toast('Router created', 'ok');
+    loadRouters();
+  } catch (err) {
+    toast('Create failed: ' + err.message, 'err');
+  }
+}
+async function addRouterIface(routerId) {
+  const labels = (_subnets || []).map(s => `${s.cidr}  ${s.name || s.id}`).join('\n');
+  const cidr = prompt('Attach a subnet — enter CIDR or subnet ID:\n' + labels);
+  if (!cidr) return;
+  const sub = (_subnets || []).find(s => s.cidr === cidr.trim() || s.id === cidr.trim() || s.name === cidr.trim());
+  if (!sub) return toast('Subnet not found', 'warn');
+  try {
+    await apiPost(`/api/vhi/routers/${routerId}/add-interface`, { subnet_id: sub.id });
+    toast('Interface added', 'ok');
+    loadRouters();
+    loadPortsList();
+  } catch (err) {
+    toast('Add interface failed: ' + err.message, 'err');
+  }
+}
+async function deleteRouterRow(id) {
+  const r = (_routers || []).find(x => x.id === id);
+  const name = (r && r.name) || id;
+  if (!confirm(`Delete router "${name}"?`)) return;
+  try {
+    await apiDelete('/api/vhi/routers/' + id);
+    toast('Router deleted', 'ok');
+    loadRouters();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+async function loadPortsList() {
+  const tbody = document.getElementById('portBody');
+  if (tbody) tbody.innerHTML = skeletonRows(5);
+  try {
+    const data = await apiGet('/api/vhi/ports');
+    _ports = data.ports || [];
+    renderPorts('');
+  } catch (err) {
+    if (tbody) tbody.innerHTML = emptyState('⚠️', 'Could not load ports: ' + err.message);
+  }
+}
+function renderPorts(query) {
+  const tbody = document.getElementById('portBody');
+  if (!tbody) return;
+  const rows = (_ports || []).map(p => {
+    const ip = (p.fixed_ips && p.fixed_ips[0] && p.fixed_ips[0].ip_address) || '–';
+    return `<tr>
+      <td class="mono">${p.id?.slice(0,8)}…</td>
+      <td>${statusBadge(p.status)}</td>
+      <td class="mono text-dim">${escapeHtml(p.mac_address || '–')}</td>
+      <td class="mono">${escapeHtml(ip)}</td>
+      <td class="text-dim">${escapeHtml(p.device_owner || '–')}</td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🔌', 'No ports');
+}
+
+async function deleteFlavorRow(id) {
+  if (!confirm('Delete this flavor? Existing VMs are not affected.')) return;
+  try {
+    await apiDelete('/api/vhi/flavors/' + id);
+    toast('Flavor deleted', 'ok');
+    loadFlavors(true);
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+function openCreateFlavorModal() {
+  document.getElementById('newFlName').value = '';
+  document.getElementById('newFlVcpus').value = '1';
+  document.getElementById('newFlRam').value = '1024';
+  document.getElementById('newFlDisk').value = '0';
+  openModal('createFlavorModal');
+}
+async function submitCreateFlavor() {
+  const name = document.getElementById('newFlName').value.trim();
+  if (!name) return toast('Name is required', 'warn');
+  try {
+    await apiPost('/api/vhi/flavors', {
+      name,
+      vcpus: Number(document.getElementById('newFlVcpus').value),
+      ram: Number(document.getElementById('newFlRam').value),
+      disk: Number(document.getElementById('newFlDisk').value) || 0,
+    });
+    closeModal('createFlavorModal');
+    toast('Flavor created', 'ok');
+    loadFlavors(true);
+  } catch (err) {
+    toast('Create failed: ' + err.message, 'err');
+  }
+}
+
+async function loadKeypairs() {
+  const tbody = document.getElementById('kpBody');
+  if (tbody) tbody.innerHTML = skeletonRows(4);
+  try {
+    const data = await apiGet('/api/vhi/keypairs');
+    _keypairs = data.keypairs || [];
+    renderKeypairs('');
+  } catch (err) {
+    if (tbody) tbody.innerHTML = emptyState('⚠️', 'Could not load SSH keys: ' + err.message);
+  }
+}
+function renderKeypairs(query) {
+  const tbody = document.getElementById('kpBody');
+  if (!tbody) return;
+  const rows = (_keypairs || []).map(k => `<tr>
+    <td><strong>${escapeHtml(k.name)}</strong></td>
+    <td class="mono text-dim">${escapeHtml(k.fingerprint || '–')}</td>
+    <td>${escapeHtml(k.type || 'ssh')}</td>
+    <td style="text-align:right;"><button class="act-btn act-danger" onclick="deleteKeypairRow('${encodeURIComponent(k.name)}')">Delete</button></td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🔑', 'No SSH keys');
+  const c = document.getElementById('keypairCount');
+  if (c) c.textContent = `${_keypairs.length} keys`;
+}
+function openCreateKeypairModal() {
+  document.getElementById('newKpName').value = '';
+  document.getElementById('newKpPublic').value = '';
+  openModal('createKeypairModal');
+}
+async function submitCreateKeypair() {
+  const name = document.getElementById('newKpName').value.trim();
+  if (!name) return toast('Name is required', 'warn');
+  const public_key = document.getElementById('newKpPublic').value.trim();
+  try {
+    const data = await apiPost('/api/vhi/keypairs', { name, public_key: public_key || undefined });
+    closeModal('createKeypairModal');
+    if (data.keypair && data.keypair.private_key) {
+      prompt('Private key (save this now — it will not be shown again):', data.keypair.private_key);
+    }
+    toast('SSH key created', 'ok');
+    loadKeypairs();
+  } catch (err) {
+    toast('Create failed: ' + err.message, 'err');
+  }
+}
+async function deleteKeypairRow(encName) {
+  const name = decodeURIComponent(encName);
+  if (!confirm(`Delete SSH key "${name}"?`)) return;
+  try {
+    await apiDelete('/api/vhi/keypairs/' + encodeURIComponent(name));
+    toast('SSH key deleted', 'ok');
+    loadKeypairs();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+function jobScheduleLabel(j) {
+  const s = j.schedule || {};
+  if (s.kind === 'cron') return s.expr || 'cron';
+  if (s.kind === 'interval') return 'every ' + (s.minutes || 60) + 'm';
+  if (s.kind === 'once') return s.at ? new Date(s.at).toLocaleString() : 'once';
+  return '–';
+}
+async function loadJobs() {
+  const tbody = document.getElementById('jobBody');
+  if (tbody) tbody.innerHTML = skeletonRows(7);
+  try {
+    const data = await apiGet('/api/vhi/jobs');
+    _jobs = data.jobs || [];
+    renderJobs('');
+  } catch (err) {
+    if (tbody) tbody.innerHTML = emptyState('⚠️', 'Could not load jobs: ' + err.message);
+  }
+}
+function renderJobs(query) {
+  const tbody = document.getElementById('jobBody');
+  if (!tbody) return;
+  const rows = (_jobs || []).map(j => `<tr>
+    <td><strong>${escapeHtml(j.name)}</strong></td>
+    <td>${escapeHtml((j.action || '').replace(/_/g, ' '))}</td>
+    <td class="text-dim">${escapeHtml(j.targetName || j.targetId || '–')}</td>
+    <td class="mono">${escapeHtml(jobScheduleLabel(j))}</td>
+    <td class="text-dim">${j.lastRunAt ? escapeHtml(new Date(j.lastRunAt).toLocaleString()) : '–'}${j.lastStatus ? ' · ' + escapeHtml(j.lastStatus) : ''}${j.lastError ? '<br><span class="text-dim">' + escapeHtml(j.lastError) + '</span>' : ''}</td>
+    <td>${j.enabled === false ? '<span class="badge badge-error">Off</span>' : '<span class="badge badge-active">On</span>'}</td>
+    <td style="text-align:right;">
+      <button class="act-btn" onclick="runJobNow('${j.id}')">Run</button>
+      <button class="act-btn" onclick="toggleJob('${j.id}', ${j.enabled === false})">${j.enabled === false ? 'Enable' : 'Disable'}</button>
+      <button class="act-btn act-danger" onclick="deleteJobRow('${j.id}')">Delete</button>
+    </td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('⏱', 'No scheduled jobs');
+  const c = document.getElementById('jobCount');
+  if (c) c.textContent = `${_jobs.length} jobs`;
+}
+function syncJobScheduleFields() {
+  const kind = document.getElementById('newJobKind').value;
+  document.getElementById('jobCronWrap').classList.toggle('hidden', kind !== 'cron');
+  document.getElementById('jobIntervalWrap').classList.toggle('hidden', kind !== 'interval');
+  document.getElementById('jobOnceWrap').classList.toggle('hidden', kind !== 'once');
+}
+function fillJobTargets() {
+  const action = document.getElementById('newJobAction').value;
+  const sel = document.getElementById('newJobTarget');
+  if (action === 'snapshot_volume') {
+    sel.innerHTML = (_vols || []).map(v =>
+      `<option value="${v.id}">${escapeHtml(v.name || v.id)}</option>`
+    ).join('') || '<option value="">No volumes</option>';
+  } else {
+    sel.innerHTML = (_vms || []).map(v =>
+      `<option value="${v.id}">${escapeHtml(v.name || v.id)}</option>`
+    ).join('') || '<option value="">No VMs</option>';
+  }
+}
+function openCreateJobModal() {
+  document.getElementById('newJobName').value = '';
+  document.getElementById('newJobKind').value = 'cron';
+  document.getElementById('newJobCron').value = '0 2 * * *';
+  syncJobScheduleFields();
+  fillJobTargets();
+  openModal('createJobModal');
+}
+async function submitCreateJob() {
+  const name = document.getElementById('newJobName').value.trim();
+  const action = document.getElementById('newJobAction').value;
+  const targetId = document.getElementById('newJobTarget').value;
+  if (!name || !targetId) return toast('Name and target are required', 'warn');
+  const targetSel = document.getElementById('newJobTarget');
+  const targetName = targetSel.options[targetSel.selectedIndex]?.text || targetId;
+  const kind = document.getElementById('newJobKind').value;
+  const schedule = { kind };
+  if (kind === 'cron') schedule.expr = document.getElementById('newJobCron').value.trim();
+  if (kind === 'interval') schedule.minutes = Number(document.getElementById('newJobMinutes').value) || 60;
+  if (kind === 'once') {
+    const at = document.getElementById('newJobAt').value;
+    if (!at) return toast('Pick a date and time', 'warn');
+    schedule.at = new Date(at).toISOString();
+  }
+  try {
+    await apiPost('/api/vhi/jobs', { name, action, targetId, targetName, schedule });
+    closeModal('createJobModal');
+    toast('Job scheduled', 'ok');
+    loadJobs();
+  } catch (err) {
+    toast('Create failed: ' + err.message, 'err');
+  }
+}
+async function runJobNow(id) {
+  try {
+    await apiPost('/api/vhi/jobs/' + id + '/run', {});
+    toast('Job started', 'ok');
+    loadJobs();
+  } catch (err) {
+    toast('Run failed: ' + err.message, 'err');
+  }
+}
+async function toggleJob(id, enable) {
+  try {
+    await apiPatch('/api/vhi/jobs/' + id, { enabled: !!enable });
+    loadJobs();
+  } catch (err) {
+    toast('Update failed: ' + err.message, 'err');
+  }
+}
+async function deleteJobRow(id) {
+  if (!confirm('Delete this scheduled job?')) return;
+  try {
+    await apiDelete('/api/vhi/jobs/' + id);
+    toast('Job deleted', 'ok');
+    loadJobs();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+const CLUSTER_STORE_KEY = 'vhi_multi_clusters';
+function readSavedClusters() {
+  try { return JSON.parse(localStorage.getItem(CLUSTER_STORE_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+function clusterIdFromSession(s) {
+  if (!s) return '';
+  const host = String(s.baseUrl || '').replace(/https?:\/\//, '').split('/')[0];
+  return host + '_' + (s.project || 'admin');
+}
+function rememberClusterInSwitcher() {
+  if (!session) return;
+  const clusters = readSavedClusters();
+  const id = clusterIdFromSession(session);
+  const rec = {
+    id,
+    baseUrl: session.baseUrl,
+    username: session.username,
+    password: session.password,
+    project: session.project,
+    userDomain: session.userDomain,
+    projectDomain: session.projectDomain,
+    projectId: session.projectId || '',
+  };
+  const idx = clusters.findIndex(c => c.id === id);
+  if (idx >= 0) clusters[idx] = Object.assign({}, clusters[idx], rec);
+  else clusters.push(rec);
+  localStorage.setItem(CLUSTER_STORE_KEY, JSON.stringify(clusters));
+}
+function refreshClusterSwitcher() {
+  const sel = document.getElementById('clusterSwitcher');
+  if (!sel) return;
+  const clusters = readSavedClusters();
+  const currentId = clusterIdFromSession(session);
+  if (!clusters.length) {
+    const label = session
+      ? String(session.baseUrl || '').replace(/https?:\/\//, '').split(/[:/]/)[0]
+      : 'Not connected';
+    sel.innerHTML = `<option value="">${escapeHtml(label)}</option>`;
+    return;
+  }
+  sel.innerHTML = clusters.map(c => {
+    const host = String(c.baseUrl || '').replace(/https?:\/\//, '').split(/[:/]/)[0];
+    const label = host + ' · ' + (c.project || 'admin');
+    return `<option value="${escapeHtml(c.id)}"${c.id === currentId ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  }).join('');
+}
+async function switchCluster(id) {
+  const c = readSavedClusters().find(x => x.id === id);
+  if (!c) return;
+  if (session && clusterIdFromSession(session) === id) return;
+  if (!c.password) {
+    toast('No saved password for this cluster. Open Clusters to reconnect.', 'warn');
+    refreshClusterSwitcher();
+    return;
+  }
+  localStorage.setItem('vhiBaseUrl', c.baseUrl);
+  localStorage.setItem('vhiUser', c.username);
+  localStorage.setItem('vhiPassword', c.password);
+  localStorage.setItem('vhiProject', c.project);
+  document.getElementById('loginHost').value = c.baseUrl;
+  document.getElementById('loginUser').value = c.username;
+  document.getElementById('loginPass').value = c.password;
+  document.getElementById('loginProject').value = c.project || 'admin';
+  if (c.userDomain) document.getElementById('loginUserDomain').value = c.userDomain;
+  if (c.projectDomain) document.getElementById('loginProjDomain').value = c.projectDomain;
+  toast('Switching cluster…', 'info');
+  await doLogin();
+}
+document.getElementById('clusterSwitcher')?.addEventListener('change', (e) => {
+  if (e.target.value) switchCluster(e.target.value);
+});
+document.getElementById('newJobAction')?.addEventListener('change', fillJobTargets);
+
+hookSearch('flavorSearch', renderFlavors);
+hookSearch('kpSearch', renderKeypairs);
+hookSearch('jobSearch', renderJobs);
+hookSearch('sgSearch', renderSgs);
+hookSearch('fipSearch', renderFips);
+hookSearch('rtrSearch', renderRouters);
+hookSearch('portSearch', renderPorts);
+
+window.closeModal = closeModal;
+window.openCreateNetModal = openCreateNetModal;
+window.submitCreateNet = submitCreateNet;
+window.deleteNetworkRow = deleteNetworkRow;
+window.openCreateSgModal = openCreateSgModal;
+window.submitCreateSg = submitCreateSg;
+window.deleteSgRow = deleteSgRow;
+window.openCreateFipModal = openCreateFipModal;
+window.submitCreateFip = submitCreateFip;
+window.disassociateFip = disassociateFip;
+window.deleteFipRow = deleteFipRow;
+window.openCreateRouterModal = openCreateRouterModal;
+window.submitCreateRouter = submitCreateRouter;
+window.addRouterIface = addRouterIface;
+window.deleteRouterRow = deleteRouterRow;
+window.openCreateFlavorModal = openCreateFlavorModal;
+window.submitCreateFlavor = submitCreateFlavor;
+window.deleteFlavorRow = deleteFlavorRow;
+window.openCreateKeypairModal = openCreateKeypairModal;
+window.submitCreateKeypair = submitCreateKeypair;
+window.deleteKeypairRow = deleteKeypairRow;
+window.openCreateJobModal = openCreateJobModal;
+window.submitCreateJob = submitCreateJob;
+window.syncJobScheduleFields = syncJobScheduleFields;
+window.runJobNow = runJobNow;
+window.toggleJob = toggleJob;
+window.deleteJobRow = deleteJobRow;
 
 // ── IMAGES ────────────────────────────────────────────────────────────────
 
@@ -5708,6 +6415,7 @@ async function loadProjects() {
     hookSearch('projSearch', renderProjects);
     document.getElementById('projBadge').textContent = _projs.length;
     document.getElementById('projCount').textContent = `${_projs.length} projects`;
+    if (_vols.length) renderVolumes(document.getElementById('volSearch')?.value || '');
   } catch (err) {
     document.getElementById('projBody').innerHTML = emptyState('⚠️', 'Could not load projects: ' + err.message);
     toast('Projects: ' + err.message, 'err');

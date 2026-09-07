@@ -608,7 +608,7 @@
       try {
         const res = await fetch('/api/vhi/auth', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: webAuthHeaders(),
           body: JSON.stringify({
             baseUrl, username: user, password: pass, project: proj,
             userDomain: uDom, projectDomain: pDom
@@ -768,16 +768,23 @@
       });
     }
 
-    async function fetchClusterMetric(c, path) {
-      const hdrs = {
+    function webAuthHeaders(extra) {
+      const webPw = localStorage.getItem('webPassword') || '';
+      return Object.assign({
         'Content-Type': 'application/json',
+        ...(webPw ? { 'X-Web-Password': webPw } : {}),
+      }, extra || {});
+    }
+
+    async function fetchClusterMetric(c, path) {
+      const hdrs = webAuthHeaders({
         'X-VHI-Base-URL': c.baseUrl,
         'X-VHI-User': c.username,
         'X-VHI-Password': c.password,
         'X-VHI-Project': c.project,
         'X-VHI-Project-ID': c.projectId || '',
         'X-VHI-Domain': c.userDomain || 'Default'
-      };
+      });
       
       const res = await fetch(path, { headers: hdrs });
       if (!res.ok) throw new Error('API Sync Error');
@@ -822,7 +829,7 @@
     // Auto-sync with server registry
     async function syncWithServer() {
       try {
-        const res = await fetch('/api/vhi/clusters/all');
+        const res = await fetch('/api/vhi/clusters/all', { headers: webAuthHeaders() });
         if (!res.ok) return;
         const data = await res.json();
         const serverUrls = data.clusters || [];

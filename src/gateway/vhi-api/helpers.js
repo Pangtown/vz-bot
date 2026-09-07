@@ -33,6 +33,7 @@ export function extractContext(req) {
     vhiPassword:    req.headers['x-vhi-password']      || (isWebAuthed ? process.env.VHI_PASSWORD : '')         || '',
     vhiProject:     req.headers['x-vhi-project']       || (isWebAuthed ? process.env.VHI_PROJECT_NAME : '')     || 'admin',
     vhiDomain:      req.headers['x-vhi-domain']        || (isWebAuthed ? process.env.VHI_DOMAIN_NAME : '')      || 'Default',
+    vhiProjectDomain: req.headers['x-vhi-project-domain'] || req.headers['x-vhi-domain'] || (isWebAuthed ? process.env.VHI_DOMAIN_NAME : '') || 'Default',
     vhiProjectId:   req.headers['x-vhi-project-id']   || (isWebAuthed ? process.env.VHI_PROJECT_ID : '')       || '',
     vhiSshHost:     req.headers['x-vhi-ssh-host']     || (isWebAuthed ? process.env.VHI_SSH_HOST : '')         || '',
     vhiSshUser:     req.headers['x-vhi-ssh-user']     || (isWebAuthed ? process.env.VHI_SSH_USER : '')         || 'root',

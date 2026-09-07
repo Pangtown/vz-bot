@@ -31,7 +31,11 @@ export async function getNetwork(args) {
 
 export async function createNetwork(args) {
     if (!args.name) throw new Error('name required');
-    const network = await apiCreateNetwork(args);
+    const network = await apiCreateNetwork({
+        name: args.name,
+        external: args.external,
+        admin_state_up: args.admin_state_up,
+    });
     let subnet = null;
     if (args.cidr) {
         subnet = await apiCreateSubnet({

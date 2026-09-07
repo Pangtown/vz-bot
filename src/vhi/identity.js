@@ -24,6 +24,7 @@ export async function getToken() {
   const password = getContextValue('vhiPassword', 'VHI_PASSWORD');
   const projectName = getContextValue('vhiProject', 'VHI_PROJECT_NAME') || 'admin';
   const domainName = getContextValue('vhiDomain', 'VHI_DOMAIN_NAME') || 'Default';
+  const projectDomain = getContextValue('vhiProjectDomain') || domainName;
 
   if (!user || !password) {
     throw new Error('VHI_USER and VHI_PASSWORD must be set in environment');
@@ -44,7 +45,7 @@ export async function getToken() {
       scope: {
         project: {
           name: projectName,
-          domain: { name: domainName },
+          domain: { name: projectDomain },
         },
       },
     },
