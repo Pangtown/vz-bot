@@ -28,41 +28,37 @@ async function blockUrl(path = '', resourceType = 'volumes') {
   return `${base}:${port}${prefix}${path}`;
 }
 
-const CINDER_HEADERS = {};
+function mergeById(primary, extra) {
+  const seen = new Set((primary || []).map((v) => v && v.id).filter(Boolean));
+  const out = [...(primary || [])];
+  for (const item of extra || []) {
+    if (item?.id && !seen.has(item.id)) {
+      seen.add(item.id);
+      out.push(item);
+    }
+  }
+  return out;
+}
 
-async function listBlockCollection(resourceType, { allTenants = true } = {}) {
+async function listBlockCollection(resourceType, extraParams = {}) {
   const client = await getClient();
   const collected = [];
   const seen = new Set();
-  const pageSize = 1000;
+  const pageSize = 200;
   let marker = null;
-  let tenantsFlag = allTenants ? 'True' : null;
 
   for (let page = 0; page < 40; page++) {
     const params = new URLSearchParams();
     params.set('limit', String(pageSize));
-    if (tenantsFlag) {
-      params.set('all_tenants', tenantsFlag);
-      params.set('all_projects', tenantsFlag);
+    for (const [k, v] of Object.entries(extraParams)) {
+      if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
     }
     if (marker) params.set('marker', marker);
 
     const url = await blockUrl(`/detail?${params.toString()}`, resourceType);
-    const res = await client.fetch(url, { headers: CINDER_HEADERS });
+    const res = await client.fetch(url);
     if (!res.ok) {
       const text = await res.text();
-      if (tenantsFlag === 'True' && page === 0 && (res.status === 400 || res.status === 403)) {
-        tenantsFlag = '1';
-        marker = null;
-        page = -1;
-        continue;
-      }
-      if (tenantsFlag && page === 0 && (res.status === 400 || res.status === 403)) {
-        tenantsFlag = null;
-        marker = null;
-        page = -1;
-        continue;
-      }
       throw new Error(`VHI Block list ${resourceType} failed (${res.status}): ${text.slice(0, 300)}`);
     }
     const data = await res.json();
@@ -81,54 +77,12 @@ async function listBlockCollection(resourceType, { allTenants = true } = {}) {
 }
 
 export async function listVolumes() {
-  const primary = await listBlockCollection('volumes', { allTenants: true });
-  let projects = [];
+  const scoped = await listBlockCollection('volumes');
   try {
-    const { listProjects } = await import('./identity.js');
-    projects = await listProjects();
+    return mergeById(scoped, await listBlockCollection('volumes', { all_tenants: '1' }));
   } catch {
-    return primary;
+    return scoped;
   }
-
-  const enabled = (projects || []).filter((p) => p && p.name && p.enabled !== false);
-  const tenantIds = new Set(primary.map(volumeTenantId).filter(Boolean));
-  if (enabled.length <= 1 || tenantIds.size >= 2) return primary;
-
-  const { runWithContext } = await import('../gateway/context.js');
-  const currentProject = getContextValue('vhiProject', 'VHI_PROJECT_NAME') || 'admin';
-  const baseCtx = {
-    vhiBaseUrl: getContextValue('vhiBaseUrl', 'VHI_BASE_URL'),
-    vhiUser: getContextValue('vhiUser', 'VHI_USER'),
-    vhiPassword: getContextValue('vhiPassword', 'VHI_PASSWORD'),
-    vhiDomain: getContextValue('vhiDomain', 'VHI_DOMAIN_NAME') || 'Default',
-    vhiProjectDomain: getContextValue('vhiProjectDomain') || getContextValue('vhiDomain', 'VHI_DOMAIN_NAME') || 'Default',
-  };
-
-  const merged = [...primary];
-  const seen = new Set(primary.map((v) => v.id));
-  const extras = await Promise.all(enabled.map(async (p) => {
-    if (p.name === currentProject || tenantIds.has(p.id)) return [];
-    try {
-      return await runWithContext({ ...baseCtx, vhiProject: p.name, vhiProjectId: p.id }, () =>
-        listBlockCollection('volumes', { allTenants: true })
-      );
-    } catch {
-      return [];
-    }
-  }));
-  for (const list of extras) {
-    for (const v of list) {
-      if (v?.id && !seen.has(v.id)) {
-        seen.add(v.id);
-        merged.push(v);
-      }
-    }
-  }
-  return merged;
-}
-
-function volumeTenantId(v) {
-  return v?.['os-vol-tenant-attr:tenant_id'] || v?.tenant_id || v?.project_id || '';
 }
 
 export async function listVolumeTypes() {
@@ -318,7 +272,12 @@ export async function detachVolume(serverId, attachmentId) {
 // ── Snapshots ─────────────────────────────────────────────────────────────
 
 export async function listSnapshots() {
-  return listBlockCollection('snapshots', { allTenants: true });
+  const scoped = await listBlockCollection('snapshots');
+  try {
+    return mergeById(scoped, await listBlockCollection('snapshots', { all_tenants: '1' }));
+  } catch {
+    return scoped;
+  }
 }
 
 export async function createSnapshot(name, volumeId, description = '') {

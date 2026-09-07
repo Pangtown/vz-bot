@@ -5055,48 +5055,41 @@ async function loadVolumes() {
   setRefreshing('volRefresh', true);
   document.getElementById('volBody').innerHTML = skeletonRows(9);
   try {
-    const clusters = (typeof readSavedClusters === 'function' ? readSavedClusters() : [])
-      .filter(c => c && c.password && c.baseUrl);
     const currentId = (typeof clusterIdFromSession === 'function' && session)
       ? clusterIdFromSession(session)
-      : '';
-    const targets = clusters.length
-      ? clusters
-      : (session ? [{
-          id: currentId || 'current',
-          baseUrl: session.baseUrl,
-          username: session.username,
-          password: session.password,
-          project: session.project,
-          projectId: session.projectId,
-          userDomain: session.userDomain,
-          projectDomain: session.projectDomain,
-        }] : []);
+      : 'current';
+    const host = String(session?.baseUrl || '').replace(/https?:\/\//, '').split(/[:/]/)[0];
+    const currentLabel = host + (session?.project ? ' · ' + session.project : '');
 
-    const results = await Promise.all(targets.map(async (c) => {
-      try {
-        const data = await apiGetForCluster('/api/vhi/volumes', c);
-        const host = String(c.baseUrl || '').replace(/https?:\/\//, '').split(/[:/]/)[0];
-        const label = host + (c.project ? ' · ' + c.project : '');
-        return (data.volumes || []).map(v => ({
-          ...v,
-          _clusterId: c.id,
-          _clusterLabel: label,
-        }));
-      } catch (err) {
-        console.warn('Volumes fetch failed for', c.baseUrl, err.message);
-        return [];
-      }
+    const data = await apiGet('/api/vhi/volumes');
+    _vols = (data.volumes || []).map(v => ({
+      ...v,
+      _clusterId: currentId,
+      _clusterLabel: currentLabel,
     }));
 
-    const seen = new Set();
-    _vols = [];
-    for (const list of results) {
-      for (const v of list) {
-        const key = (v._clusterId || '') + ':' + v.id;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        _vols.push(v);
+    const otherClusters = (typeof readSavedClusters === 'function' ? readSavedClusters() : [])
+      .filter(c => c && c.password && c.baseUrl && c.id !== currentId);
+    if (otherClusters.length) {
+      const extras = await Promise.all(otherClusters.map(async (c) => {
+        try {
+          const extra = await apiGetForCluster('/api/vhi/volumes', c);
+          const extraHost = String(c.baseUrl || '').replace(/https?:\/\//, '').split(/[:/]/)[0];
+          const label = extraHost + (c.project ? ' · ' + c.project : '');
+          return (extra.volumes || []).map(v => ({ ...v, _clusterId: c.id, _clusterLabel: label }));
+        } catch (err) {
+          console.warn('Volumes fetch failed for', c.baseUrl, err.message);
+          return [];
+        }
+      }));
+      const seen = new Set(_vols.map(v => (v._clusterId || '') + ':' + v.id));
+      for (const list of extras) {
+        for (const v of list) {
+          const key = (v._clusterId || '') + ':' + v.id;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          _vols.push(v);
+        }
       }
     }
 
