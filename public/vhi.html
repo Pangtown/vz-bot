@@ -1933,6 +1933,10 @@
         <label>Network</label>
         <select id="newVmNetwork"><option>Loading...</option></select>
       </div>
+      <div class="form-group">
+        <label>SSH Key (optional)</label>
+        <select id="newVmKeypair"><option value="">None</option></select>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="cancelVmBtn" style="flex:0; padding: .6rem 1rem;">Cancel</button>
@@ -2092,6 +2096,125 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeCreateVolModal()">Cancel</button>
       <button class="btn btn-primary" onclick="submitCreateVol()">Create Volume</button>
+    </div>
+  </div>
+</div>
+
+<div id="createNetModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 450px;">
+    <div class="modal-header"><h3>Create Network</h3><button class="modal-close" onclick="closeModal('createNetModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Name</label><input type="text" id="newNetName" placeholder="e.g. app-net"></div>
+      <div class="form-group"><label>CIDR</label><input type="text" id="newNetCidr" placeholder="192.168.50.0/24"></div>
+      <div class="form-group"><label><input type="checkbox" id="newNetExternal"> External / public</label></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createNetModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateNet()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="createSgModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 450px;">
+    <div class="modal-header"><h3>Create Security Group</h3><button class="modal-close" onclick="closeModal('createSgModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Name</label><input type="text" id="newSgName"></div>
+      <div class="form-group"><label>Description</label><input type="text" id="newSgDesc"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createSgModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateSg()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="createFipModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 450px;">
+    <div class="modal-header"><h3>Allocate Floating IP</h3><button class="modal-close" onclick="closeModal('createFipModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>External network</label><select id="newFipNetwork"></select></div>
+      <div class="form-group"><label>Assign to VM port (optional)</label><select id="newFipPort"><option value="">Unassigned</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createFipModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateFip()">Allocate</button>
+    </div>
+  </div>
+</div>
+
+<div id="createRouterModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 450px;">
+    <div class="modal-header"><h3>Add Router</h3><button class="modal-close" onclick="closeModal('createRouterModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Name</label><input type="text" id="newRtrName"></div>
+      <div class="form-group"><label>External network (optional)</label><select id="newRtrExt"><option value="">None</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createRouterModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateRouter()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="createFlavorModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 450px;">
+    <div class="modal-header"><h3>Create Flavor</h3><button class="modal-close" onclick="closeModal('createFlavorModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Name</label><input type="text" id="newFlName"></div>
+      <div class="form-group"><label>vCPUs</label><input type="number" id="newFlVcpus" value="1" min="1"></div>
+      <div class="form-group"><label>RAM (MiB)</label><input type="number" id="newFlRam" value="1024" min="64"></div>
+      <div class="form-group"><label>Disk (GiB)</label><input type="number" id="newFlDisk" value="0" min="0"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createFlavorModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateFlavor()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="createKeypairModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 500px;">
+    <div class="modal-header"><h3>Create SSH Key</h3><button class="modal-close" onclick="closeModal('createKeypairModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Name</label><input type="text" id="newKpName" placeholder="my-laptop"></div>
+      <div class="form-group"><label>Public key (leave empty to generate)</label><textarea id="newKpPublic" rows="4" placeholder="ssh-rsa AAAA..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createKeypairModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateKeypair()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="createJobModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 500px;">
+    <div class="modal-header"><h3>New Scheduled Job</h3><button class="modal-close" onclick="closeModal('createJobModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Name</label><input type="text" id="newJobName" placeholder="Nightly snapshot"></div>
+      <div class="form-group"><label>Action</label>
+        <select id="newJobAction">
+          <option value="start_vm">Start VM</option>
+          <option value="stop_vm">Stop VM</option>
+          <option value="reboot_vm">Reboot VM</option>
+          <option value="snapshot_volume">Snapshot volume</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Target</label><select id="newJobTarget"></select></div>
+      <div class="form-group"><label>Schedule type</label>
+        <select id="newJobKind" onchange="syncJobScheduleFields()">
+          <option value="cron">Cron</option>
+          <option value="interval">Every N minutes</option>
+          <option value="once">Once at</option>
+        </select>
+      </div>
+      <div class="form-group" id="jobCronWrap"><label>Cron (min hour day month weekday)</label><input type="text" id="newJobCron" value="0 2 * * *"></div>
+      <div class="form-group hidden" id="jobIntervalWrap"><label>Minutes</label><input type="number" id="newJobMinutes" value="60" min="1"></div>
+      <div class="form-group hidden" id="jobOnceWrap"><label>When</label><input type="datetime-local" id="newJobAt"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createJobModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateJob()">Create job</button>
     </div>
   </div>
 </div>
