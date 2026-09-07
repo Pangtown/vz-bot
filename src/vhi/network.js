@@ -174,3 +174,82 @@ export async function listSecurityGroups() {
   const data = await res.json();
   return data.security_groups || [];
 }
+
+async function neutron(method, path, wrapKey, payload) {
+  const client = await getClient();
+  const opts = { method };
+  if (payload !== undefined) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify(wrapKey ? { [wrapKey]: payload } : payload);
+  }
+  const res = await client.fetch(networkUrl(path), opts);
+  if (method === 'DELETE') {
+    if (!res.ok && res.status !== 404) {
+      const text = await res.text();
+      throw new Error(`VHI Network ${method} ${path} failed (${res.status}): ${text.slice(0, 300)}`);
+    }
+    return true;
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Network ${method} ${path} failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  if (res.status === 204) return true;
+  const data = await res.json();
+  if (wrapKey && data[wrapKey] !== undefined) return data[wrapKey];
+  return data;
+}
+
+export async function createSecurityGroup(options = {}) {
+  return neutron('POST', '/security-groups', 'security_group', options);
+}
+
+export async function deleteSecurityGroup(id) {
+  return neutron('DELETE', `/security-groups/${id}`);
+}
+
+export async function createSecurityGroupRule(options = {}) {
+  return neutron('POST', '/security-group-rules', 'security_group_rule', options);
+}
+
+export async function deleteSecurityGroupRule(id) {
+  return neutron('DELETE', `/security-group-rules/${id}`);
+}
+
+export async function listFloatingIPs() {
+  const data = await neutron('GET', '/floatingips');
+  return data.floatingips || [];
+}
+
+export async function createFloatingIP(options = {}) {
+  return neutron('POST', '/floatingips', 'floatingip', options);
+}
+
+export async function updateFloatingIP(id, options = {}) {
+  return neutron('PUT', `/floatingips/${id}`, 'floatingip', options);
+}
+
+export async function deleteFloatingIP(id) {
+  return neutron('DELETE', `/floatingips/${id}`);
+}
+
+export async function listRouters() {
+  const data = await neutron('GET', '/routers');
+  return data.routers || [];
+}
+
+export async function createRouter(options = {}) {
+  return neutron('POST', '/routers', 'router', options);
+}
+
+export async function deleteRouter(id) {
+  return neutron('DELETE', `/routers/${id}`);
+}
+
+export async function addRouterInterface(routerId, options = {}) {
+  return neutron('PUT', `/routers/${routerId}/add_router_interface`, null, options);
+}
+
+export async function removeRouterInterface(routerId, options = {}) {
+  return neutron('PUT', `/routers/${routerId}/remove_router_interface`, null, options);
+}
