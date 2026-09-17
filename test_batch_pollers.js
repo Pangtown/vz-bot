@@ -11,7 +11,7 @@ async function main() {
         vhiBaseUrl: process.env.VHI_BASE_URL || 'https://172.16.218.7',
         host: process.env.VHI_SSH_HOST || '172.16.218.7',
         username: 'root',
-        password: process.env.VHI_SSH_PASSWORD || 'Nexpass8188!',
+        password: process.env.VHI_SSH_PASSWORD || process.env.VHI_PASSWORD || '',
     };
 
     console.log(`Target Host: ${context.host}`);

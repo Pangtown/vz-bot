@@ -1,12 +1,13 @@
+import 'dotenv/config';
 import { runVinfraCommand } from '../src/vhi/vinfra.js';
 
-process.env.VHI_USER = 'admin';
-process.env.VHI_PASSWORD = 'Nexpass8188!';
-process.env.VHI_BASE_URL = 'https://172.16.218.7';
+process.env.VHI_USER = process.env.VHI_USER || 'admin';
+process.env.VHI_PASSWORD = process.env.VHI_PASSWORD || '';
+process.env.VHI_BASE_URL = process.env.VHI_BASE_URL || 'https://172.16.218.7';
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-process.env.VHI_SSH_HOST = '172.16.218.7';
-process.env.VHI_SSH_USER = 'root';
-process.env.VHI_SSH_PASSWORD = 'Nexpass8188!';
+process.env.VHI_SSH_HOST = process.env.VHI_SSH_HOST || '172.16.218.7';
+process.env.VHI_SSH_USER = process.env.VHI_SSH_USER || 'root';
+process.env.VHI_SSH_PASSWORD = process.env.VHI_SSH_PASSWORD || process.env.VHI_PASSWORD || '';
 
 async function run() {
   try {

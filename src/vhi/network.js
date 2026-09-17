@@ -6,7 +6,10 @@ import { getClient } from './client.js';
 import { getContextValue } from '../gateway/context.js';
 
 const getBaseUrl = () => {
-  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL') || 'https://172.16.218.7';
+  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL');
+  if (!base) {
+    throw new Error('VHI Base URL is not configured. Please provide vhiBaseUrl in context or set VHI_BASE_URL.');
+  }
   return base.replace(/\/$/, '');
 };
 
@@ -74,11 +77,39 @@ export async function deletePort(portId) {
   return true;
 }
 
+export async function createPort(options = {}) {
+  const client = await getClient();
+  const payload = {
+    network_id: options.network_id,
+    name: options.name || '',
+    admin_state_up: options.admin_state_up !== false,
+  };
+  if (options.description) payload.description = options.description;
+  if (options.fixed_ips) payload.fixed_ips = options.fixed_ips;
+  if (options.device_owner) payload.device_owner = options.device_owner;
+  if (options.security_groups) payload.security_groups = options.security_groups;
+
+  const res = await client.fetch(networkUrl('/ports'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ port: payload }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Network createPort failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.port || null;
+}
+
 export async function createNetwork(options = {}) {
   const client = await getClient();
-  
-  // Map 'external' to 'router:external' for VHI/OpenStack
-  const payload = { ...options };
+  const skip = new Set(['cidr', 'ip_version', 'subnet_name', 'gateway_ip', 'enable_dhcp']);
+  const payload = {};
+  for (const [k, v] of Object.entries(options || {})) {
+    if (skip.has(k) || v === undefined) continue;
+    payload[k] = v;
+  }
   if (payload.external !== undefined) {
     payload['router:external'] = payload.external;
     delete payload.external;
@@ -170,4 +201,83 @@ export async function listSecurityGroups() {
   }
   const data = await res.json();
   return data.security_groups || [];
+}
+
+async function neutron(method, path, wrapKey, payload) {
+  const client = await getClient();
+  const opts = { method };
+  if (payload !== undefined) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify(wrapKey ? { [wrapKey]: payload } : payload);
+  }
+  const res = await client.fetch(networkUrl(path), opts);
+  if (method === 'DELETE') {
+    if (!res.ok && res.status !== 404) {
+      const text = await res.text();
+      throw new Error(`VHI Network ${method} ${path} failed (${res.status}): ${text.slice(0, 300)}`);
+    }
+    return true;
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Network ${method} ${path} failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  if (res.status === 204) return true;
+  const data = await res.json();
+  if (wrapKey && data[wrapKey] !== undefined) return data[wrapKey];
+  return data;
+}
+
+export async function createSecurityGroup(options = {}) {
+  return neutron('POST', '/security-groups', 'security_group', options);
+}
+
+export async function deleteSecurityGroup(id) {
+  return neutron('DELETE', `/security-groups/${id}`);
+}
+
+export async function createSecurityGroupRule(options = {}) {
+  return neutron('POST', '/security-group-rules', 'security_group_rule', options);
+}
+
+export async function deleteSecurityGroupRule(id) {
+  return neutron('DELETE', `/security-group-rules/${id}`);
+}
+
+export async function listFloatingIPs() {
+  const data = await neutron('GET', '/floatingips');
+  return data.floatingips || [];
+}
+
+export async function createFloatingIP(options = {}) {
+  return neutron('POST', '/floatingips', 'floatingip', options);
+}
+
+export async function updateFloatingIP(id, options = {}) {
+  return neutron('PUT', `/floatingips/${id}`, 'floatingip', options);
+}
+
+export async function deleteFloatingIP(id) {
+  return neutron('DELETE', `/floatingips/${id}`);
+}
+
+export async function listRouters() {
+  const data = await neutron('GET', '/routers');
+  return data.routers || [];
+}
+
+export async function createRouter(options = {}) {
+  return neutron('POST', '/routers', 'router', options);
+}
+
+export async function deleteRouter(id) {
+  return neutron('DELETE', `/routers/${id}`);
+}
+
+export async function addRouterInterface(routerId, options = {}) {
+  return neutron('PUT', `/routers/${routerId}/add_router_interface`, null, options);
+}
+
+export async function removeRouterInterface(routerId, options = {}) {
+  return neutron('PUT', `/routers/${routerId}/remove_router_interface`, null, options);
 }

@@ -19,6 +19,15 @@ import argparse
 import subprocess
 from pathlib import Path
 
+# Fix Windows console encoding issues for Unicode emojis
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass # Python 3.6 or older might not have reconfigure
+
+
 AGENT_DIR = Path(".agent")
 PID_FILE = AGENT_DIR / "preview.pid"
 LOG_FILE = AGENT_DIR / "preview.log"
@@ -71,6 +80,9 @@ def start_server(port=3000):
     
     print(f"🚀 Starting preview on port {port}...")
     
+    if isinstance(cmd, list):
+        cmd = " ".join(cmd)
+        
     with open(LOG_FILE, "w") as log:
         process = subprocess.Popen(
             cmd,

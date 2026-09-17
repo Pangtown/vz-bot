@@ -1,9 +1,10 @@
+import 'dotenv/config';
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import { getClient } from './src/vhi/client.js';
 
-process.env.VHI_USER = 'admin';
-process.env.VHI_PASSWORD = 'Nexpass8188!';
-process.env.VHI_BASE_URL = 'https://172.16.218.7';
+process.env.VHI_USER = process.env.VHI_USER || 'admin';
+process.env.VHI_PASSWORD = process.env.VHI_PASSWORD || '';
+process.env.VHI_BASE_URL = process.env.VHI_BASE_URL || 'https://172.16.218.7';
 
 async function mirrorPython() {
   const client = await getClient();
@@ -16,7 +17,7 @@ async function mirrorPython() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       auth: {
-        identity: { methods: ['password'], password: { user: { domain: { name: 'Default' }, name: 'admin', password: 'Nexpass8188!' } } },
+        identity: { methods: ['password'], password: { user: { domain: { name: 'Default' }, name: process.env.VHI_USER || 'admin', password: process.env.VHI_PASSWORD || '' } } },
         scope: { project: { domain: { name: 'Default' }, name: 'admin' } }
       }
     })

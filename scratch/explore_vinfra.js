@@ -1,9 +1,10 @@
+import 'dotenv/config';
 import { Client } from 'ssh2';
 import { logger, retryOperation } from '../src/utils/index.js';
 
-const host = '172.16.218.7';
-const username = 'root';
-const password = 'Nexpass8188!';
+const host = process.env.VHI_SSH_HOST || '172.16.218.7';
+const username = process.env.VHI_SSH_USER || 'root';
+const password = process.env.VHI_SSH_PASSWORD || process.env.VHI_PASSWORD || '';
 
 async function run() {
     await retryOperation(async () => {

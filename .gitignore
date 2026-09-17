@@ -3,3 +3,9 @@ node_modules/
 memory/
 *.log
 .DS_Store
+backups/
+data/
+scratch/
+tmp/
+*.txt
+

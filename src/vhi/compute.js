@@ -6,7 +6,10 @@ import { getClient } from './client.js';
 import { getContextValue } from '../gateway/context.js';
 
 const getBaseUrl = () => {
-  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL') || 'https://172.16.218.7';
+  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL');
+  if (!base) {
+    throw new Error('VHI Base URL is not configured. Please provide vhiBaseUrl in context or set VHI_BASE_URL.');
+  }
   return base.replace(/\/$/, '');
 };
 
@@ -58,6 +61,21 @@ export async function getServer(serverId) {
   return data.server || null;
 }
 
+export async function getConsoleOutput(serverId, length = 4096) {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl(`/servers/${serverId}/action`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 'os-getConsoleOutput': { length } }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute getConsoleOutput failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.output || '';
+}
+
 export async function serverAction(serverId, action, body = {}) {
   const client = await getClient();
   const res = await client.fetch(await computeUrl(`/servers/${serverId}/action`), {
@@ -73,7 +91,12 @@ export async function serverAction(serverId, action, body = {}) {
 }
 
 export async function startServer(serverId) {
-  return serverAction(serverId, 'os-start');
+  try {
+    return await serverAction(serverId, 'os-start');
+  } catch (err) {
+    if (/409/.test(String(err.message)) && /active/i.test(String(err.message))) return true;
+    throw err;
+  }
 }
 
 export async function stopServer(serverId) {
@@ -96,36 +119,59 @@ export async function deleteServer(serverId) {
 
 export async function createServer(options = {}) {
   const client = await getClient();
-  
-  // Abstraction for easier LLM use
+
+  const incomingBdm = Array.isArray(options.block_device_mapping_v2) ? options.block_device_mapping_v2 : null;
+  const volumeBoot = incomingBdm && incomingBdm.some((d) => d.source_type === 'volume');
+  const bdm = incomingBdm ? incomingBdm[0] : null;
+  const imageRef = volumeBoot
+    ? undefined
+    : (options.imageRef || (bdm?.source_type === 'image' ? bdm.uuid : undefined));
+  const volumeSize = options.volume_size || bdm?.volume_size || 50;
+  const volumeType = options.volume_type || bdm?.volume_type;
+
   const payload = {
     name: options.name,
-    imageRef: options.imageRef,
     flavorRef: options.flavorRef,
     networks: options.networks || [],
     min_count: options.min_count || 1,
     max_count: options.max_count || 1,
   };
+  if (imageRef) payload.imageRef = imageRef;
 
   // If networks is just a string (ID), convert to object
   if (typeof payload.networks === 'string') {
     payload.networks = [{ uuid: payload.networks }];
   }
 
-  // Default to Boot from Volume (block_device_mapping_v2) if an image is provided
-  // to avoid MaxRetriesExceeded scheduling errors on compute nodes without ephemeral storage.
-  if (options.volume_size || options.volume_type || options.imageRef) {
+  // Post-provision script via cloud-init: Nova expects base64 user_data (max 65535 bytes)
+  if (options.user_data) {
+    const encoded = Buffer.from(String(options.user_data), 'utf8').toString('base64');
+    if (encoded.length > 65535) {
+      throw new Error('user_data too large: cloud-init payload must be under 64 KB');
+    }
+    payload.user_data = encoded;
+    // Deliver user_data via config drive so cloud-init works even on networks
+    // where the Nova metadata service (169.254.169.254) is unreachable.
+    payload.config_drive = true;
+  }
+
+  if (options.key_name) {
+    payload.key_name = options.key_name;
+  }
+
+  if (volumeBoot) {
+    payload.block_device_mapping_v2 = incomingBdm;
+  } else if (volumeSize || volumeType || imageRef) {
+    // Boot from volume created from a Glance image to avoid nodes without ephemeral disks.
     payload.block_device_mapping_v2 = [{
       boot_index: 0,
-      uuid: options.imageRef,
+      uuid: imageRef,
       source_type: 'image',
       destination_type: 'volume',
-      volume_size: options.volume_size || 50,
-      volume_type: options.volume_type || undefined,
+      volume_size: volumeSize,
+      volume_type: volumeType || undefined,
       delete_on_termination: options.delete_on_termination !== false
     }];
-    // When using BDM for boot, the root imageRef must be removed
-    delete payload.imageRef; 
   }
 
   console.log('[CREATE_VM] Payload:', JSON.stringify({ server: payload }, null, 2));
@@ -180,14 +226,9 @@ export async function getRemoteConsole(serverId, protocol = 'vnc', type = 'novnc
         const baseUri = new URL(base);
         const baseHostname = baseUri.hostname;
         
-        // Regex to check if hostname is NOT an IP address
-        const isIp = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(baseHostname);
-        
-        if (!isIp) {
-          console.log(`[DEBUG] Overriding VNC IP with hostname: ${baseHostname}`);
-          // Replace the IP segment of the URL (e.g., https://208.98.41.133:6080/...) with hostname
-          consoleUrl = consoleUrl.replace(/https?:\/\/[^:/]+(:[0-9]+)/, `${baseUri.protocol}//${baseHostname}$1`);
-        }
+        console.log(`[DEBUG] Overriding console hostname to target VHI endpoint: ${baseHostname}`);
+        // Replace scheme + hostname returned by Nova (e.g., https://demo.nexvantage.net:6080/...) with reachable base hostname
+        consoleUrl = consoleUrl.replace(/https?:\/\/[^:/]+(:[0-9]+)/, `${baseUri.protocol}//${baseHostname}$1`);
       } catch (err) {
         console.error('[DEBUG] Failed to override VNC URL hostname:', err.message);
       }
@@ -197,7 +238,10 @@ export async function getRemoteConsole(serverId, protocol = 'vnc', type = 'novnc
   }
   
   const textErr = await res.text();
-  throw new Error(`VNC Console negotiation failed (${res.status}): ${textErr.slice(0, 200)}`);
+  if (res.status === 400 || textErr.includes('Unavailable console type') || textErr.includes('Invalid input') || textErr.includes('Invalid console type')) {
+    throw new Error(`Console type '${type}' (${protocol}) is not enabled on this VHI cluster. Only VNC (noVNC) is currently configured in Nova.`);
+  }
+  throw new Error(`Console negotiation failed (${res.status}): ${textErr.slice(0, 200)}`);
 }
 
 export async function listFlavors() {
@@ -209,6 +253,76 @@ export async function listFlavors() {
   }
   const data = await res.json();
   return data.flavors || [];
+}
+
+export async function createFlavor(options = {}) {
+  const client = await getClient();
+  const payload = {
+    name: options.name,
+    ram: Number(options.ram),
+    vcpus: Number(options.vcpus),
+    disk: Number(options.disk) || 0,
+    'os-flavor-access:is_public': options.is_public !== false,
+  };
+  const res = await client.fetch(await computeUrl('/flavors'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ flavor: payload }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute createFlavor failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.flavor || null;
+}
+
+export async function deleteFlavor(flavorId) {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl(`/flavors/${flavorId}`), { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text();
+    throw new Error(`VHI Compute deleteFlavor failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
+export async function listKeypairs() {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl('/os-keypairs'));
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute listKeypairs failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return (data.keypairs || []).map((k) => k.keypair || k);
+}
+
+export async function createKeypair(options = {}) {
+  const client = await getClient();
+  const body = { name: options.name };
+  if (options.public_key) body.public_key = options.public_key;
+  const res = await client.fetch(await computeUrl('/os-keypairs'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keypair: body }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute createKeypair failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.keypair || null;
+}
+
+export async function deleteKeypair(name) {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl(`/os-keypairs/${encodeURIComponent(name)}`), { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text();
+    throw new Error(`VHI Compute deleteKeypair failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
 }
 
 export async function listHypervisors() {

@@ -31,8 +31,21 @@ export async function getNetwork(args) {
 
 export async function createNetwork(args) {
     if (!args.name) throw new Error('name required');
-    const network = await apiCreateNetwork(args);
-    return { ok: true, action: 'create_network', network_id: network.id, network };
+    const network = await apiCreateNetwork({
+        name: args.name,
+        external: args.external,
+        admin_state_up: args.admin_state_up,
+    });
+    let subnet = null;
+    if (args.cidr) {
+        subnet = await apiCreateSubnet({
+            network_id: network.id,
+            cidr: args.cidr,
+            ip_version: args.ip_version || 4,
+            name: args.subnet_name || `${args.name}-subnet`,
+        });
+    }
+    return { ok: true, action: 'create_network', network_id: network.id, network, subnet };
 }
 
 export async function deleteNetwork(args) {

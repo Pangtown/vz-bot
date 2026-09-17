@@ -8,6 +8,7 @@ import * as network from './network.js';
 import * as image from './image.js';
 import * as health from './health.js';
 import * as vinfra from './vinfra.js';
+import * as jobs from './jobs.js';
 
 const TOOLS = {
   // VM
@@ -47,6 +48,8 @@ const TOOLS = {
 
   // Vinfra CLI
   execute_vinfra_cli: vinfra.vinfraCli.execute,
+  list_scheduled_jobs: jobs.listScheduledJobs,
+  create_scheduled_job: jobs.createScheduledJob,
 };
 
 export function isAllowed(name, confirmed = false) {

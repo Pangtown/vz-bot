@@ -5,7 +5,7 @@ dotenv.config();
 // We'll read from .env or just use the known ones
 const host = process.env.VHI_SSH_HOST || '172.16.218.7';
 const username = process.env.VHI_SSH_USER || 'root';
-const password = process.env.VHI_SSH_PASSWORD || 'VirtuozzoD3m0!';
+const password = process.env.VHI_SSH_PASSWORD || process.env.VHI_PASSWORD || '';
 
 function execSsh(cmd) {
     return new Promise((resolve, reject) => {
@@ -32,8 +32,8 @@ async function main() {
         console.log('Stdout:', res1.stdout.substring(0, 100));
         console.log('Stderr:', res1.stderr);
 
-        console.log('\nTesting with VINFRA_USERNAME=admin VINFRA_PASSWORD=... VINFRA_PROJECT_NAME=admin...');
-        const res2 = await execSsh('VINFRA_USERNAME="admin" VINFRA_PASSWORD="VirtuozzoD3m0!" VINFRA_DOMAIN="Default" VINFRA_PROJECT_NAME="admin" vinfra cluster list -f json');
+        const vhiPass = process.env.VHI_PASSWORD || '';
+        const res2 = await execSsh(`VINFRA_USERNAME="admin" VINFRA_PASSWORD="${vhiPass}" VINFRA_DOMAIN="Default" VINFRA_PROJECT_NAME="admin" vinfra cluster list -f json`);
         console.log('Code:', res2.code);
         console.log('Stdout:', res2.stdout.substring(0, 100));
         console.log('Stderr:', res2.stderr);

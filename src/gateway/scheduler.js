@@ -9,6 +9,8 @@ import * as billingMeter from '../monitoring/billing-meter.js';
 import * as billingStorage from '../monitoring/billing-storage.js';
 import { runAuditPoll } from '../monitoring/audit-poller.js';
 import { runAlertPoll } from '../monitoring/alert-poller.js';
+import { tickDueJobs } from './jobs.js';
+import { tickMigrations } from '../vmware/migration-engine.js';
 import { getLastValidContext } from './context.js';
 
 let healthJob = null;
@@ -102,6 +104,20 @@ export function start(config = {}) {
     }, 15000);
     console.log(`Scheduler: audit & alert poll every 5 min`);
   }
+
+  cron.schedule('* * * * *', async () => {
+    try {
+      await tickDueJobs();
+    } catch (e) {
+      console.error('User job tick error:', e.message);
+    }
+  });
+  console.log('Scheduler: user jobs tick every minute');
+
+  setInterval(() => {
+    tickMigrations().catch((err) => console.error('Migration tick error:', err.message));
+  }, 4000);
+  console.log('Scheduler: Coriolis-style migration engine tick every 4s');
 }
 
 /**

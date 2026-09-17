@@ -56,7 +56,7 @@ header: Connection: keep-alive
 header: Vary: X-Auth-Token
 header: x-openstack-request-id: req-8d953e8c-bdcc-4041-95b6-2ce478fb21f0
 send: b'POST /v3/auth/tokens HTTP/1.1\r\nHost: 172.16.218.7:5000\r\nUser-Agent: openstacksdk/4.8.0 keystoneauth1/5.12.0 python-requests/2.32.5 CPython/3.13.12\r\nAccept-Encoding: gzip, deflate, br\r\nAccept: application/json\r\nConnection: keep-alive\r\nContent-Type: application/json\r\nContent-Length: 221\r\n\r\n'
-send: b'{"auth": {"identity": {"methods": ["password"], "password": {"user": {"password": "Nexpass8188!", "name": "admin", "domain": {"name": "Default"}}}}, "scope": {"project": {"name": "admin", "domain": {"name": "Default"}}}}}'
+send: b'{"auth": {"identity": {"methods": ["password"], "password": {"user": {"password": "***HIDDEN***", "name": "admin", "domain": {"name": "Default"}}}}, "scope": {"project": {"name": "admin", "domain": {"name": "Default"}}}}}'
 reply: 'HTTP/1.1 201 CREATED\r\n'
 header: Server: nginx
 header: Date: Mon, 23 Feb 2026 02:24:47 GMT

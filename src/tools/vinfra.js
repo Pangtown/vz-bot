@@ -2,7 +2,7 @@ import { runVinfraCommand } from '../vhi/vinfra.js';
 
 export const vinfraCli = {
     name: 'execute_vinfra_cli',
-    description: 'Execute arbitrary vinfra CLI commands on the VHI cluster. *** IMPORTANT: THE CLUSTER IS ALREADY CONFIGURED ON THE SERVER (172.16.218.7) ***. You MUST ALWAYS use this tool whenever you need cluster-level info or specialized VM details. DO NOT ASK THE USER FOR CREDENTIALS. DO NOT CLAIM THE HOST IS NOT CONFIGURED. Provide an array of command arguments, e.g., ["cluster", "list"].',
+    description: 'Execute vinfra CLI commands on the VHI cluster to retrieve cluster-level info or specialized node/service details. Provide an array of command arguments, e.g., ["cluster", "list"] or ["node", "list"]. Omit the "vinfra" prefix.',
     inputSchema: {
         type: 'object',
         properties: {
@@ -11,7 +11,7 @@ export const vinfraCli = {
                 items: {
                     type: 'string'
                 },
-                description: 'Array of strings representing the vinfra command arguments. Omit the "vinfra" prefix and omit the format flags (like -f json) as those are handled automatically.'
+                description: 'Array of strings representing the vinfra command arguments. Omit the "vinfra" prefix and omit format flags (like -f json) as those are handled automatically.'
             }
         },
         required: ['args'],
@@ -21,6 +21,10 @@ export const vinfraCli = {
             const { args } = input;
             if (!Array.isArray(args) || args.length === 0) {
                 throw new Error('Args array must be provided and not empty.');
+            }
+            const first = String(args[0]).trim();
+            if (first.startsWith('/') || first === 'reboot' || first === 'sh' || first === 'bash') {
+                throw new Error('Raw shell command execution is prohibited. Only vinfra subcommands are allowed.');
             }
             return await runVinfraCommand(args);
         } catch (err) {

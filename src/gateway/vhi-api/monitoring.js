@@ -113,7 +113,15 @@ export async function handleAuditRefresh(req, res, ctx) {
 export async function handleGetSshSettings(req, res, ctx) {
   try {
     const config = await loadGlobalSshConfig(ctx.vhiBaseUrl);
-    return json(res, 200, config);
+    const sanitized = {
+      host: config.host || '',
+      username: config.username || 'root',
+      authMethod: config.authMethod || (config.privateKey ? 'key' : 'password'),
+      hasPassword: !!config.password,
+      hasPrivateKey: !!config.privateKey,
+      hasPassphrase: !!config.passphrase,
+    };
+    return json(res, 200, sanitized);
   } catch (err) {
     logger.error(`handleGetSshSettings error: ${err.message}`, { error: err.message });
     return json(res, 500, { error: err.message });
@@ -123,6 +131,23 @@ export async function handleGetSshSettings(req, res, ctx) {
 export async function handlePostSshSettings(req, res, ctx) {
   try {
     const config = await readBody(req);
+    const existing = await loadGlobalSshConfig(ctx.vhiBaseUrl);
+
+    // If secrets were not provided but previously configured, retain the existing values
+    if (!config.password && config.hasPassword && existing.password) {
+      config.password = existing.password;
+    }
+    if (!config.privateKey && config.hasPrivateKey && existing.privateKey) {
+      config.privateKey = existing.privateKey;
+    }
+    if (!config.passphrase && config.hasPassphrase && existing.passphrase) {
+      config.passphrase = existing.passphrase;
+    }
+
+    delete config.hasPassword;
+    delete config.hasPrivateKey;
+    delete config.hasPassphrase;
+
     await saveGlobalSshConfig(config, ctx.vhiBaseUrl);
     logger.info('Saved global SSH settings');
     return json(res, 200, { ok: true });

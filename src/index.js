@@ -31,25 +31,30 @@ process.on('unhandledRejection', (reason) => {
   logger.error(`Unhandled rejection (service kept alive): ${msg}`, { reason });
 });
 
-let chatPageHtml = null;
 async function getChatPage() {
-  if (chatPageHtml) return chatPageHtml;
-  chatPageHtml = await readFile(join(__dirname, '..', 'public', 'index.html'), 'utf8');
-  return chatPageHtml;
+  return readFile(join(__dirname, '..', 'public', 'index.html'), 'utf8');
 }
 
-let vhiPageHtml = null;
 async function getVhiPage() {
-  if (vhiPageHtml) return vhiPageHtml;
-  vhiPageHtml = await readFile(join(__dirname, '..', 'public', 'vhi.html'), 'utf8');
-  return vhiPageHtml;
+  return readFile(join(__dirname, '..', 'public', 'vhi.html'), 'utf8');
 }
 
-let clustersPageHtml = null;
 async function getClustersPage() {
-  if (clustersPageHtml) return clustersPageHtml;
-  clustersPageHtml = await readFile(join(__dirname, '..', 'public', 'clusters.html'), 'utf8');
-  return clustersPageHtml;
+  return readFile(join(__dirname, '..', 'public', 'clusters.html'), 'utf8');
+}
+
+async function getMarketplacePage() {
+  return readFile(join(__dirname, '..', 'public', 'marketplace.html'), 'utf8');
+}
+
+async function getSpicePage() {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>No console</title>
+<style>body{font:15px/1.45 system-ui,sans-serif;background:#111;color:#ddd;margin:2rem;max-width:40rem}</style>
+</head><body>
+<h1>This is not a VM console</h1>
+<p>SPICE mock terminals are disabled. Open the guest from the VHI dashboard with <strong>VNC (Web)</strong> after Nova has deployed it.</p>
+</body></html>`;
 }
 
 const app = async (req, res) => {
@@ -121,6 +126,28 @@ const app = async (req, res) => {
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Error loading clusters page.');
+    }
+    return;
+  }
+  if (method === 'GET' && (url === '/marketplace' || url === '/marketplace/' || url === '/marketplace.html')) {
+    try {
+      const html = await getMarketplacePage();
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error loading marketplace page.');
+    }
+    return;
+  }
+  if (method === 'GET' && (url === '/spice' || url === '/spice/' || url === '/spice.html' || url === '/console' || url === '/console.html')) {
+    try {
+      const html = await getSpicePage();
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error loading console page: ' + e.message);
     }
     return;
   }
@@ -283,8 +310,8 @@ server.listen(PORT, () => {
   logger.info(`VZ Bot listening on ${url}`);
   logger.info('Open this URL in your browser for the chat page (text box to type messages):');
   logger.info(`  ${url}`);
+  scheduler.start({ healthPollIntervalMinutes: Number(process.env.HEALTH_POLL_MINUTES) || 5 });
   if (process.env.HEALTH_POLL_ENABLED !== '0') {
     logger.info(`Scheduler: health poll every ${Number(process.env.HEALTH_POLL_MINUTES) || 5} min`);
-    scheduler.start({ healthPollIntervalMinutes: Number(process.env.HEALTH_POLL_MINUTES) || 5 });
   }
 });

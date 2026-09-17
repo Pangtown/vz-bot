@@ -1,8 +1,8 @@
 {
   "https://172.16.218.7": {
-    "host": "172.16.218.7",
+    "host": "",
     "username": "root",
-    "password": "Nexpass8188!",
+    "password": "",
     "authMethod": "password"
   },
   "https://demo.nexvantage.com": {

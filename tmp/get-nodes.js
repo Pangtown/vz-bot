@@ -6,10 +6,10 @@ async function main() {
     try {
         console.log('Running vinfra node list...');
         const creds = {
-            host: '172.16.218.7',
-            username: 'root',
-            password: 'Nexpass8188!',
-            vhiBaseUrl: 'https://172.16.218.7'
+            host: process.env.VHI_SSH_HOST || '172.16.218.7',
+            username: process.env.VHI_SSH_USER || 'root',
+            password: process.env.VHI_SSH_PASSWORD || process.env.VHI_PASSWORD || '',
+            vhiBaseUrl: process.env.VHI_BASE_URL || 'https://172.16.218.7'
         };
         const nodes = await runVinfraCommand(['node', 'list'], creds);
         await writeFile('tmp/vNodes_raw.json', JSON.stringify(nodes, null, 2));

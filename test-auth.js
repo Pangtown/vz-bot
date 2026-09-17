@@ -1,5 +1,7 @@
+import 'dotenv/config';
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-const url = 'https://demo.nexvantage.com:5000/v3/auth/tokens';
+const base = process.env.VHI_BASE_URL || 'https://demo.nexvantage.com';
+const url = `${base}:5000/v3/auth/tokens`;
 
 async function testAuth(project) {
     const body = {
@@ -7,7 +9,7 @@ async function testAuth(project) {
             identity: {
                 methods: ['password'],
                 password: {
-                    user: { name: 'admin', domain: { name: 'Default' }, password: 'VirtuozzoD3m0!' }
+                    user: { name: process.env.VHI_USER || 'admin', domain: { name: 'Default' }, password: process.env.VHI_PASSWORD || '' }
                 }
             },
             scope: {

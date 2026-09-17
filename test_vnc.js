@@ -9,7 +9,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 async function testConsoles() {
   const base = process.env.VHI_BASE_URL || 'https://172.16.218.7';
   const user = process.env.VHI_USER || 'admin';
-  const pass = process.env.VHI_PASSWORD || 'Password123!';
+  const pass = process.env.VHI_PASSWORD || '';
   const domain = 'Default';
 
   console.log('Authenticating...');

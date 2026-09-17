@@ -6,7 +6,10 @@ import { getClient } from './client.js';
 import { getContextValue } from '../gateway/context.js';
 
 const getBaseUrl = () => {
-  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL') || 'https://172.16.218.7';
+  const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL');
+  if (!base) {
+    throw new Error('VHI Base URL is not configured. Please provide vhiBaseUrl in context or set VHI_BASE_URL.');
+  }
   return base.replace(/\/$/, '');
 };
 
@@ -25,30 +28,44 @@ async function blockUrl(path = '', resourceType = 'volumes') {
   return `${base}:${port}${prefix}${path}`;
 }
 
-export async function listVolumes() {
+async function listBlockCollection(resourceType, extraParams = {}) {
   const client = await getClient();
-  // Try multiple URL patterns for administrative visibility
-  const urlWithProject = await blockUrl('/detail?all_tenants=1');
-  const urlWithoutProject = urlWithProject.replace(/\/v3\/[^/]+\/volumes/, '/v3/volumes');
-  
-  const urls = [urlWithoutProject, urlWithProject];
-  let lastError = null;
+  const collected = [];
+  const seen = new Set();
+  const pageSize = 200;
+  let marker = null;
 
-  for (const url of urls) {
-    try {
-      const res = await client.fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        // If we got results, great. If not, maybe try the next one.
-        if (data.volumes && data.volumes.length > 0) return data.volumes;
-        if (url === urls[urls.length - 1]) return data.volumes || [];
-      }
-    } catch (err) {
-      lastError = err;
+  for (let page = 0; page < 40; page++) {
+    const params = new URLSearchParams();
+    params.set('limit', String(pageSize));
+    for (const [k, v] of Object.entries(extraParams)) {
+      if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
     }
-  }
+    if (marker) params.set('marker', marker);
 
-  throw lastError || new Error('VHI Block listVolumes failed to retrieve any volumes');
+    const url = await blockUrl(`/detail?${params.toString()}`, resourceType);
+    const res = await client.fetch(url);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`VHI Block list ${resourceType} failed (${res.status}): ${text.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    const items = data[resourceType] || [];
+    for (const item of items) {
+      if (item?.id && !seen.has(item.id)) {
+        seen.add(item.id);
+        collected.push(item);
+      }
+    }
+    if (items.length < pageSize) break;
+    marker = items[items.length - 1].id;
+    if (!marker) break;
+  }
+  return collected;
+}
+
+export async function listVolumes() {
+  return listBlockCollection('volumes');
 }
 
 export async function listVolumeTypes() {
@@ -184,6 +201,34 @@ export async function updateVolume(volumeId, options = {}) {
   return data.volume || null;
 }
 
+export async function setVolumeBootable(volumeId, bootable = true) {
+  const client = await getClient();
+  const res = await client.fetch(await blockUrl(`/${volumeId}/action`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 'os-set_bootable': { bootable: !!bootable } }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Block setVolumeBootable failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
+export async function setVolumeImageMetadata(volumeId, metadata) {
+  const client = await getClient();
+  const res = await client.fetch(await blockUrl(`/${volumeId}/action`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 'os-set_image_metadata': { metadata } }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Block setVolumeImageMetadata failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
 export async function deleteVolume(volumeId) {
   const client = await getClient();
   const res = await client.fetch(await blockUrl(`/${volumeId}`), { method: 'DELETE' });
@@ -223,6 +268,23 @@ export async function attachVolume(serverId, volumeId, device) {
   return data.volumeAttachment || null;
 }
 
+export async function forceDetachVolume(volumeId, attachmentId) {
+  const client = await getClient();
+  const payload = attachmentId
+    ? { 'os-force_detach': { attachment_id: attachmentId } }
+    : { 'os-force_detach': {} };
+  const res = await client.fetch(await blockUrl(`/${volumeId}/action`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok && res.status !== 202 && res.status !== 204) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`VHI Block forceDetach failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
 export async function detachVolume(serverId, attachmentId) {
   const client = await getClient();
   const res = await client.fetch(await computeUrl(`/servers/${serverId}/os-volume_attachments/${attachmentId}`), {
@@ -238,15 +300,19 @@ export async function detachVolume(serverId, attachmentId) {
 // ── Snapshots ─────────────────────────────────────────────────────────────
 
 export async function listSnapshots() {
+  return listBlockCollection('snapshots');
+}
+
+export async function getSnapshot(snapshotId) {
   const client = await getClient();
-  const url = await blockUrl('/detail', 'snapshots');
-  const res = await client.fetch(url);
+  const res = await client.fetch(await blockUrl(`/${snapshotId}`, 'snapshots'));
   if (!res.ok) {
+    if (res.status === 404) return null;
     const text = await res.text();
-    throw new Error(`VHI Block listSnapshots failed (${res.status}): ${text.slice(0, 300)}`);
+    throw new Error(`VHI Block getSnapshot failed (${res.status}): ${text.slice(0, 300)}`);
   }
   const data = await res.json();
-  return data.snapshots || [];
+  return data.snapshot || null;
 }
 
 export async function createSnapshot(name, volumeId, description = '') {

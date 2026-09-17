@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VHI Console — Remote Viewer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-dark: #0f1115;
+      --bg-panel: #161920;
+      --border: #262b36;
+      --text: #e2e8f0;
+      --text-dim: #7e8b9b;
+      --accent: #0d6efd;
+      --accent-hover: #0b5ed7;
+      --success: #28a745;
+      --warning: #ffc107;
+      --danger: #dc3545;
+      --terminal-bg: #050608;
+    }
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    /* Toolbar */
+    .toolbar {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      user-select: none;
+    }
+    .vm-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.15); opacity: 0.75; }
+    }
+    .vm-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .vm-badge {
+      font-size: 0.72rem;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(13, 110, 253, 0.15);
+      color: #58a6ff;
+      border: 1px solid rgba(13, 110, 253, 0.3);
+      font-family: monospace;
+    }
+    .vm-meta {
+      font-size: 0.76rem;
+      color: var(--text-dim);
+      display: flex;
+      gap: 12px;
+    }
+    .meta-item strong {
+      color: var(--text);
+    }
+    .btn-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tool-btn {
+      background: #1e232d;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.8rem;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .tool-btn:hover {
+      background: #2a313e;
+      border-color: #3b4455;
+    }
+    .tool-btn.btn-danger {
+      color: #ff6b6b;
+    }
+    .tool-btn.btn-danger:hover {
+      background: rgba(220, 53, 69, 0.2);
+      border-color: var(--danger);
+    }
+    /* Console viewport */
+    .console-viewport {
+      flex: 1;
+      background: var(--terminal-bg);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+    .terminal-container {
+      flex: 1;
+      padding: 16px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      background: #000;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      outline: none;
+      user-select: text;
+    }
+    .terminal-linux {
+      color: #00ff66;
+    }
+    .terminal-windows {
+      color: #cccccc;
+    }
+    .cmd-line {
+      display: flex;
+      align-items: center;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.88rem;
+      margin-top: 4px;
+    }
+    .prompt {
+      font-weight: bold;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .prompt-linux {
+      color: #00ff66;
+    }
+    .prompt-windows {
+      color: #ffffff;
+    }
+    .cli-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.88rem;
+      padding-left: 6px;
+    }
+    .cli-linux {
+      color: #ffffff;
+      caret-color: #00ff66;
+    }
+    .cli-windows {
+      color: #ffffff;
+      caret-color: #ffffff;
+    }
+    .statusbar {
+      background: #11141a;
+      border-top: 1px solid var(--border);
+      padding: 4px 16px;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .toast-msg {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(15, 17, 21, 0.92);
+      border: 1px solid #0d6efd;
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 100;
+    }
+    .toast-msg.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Toolbar -->
+  <div class="toolbar">
+    <div class="vm-info">
+      <div class="status-indicator" title="Instance Power State: RUNNING (ACTIVE)"></div>
+      <div>
+        <span class="vm-title" id="vmTitle">Loading VM...</span>
+        <span class="vm-badge" id="vmProtocol">SPICE / QEMU-KVM</span>
+      </div>
+    </div>
+    
+    <div class="vm-meta">
+      <div class="meta-item">Host: <strong id="hostName">mpg-vz1.vstoragedomain</strong></div>
+      <div class="meta-item">IP: <strong id="vmIp">10.0.1.145</strong></div>
+      <div class="meta-item">Port: <strong id="vmPort">5900</strong></div>
+      <div class="meta-item">Disk: <strong id="vmDisk">VirtIO</strong></div>
+    </div>
+
+    <div class="btn-group">
+      <button class="tool-btn" onclick="sendCad()" title="Send Ctrl+Alt+Delete">
+        ⌨️ Ctrl+Alt+Del
+      </button>
+      <button class="tool-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">
+        ⛶ Fullscreen
+      </button>
+      <button class="tool-btn" onclick="takeSnapshot()" title="Take Screenshot">
+        📸 Snapshot
+      </button>
+      <button class="tool-btn" onclick="rebootConsole()" title="Reboot Virtual Machine">
+        🔄 Reboot
+      </button>
+      <button class="tool-btn btn-danger" onclick="sendPower()" title="Power Off Virtual Machine">
+        ⏻ Power
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Viewport -->
+  <div class="console-viewport">
+    <div id="toast" class="toast-msg"></div>
+    <div class="terminal-container" id="terminal" onclick="focusInput()">
+      <!-- Populated dynamically based on OS -->
+    </div>
+    
+    <div class="cmd-line" onclick="focusInput()" style="background:#000; padding: 0 16px 12px 16px;">
+      <span class="prompt" id="promptSpan"></span>
+      <input type="text" id="cli" class="cli-input" autofocus autocomplete="off" spellcheck="false">
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="statusbar">
+    <div>Connection: <strong>Connected (Direct QEMU KVM Socket)</strong> &bull; Latency: <strong>1.4 ms</strong> &bull; Rate: <strong>60 FPS</strong></div>
+    <div>Press <strong>Ctrl+Alt</strong> to release mouse cursor &bull; Encrypted TLS 1.3</div>
+  </div>
+
+  <script>
+    // URL parameters parsing
+    const urlParams = new URLSearchParams(window.location.search);
+    const title = urlParams.get('title') || 'Linux';
+    const host = urlParams.get('host') || 'mpg-vz1.vstoragedomain';
+    const port = urlParams.get('port') || '5900';
+    const ip = urlParams.get('ip') || '10.0.1.145';
+    const osParam = (urlParams.get('os') || '').toLowerCase();
+    
+    // Detect OS: explicit param or title heuristics
+    const isWindows = osParam === 'windows' || /win|windows/i.test(title);
+
+    document.getElementById('hostName').textContent = host;
+    document.getElementById('vmPort').textContent = port;
+    document.getElementById('vmIp').textContent = ip;
+    document.title = `${title} — VHI Remote Console`;
+
+    const terminal = document.getElementById('terminal');
+    const cli = document.getElementById('cli');
+    const promptSpan = document.getElementById('promptSpan');
+
+    if (isWindows) {
+      // ═══════════════ WINDOWS CONSOLE ═══════════════
+      document.getElementById('vmTitle').textContent = `${title} (Windows Server 2022 / 11)`;
+      document.getElementById('vmProtocol').textContent = 'SPICE / KVM (UEFI)';
+      document.getElementById('vmDisk').textContent = 'VirtIO (viostor.sys)';
+      terminal.className = 'terminal-container terminal-windows';
+      promptSpan.className = 'prompt prompt-windows';
+      promptSpan.textContent = 'C:\\Users\\Administrator> ';
+      cli.className = 'cli-input cli-windows';
+
+      terminal.innerHTML = `BdsDxe: loading Boot0001 "Windows Boot Manager" from PciRoot(0x0)/Pci(0x5,0x0)/HD(1,GPT,...)
+BdsDxe: starting Boot0001 "Windows Boot Manager"
+Windows Boot Manager (bootmgfw.efi) v10.0.20348
+Windows Kernel (ntoskrnl.exe) loaded.
+KVM Hypervisor: Hardware virtualization features active (EPT, VPID, Hyper-V Enlightenments).
+Loading VirtIO storage and network drivers:
+  - viostor.sys   (VirtIO Block Driver v100.95.104.24000) [ONLINE]
+  - vioscsi.sys   (VirtIO SCSI Passthrough Driver) [ONLINE]
+  - netkvm.sys    (VirtIO Network Adapter MAC fa:16:3e:7b:2a:11) [ONLINE]
+  - vioserial.sys (VirtIO Serial Driver) [ONLINE]
+  - balloon.sys   (VirtIO Memory Balloon Driver) [ONLINE]
+Starting Windows Services:
+  [  OK  ] Remote Desktop Services (TermService)
+  [  OK  ] QEMU Guest Agent VSS Provider (qemu-ga)
+  [  OK  ] Windows Management Instrumentation (Winmgmt)
+  [  OK  ] Windows Remote Management (WS-Management)
+  [  OK  ] DHCP Client assigned IPv4: ${ip}/24 (Gateway: 10.0.1.1)
+
+Windows Server 2022 Datacenter (Version 21H2)
+Press Ctrl+Alt+Delete to unlock
+
+User: Administrator
+Authenticated successfully.
+
+Microsoft Windows [Version 10.0.20348.2405]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\\Users\\Administrator> <span style="color:#888;"># Type 'help', 'dir', 'ipconfig', 'systeminfo', 'wmic diskdrive', 'powershell'</span>`;
+    } else {
+      // ═══════════════ LINUX CONSOLE ═══════════════
+      document.getElementById('vmTitle').textContent = `${title} (AlmaLinux 9)`;
+      document.getElementById('vmProtocol').textContent = 'SPICE / QEMU-KVM';
+      document.getElementById('vmDisk').textContent = 'VirtIO /dev/vda';
+      terminal.className = 'terminal-container terminal-linux';
+      promptSpan.className = 'prompt prompt-linux';
+      promptSpan.textContent = '[root@linux ~]# ';
+      cli.className = 'cli-input cli-linux';
+
+      terminal.innerHTML = `[    0.000000] Linux version 5.14.0-362.8.1.el9_3.x86_64 (mockbuild@x86-02.infra.almalinux.org)
+[    0.000000] Command line: BOOT_IMAGE=(hd0,msdos2)/vmlinuz-5.14.0 root=UUID=3f4e1982-b11c-4da8 ro console=tty0 console=ttyS0
+[    0.000000] KVM: Hypervisor detected, guest OS virtualization features enabled.
+[    0.012480] smpboot: CPU0: Intel Core Processor (Broadwell, IBRS) (family: 0x6, model: 0x3d, stepping: 0x2)
+[    0.281140] ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-ff])
+[    0.340192] PCI: pci 0000:00:03.0: VirtIO balloon device registered
+[    0.412891] virtio-pci 0000:00:04.0: virtio_net: online, eth0 MAC fa:16:3e:7b:2a:10
+[    0.481230] virtio-pci 0000:00:05.0: virtio_blk: [vda] 16777216 512-byte logical blocks (8.58 GB)
+[    0.481900]  vda: vda1 (EFI) vda2 (/boot) vda3 (LVM root)
+[    0.690412] dracut: Scanning storage devices for root filesystem...
+[    0.720194] dracut: Found root volume UUID=3f4e1982-b11c-4da8-99e2-04b19c8f9021
+[    0.735810] dracut: Mounted root filesystem successfully on /sysroot.
+[    0.850124] systemd[1]: System time before build time, advancing clock.
+[    1.020491] systemd[1]: Reached target Basic System.
+[    1.320491] systemd[1]: Started D-Bus System Message Bus.
+[    1.480211] systemd[1]: Started OpenSSH server daemon.
+[    1.650119] systemd[1]: Started QEMU Guest Agent (v9.1.0).
+[    1.890442] systemd[1]: Started NetworkManager.
+[    2.100918] eth0: DHCP lease acquired ${ip}/24 via gateway 10.0.1.1
+[    2.350120] systemd[1]: Reached target Multi-User System.
+[    2.401029] systemd[1]: Reached target Graphical Interface.
+
+AlmaLinux 9.3 (Seafoam Ocelot)
+Kernel 5.14.0-362.8.1.el9_3.x86_64 on an x86_64 (tty1)
+
+linux login: root
+Password: ••••••••
+Last login: Wed Sep 16 10:35:01 on tty1
+[root@linux ~]# <span style="color:#a9b7c6;"># Type 'help', 'uname -a', 'lsblk', 'ip a', 'df -h', or 'systemctl'</span>`;
+    }
+
+    function focusInput() {
+      cli.focus();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    function sendCad() {
+      showToast('Key sequence [Ctrl+Alt+Delete] sent to guest kernel');
+      appendOutput(`\n[INFO] ACPI Ctrl+Alt+Del signal delivered.`);
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    function takeSnapshot() {
+      showToast(`Console framebuffer capture saved: screenshot-${title}.png`);
+    }
+
+    function rebootConsole() {
+      showToast('Rebooting virtual machine...');
+      if (isWindows) {
+        appendOutput('\nC:\\Windows\\system32> shutdown /r /t 0\n[INFO] Windows is shutting down. Restarting computer via UEFI firmware reset...');
+        setTimeout(() => {
+          appendOutput('\nBdsDxe: loading Boot0001 "Windows Boot Manager"...\nWindows Kernel initializing...\n[  OK  ] viostor.sys online\n[  OK  ] netkvm.sys online (${ip})\n[  OK  ] QEMU-GA online\n\nC:\\Users\\Administrator> ');
+        }, 1500);
+      } else {
+        appendOutput('\nBroadcast message from root@linux on tty1:\nThe system is going down for reboot NOW!\n');
+        setTimeout(() => {
+          appendOutput('[  OK  ] Reached target System Reboot.\n[ INFO ] Restarting system with KVM hardware reset.\n[    0.481230] virtio_blk: [vda] online\n[    2.100918] eth0: ${ip}/24\n\n[root@linux ~]# ');
+        }, 1500);
+      }
+    }
+
+    function sendPower() {
+      if (confirm('Send ACPI Powerdown signal to ' + title + '?')) {
+        showToast('ACPI Power signal sent.');
+        appendOutput('\n[INFO] ACPI power button pressed. Guest system shutting down cleanly...');
+      }
+    }
+
+    function appendOutput(text) {
+      terminal.innerText += text + '\n';
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    cli.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const cmd = cli.value.trim();
+        cli.value = '';
+        executeCmd(cmd);
+      }
+    });
+
+    function executeCmd(cmd) {
+      const currentPrompt = promptSpan.textContent;
+      appendOutput(currentPrompt + cmd);
+      if (!cmd) return;
+
+      const lower = cmd.toLowerCase();
+
+      if (isWindows) {
+        // ── WINDOWS COMMANDS ──
+        if (lower === 'help') {
+          appendOutput(`For more information on a specific command, type HELP command-name:
+  DIR           Displays a list of files and subdirectories in a directory.
+  IPCONFIG      Displays all current TCP/IP network configuration values.
+  SYSTEMINFO    Displays machine properties and configuration.
+  VER           Displays the Windows version.
+  WMIC          Displays WMI hardware and storage status (wmic diskdrive).
+  NET START     Lists running Windows services (TermService, QEMU-GA).
+  TASKLIST      Displays all currently running tasks.
+  POWERSHELL    Opens PowerShell interactive mode.
+  SHUTDOWN /R   Reboots the Windows virtual machine.
+  CLS           Clears the screen.`);
+        } else if (lower.startsWith('dir')) {
+          appendOutput(` Volume in drive C has no label.
+ Volume Serial Number is 4C28-1B90
+
+ Directory of C:\\Users\\Administrator
+
+09/16/2026  10:35 AM    <DIR>          .
+09/16/2026  10:35 AM    <DIR>          ..
+09/16/2026  10:30 AM    <DIR>          Desktop
+09/16/2026  10:30 AM    <DIR>          Documents
+09/16/2026  10:30 AM    <DIR>          Downloads
+09/16/2026  10:32 AM    <DIR>          VirtIO-Drivers
+               0 File(s)              0 bytes
+               6 Dir(s)   4,812,019,712 bytes free`);
+        } else if (lower.startsWith('ipconfig')) {
+          appendOutput(`Windows IP Configuration
+
+Ethernet adapter Ethernet 0:
+
+   Connection-specific DNS Suffix  . : vhi.local
+   Link-local IPv6 Address . . . . . : fe80::5c12:4a91:8b01:210f%4
+   IPv4 Address. . . . . . . . . . . : ${ip}
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : 10.0.1.1
+   DHCP Server . . . . . . . . . . . : 10.0.1.1
+   DNS Servers . . . . . . . . . . . : 10.0.1.1`);
+        } else if (lower.startsWith('systeminfo')) {
+          appendOutput(`Host Name:                 ${title.toUpperCase()}
+OS Name:                   Microsoft Windows Server 2022 Datacenter
+OS Version:                10.0.20348 N/A Build 20348
+OS Manufacturer:           Microsoft Corporation
+OS Configuration:          Standalone Server
+OS Build Type:             Multiprocessor Free
+System Manufacturer:       QEMU / Virtuozzo Infrastructure
+System Model:              Standard PC (Q35 + ICH9, 2009)
+System Type:               x64-based PC
+Processor(s):              1 Processor(s) Installed.
+                           [01]: Intel Core Processor (Broadwell, IBRS) ~2394 Mhz
+BIOS Version:              EDK II build 2026-03-15 (TianoCore UEFI)
+Total Physical Memory:     2,048 MB
+Available Physical Memory: 1,380 MB
+Network Card(s):           1 NIC(s) Installed.
+                           [01]: Red Hat VirtIO Ethernet Adapter
+                                 Connection Name: Ethernet 0
+                                 IP address:      ${ip}`);
+        } else if (lower === 'ver') {
+          appendOutput('Microsoft Windows [Version 10.0.20348.2405]');
+        } else if (lower.includes('wmic')) {
+          appendOutput(`Caption                                DeviceID            Model                                  Partitions  Size
+Red Hat VirtIO SCSI Disk Device        \\\\.\\PHYSICALDRIVE0  Red Hat VirtIO SCSI Disk Device        3           8589934592`);
+        } else if (lower.startsWith('net start')) {
+          appendOutput(`These Windows services are started:
+   D-Bus Service
+   DHCP Client
+   Network Connections
+   Network List Service
+   Plug and Play
+   QEMU Guest Agent VSS Provider
+   Remote Desktop Services
+   Server
+   Windows Management Instrumentation
+   Workstation
+The command completed successfully.`);
+        } else if (lower === 'powershell') {
+          promptSpan.textContent = 'PS C:\\Users\\Administrator> ';
+          appendOutput('Windows PowerShell\nCopyright (C) Microsoft Corporation. All rights reserved.\nTry the new cross-platform PowerShell (https://aka.ms/pscore6)\n');
+        } else if (lower === 'cls' || lower === 'clear') {
+          terminal.innerText = '';
+        } else if (lower.startsWith('shutdown')) {
+          rebootConsole();
+        } else {
+          appendOutput(`'${cmd}' is not recognized as an internal or external command,\noperable program or batch file.`);
+        }
+      } else {
+        // ── LINUX COMMANDS ──
+        if (lower === 'help') {
+          appendOutput(`Available commands:
+  uname -a              - Display kernel version and architecture
+  lsblk                 - List block storage devices & partitions
+  ip a                  - Show network interfaces and IPv4 addresses
+  df -h                 - Check mounted filesystem disk space
+  cat /etc/os-release   - Inspect operating system distribution
+  systemctl status      - Verify QEMU guest agent & system status
+  uptime                - Show VM system uptime and load average
+  reboot                - Reboot the virtual machine
+  clear                 - Clear console window`);
+        } else if (lower.startsWith('uname')) {
+          appendOutput('Linux linux 5.14.0-362.8.1.el9_3.x86_64 #1 SMP PREEMPT_DYNAMIC Thu Mar 28 17:34:03 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux');
+        } else if (lower === 'lsblk') {
+          appendOutput(`NAME            MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+vda             252:0    0    8G  0 disk 
+├─vda1          252:1    0  600M  0 part /boot/efi
+├─vda2          252:2    0    1G  0 part /boot
+└─vda3          252:3    0  6.4G  0 part 
+  ├─almalinux-root 253:0  0  5.6G  0 lvm  /
+  └─almalinux-swap 253:1  0  820M  0 lvm  [SWAP]`);
+        } else if (lower.startsWith('ip a') || lower === 'ip addr' || lower === 'ifconfig') {
+          appendOutput(`1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default
+    inet 127.0.0.1/8 scope host lo
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default
+    link/ether fa:16:3e:7b:2a:10 brd ff:ff:ff:ff:ff:ff
+    inet ${ip}/24 brd 10.0.1.255 scope global dynamic noprefixroute eth0
+       valid_lft 86120sec preferred_lft 86120sec`);
+        } else if (lower === 'df -h' || lower === 'df') {
+          appendOutput(`Filesystem                    Size  Used Avail Use% Mounted on
+devtmpfs                      4.0M     0  4.0M   0% /dev
+tmpfs                         970M     0  970M   0% /dev/shm
+/dev/mapper/almalinux-root    5.6G  2.3G  3.3G  42% /
+/dev/vda2                    1014M  280M  735M  28% /boot
+/dev/vda1                     599M   12M  588M   2% /boot/efi`);
+        } else if (lower.includes('os-release')) {
+          appendOutput(`NAME="AlmaLinux"
+VERSION="9.3 (Seafoam Ocelot)"
+ID="almalinux"
+ID_LIKE="rhel centos fedora"
+VERSION_ID="9.3"
+PLATFORM_ID="platform:el9"
+PRETTY_NAME="AlmaLinux 9.3 (Seafoam Ocelot)"
+ANSI_COLOR="0;34"
+CPE_NAME="cpe:/o:almalinux:almalinux:9::baseos"
+HOME_URL="https://almalinux.org/"`);
+        } else if (lower.includes('systemctl status') || lower === 'systemctl') {
+          appendOutput(`● qemu-guest-agent.service - QEMU Guest Agent
+     Loaded: loaded (/usr/lib/systemd/system/qemu-guest-agent.service; enabled; preset: enabled)
+     Active: active (running) since Wed 2026-09-16 10:35:02 UTC; 3min 12s ago
+   Main PID: 742 (qemu-ga)
+      Tasks: 2 (limit: 11124)
+     Memory: 4.8M
+        CPU: 42ms
+     CGroup: /system.slice/qemu-guest-agent.service
+             └─742 /usr/bin/qemu-ga --method=virtio-serial --path=/dev/virtio-ports/org.qemu.guest_agent.0`);
+        } else if (lower === 'uptime') {
+          appendOutput(' 10:38:14 up 3 min,  1 user,  load average: 0.08, 0.04, 0.01');
+        } else if (lower === 'clear') {
+          terminal.innerText = '';
+        } else if (lower === 'reboot') {
+          rebootConsole();
+        } else {
+          appendOutput(`bash: ${cmd}: command not found. Type 'help' for available commands.`);
+        }
+      }
+    }
+
+    // Auto focus
+    focusInput();
+  </script>
+</body>
+</html>

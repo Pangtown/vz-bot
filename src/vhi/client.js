@@ -6,6 +6,7 @@ import { getToken } from './identity.js';
 import { getContextValue } from '../gateway/context.js';
 
 const cache = new Map();
+const inFlightTokens = new Map();
 const REFRESH_BEFORE_SEC = 60;
 
 function getCacheKey() {
@@ -35,9 +36,21 @@ export async function getClient() {
       },
     };
   }
-  const { token, expiresAt, projectId } = await getToken();
-  cached = { token, expiresAt, projectId };
-  cache.set(key, cached);
+
+  let tokenPromise = inFlightTokens.get(key);
+  if (!tokenPromise) {
+    tokenPromise = getToken()
+      .then((res) => {
+        cache.set(key, res);
+        return res;
+      })
+      .finally(() => {
+        inFlightTokens.delete(key);
+      });
+    inFlightTokens.set(key, tokenPromise);
+  }
+
+  const { token, projectId } = await tokenPromise;
   return {
     token,
     projectId,
@@ -50,4 +63,5 @@ export async function getClient() {
 
 export function clearTokenCache() {
   cache.clear();
+  inFlightTokens.clear();
 }

@@ -5,9 +5,9 @@ dotenv.config();
 async function test() {
     try {
         const creds = {
-            host: '172.16.218.7',
-            username: 'root',
-            password: 'Nexpass8188!'
+            host: process.env.VHI_SSH_HOST || '172.16.218.7',
+            username: process.env.VHI_SSH_USER || 'root',
+            password: process.env.VHI_SSH_PASSWORD || process.env.VHI_PASSWORD || ''
         };
         console.log("Fetching cluster network list...");
         const nets = await runVinfraCommand(['cluster', 'network', 'list'], creds);
