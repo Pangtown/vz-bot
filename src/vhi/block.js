@@ -201,6 +201,34 @@ export async function updateVolume(volumeId, options = {}) {
   return data.volume || null;
 }
 
+export async function setVolumeBootable(volumeId, bootable = true) {
+  const client = await getClient();
+  const res = await client.fetch(await blockUrl(`/${volumeId}/action`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 'os-set_bootable': { bootable: !!bootable } }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Block setVolumeBootable failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
+export async function setVolumeImageMetadata(volumeId, metadata) {
+  const client = await getClient();
+  const res = await client.fetch(await blockUrl(`/${volumeId}/action`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 'os-set_image_metadata': { metadata } }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Block setVolumeImageMetadata failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
 export async function deleteVolume(volumeId) {
   const client = await getClient();
   const res = await client.fetch(await blockUrl(`/${volumeId}`), { method: 'DELETE' });
@@ -240,6 +268,23 @@ export async function attachVolume(serverId, volumeId, device) {
   return data.volumeAttachment || null;
 }
 
+export async function forceDetachVolume(volumeId, attachmentId) {
+  const client = await getClient();
+  const payload = attachmentId
+    ? { 'os-force_detach': { attachment_id: attachmentId } }
+    : { 'os-force_detach': {} };
+  const res = await client.fetch(await blockUrl(`/${volumeId}/action`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok && res.status !== 202 && res.status !== 204) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`VHI Block forceDetach failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return true;
+}
+
 export async function detachVolume(serverId, attachmentId) {
   const client = await getClient();
   const res = await client.fetch(await computeUrl(`/servers/${serverId}/os-volume_attachments/${attachmentId}`), {
@@ -256,6 +301,18 @@ export async function detachVolume(serverId, attachmentId) {
 
 export async function listSnapshots() {
   return listBlockCollection('snapshots');
+}
+
+export async function getSnapshot(snapshotId) {
+  const client = await getClient();
+  const res = await client.fetch(await blockUrl(`/${snapshotId}`, 'snapshots'));
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    const text = await res.text();
+    throw new Error(`VHI Block getSnapshot failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.snapshot || null;
 }
 
 export async function createSnapshot(name, volumeId, description = '') {

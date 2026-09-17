@@ -2,8 +2,16 @@
  * VHI 7.x Image API (Glance-style) – images list, get
  */
 
+import { Agent } from 'undici';
 import { getClient } from './client.js';
 import { getContextValue } from '../gateway/context.js';
+
+const longBodyAgent = new Agent({
+    headersTimeout: 0,
+    bodyTimeout: 0,
+    connectTimeout: 120000,
+});
+
 
 const getBaseUrl = () => {
     const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL');
@@ -66,6 +74,11 @@ export async function createImage(options = {}) {
     };
     if (options.os_distro) body.os_distro = options.os_distro;
     if (options.min_disk) body.min_disk = Number(options.min_disk);
+    if (options.hw_firmware_type) body.hw_firmware_type = options.hw_firmware_type;
+    if (options.hw_disk_bus) body.hw_disk_bus = options.hw_disk_bus;
+    if (options.hw_machine_type) body.hw_machine_type = options.hw_machine_type;
+    if (options.vmware_disktype) body.vmware_disktype = options.vmware_disktype;
+    if (options.vmware_adaptertype) body.vmware_adaptertype = options.vmware_adaptertype;
 
     const res = await client.fetch(imageUrl(), {
         method: 'POST',
@@ -94,6 +107,7 @@ export async function uploadImageData(imageId, bodyStream, contentLength) {
         headers,
         body: bodyStream,
         duplex: 'half',
+        dispatcher: longBodyAgent,
     });
     if (!res.ok && res.status !== 204) {
         const text = await res.text().catch(() => '');
@@ -129,4 +143,37 @@ export async function deleteImage(imageId) {
         throw new Error(`VHI Image deleteImage failed (${res.status}): ${text.slice(0, 300)}`);
     }
     return { ok: true };
+}
+
+export async function importImageFromUrl(imageId, uri) {
+    const client = await getClient();
+    const res = await client.fetch(imageUrl(`/${imageId}/import`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            method: { name: 'web-download', uri },
+        }),
+        dispatcher: longBodyAgent,
+    });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`VHI Image web-download import failed (${res.status}): ${text.slice(0, 400)}`);
+    }
+    return { ok: true };
+}
+
+export async function waitImage(imageId, statuses, timeoutMs = 2 * 60 * 60 * 1000) {
+    const want = new Set((statuses || ['active']).map((s) => String(s).toLowerCase()));
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        const img = await getImage(imageId);
+        if (!img) throw new Error(`Glance image ${imageId} disappeared`);
+        const st = String(img.status || '').toLowerCase();
+        if (want.has(st)) return img;
+        if (st === 'killed' || st === 'deleted' || st === 'error') {
+            throw new Error(`Glance image ${imageId} ended in ${img.status}`);
+        }
+        await new Promise((r) => setTimeout(r, 8000));
+    }
+    throw new Error(`Glance image ${imageId} did not reach ${[...want].join('/')} within ${timeoutMs}ms`);
 }

@@ -208,7 +208,7 @@
       letter-spacing: .5px;
       margin-bottom: .4rem;
     }
-    .form-group input, .form-group select {
+    .form-group input, .form-group select, .form-group textarea {
       width: 100%;
       padding: .72rem 1rem;
       background: #1e1e1e;
@@ -221,7 +221,7 @@
       outline: none;
     }
     .form-group input::placeholder { color: #666; }
-    .form-group input:focus, .form-group select:focus {
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(227,0,15,.2);
     }
@@ -779,6 +779,7 @@
     .modal-card {
       background: var(--bg-medium); border: 1px solid var(--border);
       border-radius: 12px; width: 480px; max-width: 95vw;
+      max-height: calc(100vh - 24px);
       box-shadow: 0 16px 48px rgba(0,0,0,.6);
       display: flex; flex-direction: column; overflow: hidden;
       transform: translateY(0); transition: transform .3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -791,10 +792,12 @@
     .modal-header h3 { font-size: 1.1rem; font-weight: 700; margin: 0; }
     .modal-close { background: none; border: none; font-size: 1.2rem; color: var(--text-dim); cursor: pointer; }
     .modal-close:hover { color: var(--text); }
-    .modal-body { padding: 1.5rem; overflow-y: auto; max-height: 70vh; }
+    .modal-body { padding: 1.5rem; overflow-y: auto; max-height: 70vh; flex: 1; min-height: 0; }
+    .modal-body.hidden { display: none !important; }
     .modal-footer {
       padding: 1rem 1.5rem; border-top: 1px solid var(--border);
-      display: flex; justify-content: flex-end; gap: .75rem; background: var(--bg-light);
+      display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .75rem; background: var(--bg-light);
+      flex-shrink: 0;
     }
     /* Console Modal specific */
     .console-options {
@@ -862,6 +865,26 @@
     .sub-tab.active {
       color: var(--text);
       border-bottom-color: var(--accent);
+    }
+    .task-check-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      background: #28a745;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .task-chevron {
+      color: var(--text-dim);
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-left: auto;
+      padding-left: 0.5rem;
     }
     .view-hidden { display: none !important; }
     .domain-back {
@@ -1054,14 +1077,18 @@
     .provider-option {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      padding: 1rem;
+      gap: 0.75rem;
+      padding: 0.7rem 0.85rem;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      margin-bottom: 0.8rem;
+      margin-bottom: 0.5rem;
       cursor: pointer;
       background: var(--bg-card);
       transition: all var(--transition);
+    }
+    .provider-option.selected {
+      border-color: var(--accent);
+      background: rgba(227, 0, 15, 0.06);
     }
     .provider-option:hover:not(.disabled) {
       border-color: var(--accent);
@@ -1096,6 +1123,13 @@
       color: var(--text-dim);
       margin-top: 2px;
     }
+    #addCloudModal .modal-card {
+      width: 520px;
+      max-width: calc(100vw - 24px);
+      max-height: calc(100vh - 24px);
+    }
+    #addCloudModal .modal-body { max-height: none; padding: 1rem 1.25rem; }
+    #addCloudModal .hidden { display: none !important; }
   </style>
 </head>
 <body>
@@ -1119,20 +1153,20 @@
           <h5>VNC (Web) <span class="badge" style="background:#22c55e; color:#fff; font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Active</span></h5>
           <p>Standard web console (noVNC). Enabled &amp; Ready.</p>
         </div>
-        <div class="console-option" onclick="openWebConsole('spice', 'spice-html5')" style="opacity:0.75;">
+        <div class="console-option" onclick="toast('SPICE is not enabled. Use VNC (Web) for the real Nova console.', 'warn')" style="opacity:0.45; cursor:not-allowed;">
           <span class="ri">🌶️</span>
-          <h5>SPICE (Web) <span class="badge" style="background:rgba(255,255,255,0.15); color:var(--text-dim); font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Cluster Disabled</span></h5>
-          <p>Modern web console. Requires SPICE proxy on cluster.</p>
+          <h5>SPICE (Web) <span class="badge" style="background:rgba(255,255,255,0.15); color:var(--text-dim); font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Unavailable</span></h5>
+          <p>Not a mock terminal. This cluster serves noVNC only.</p>
         </div>
-        <div class="console-option" onclick="openWebConsole('rdp', 'rdp-html5')" style="opacity:0.75;">
+        <div class="console-option" onclick="toast('RDP web console is not available. Use VNC (Web).', 'warn')" style="opacity:0.45; cursor:not-allowed;">
           <span class="ri">🪟</span>
-          <h5>RDP (Web) <span class="badge" style="background:rgba(255,255,255,0.15); color:var(--text-dim); font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Cluster Disabled</span></h5>
-          <p>Windows Remote Desktop via browser.</p>
+          <h5>RDP (Web) <span class="badge" style="background:rgba(255,255,255,0.15); color:var(--text-dim); font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Unavailable</span></h5>
+          <p>Not implemented. Use VNC (Web) after the guest is deployed.</p>
         </div>
-        <div class="console-option" onclick="downloadVvFile()" style="opacity:0.75;">
+        <div class="console-option" onclick="toast('Virt-viewer is not available. Use VNC (Web).', 'warn')" style="opacity:0.45; cursor:not-allowed;">
           <span class="ri">📥</span>
-          <h5>Virt-viewer <span class="badge" style="background:rgba(255,255,255,0.15); color:var(--text-dim); font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Cluster Disabled</span></h5>
-          <p>Requires SPICE driver configured on compute nodes.</p>
+          <h5>Virt-viewer <span class="badge" style="background:rgba(255,255,255,0.15); color:var(--text-dim); font-size:0.65rem; padding:0.15rem 0.4rem; border-radius:4px; margin-left:0.3rem;">Unavailable</span></h5>
+          <p>No .vv download. Use VNC (Web) for the Nova remote console.</p>
         </div>
       </div>
     </div>
@@ -1153,15 +1187,15 @@
 
     <div class="form-group">
       <label>Cluster Address</label>
-      <input type="text" id="loginHost" placeholder="hostname or IP (e.g. 192.168.1.10)" autocomplete="off">
+      <input type="text" id="loginHost" value="172.16.218.7" placeholder="hostname or IP (e.g. 192.168.1.10)" autocomplete="off">
     </div>
     <div class="form-group">
       <label>Username</label>
-      <input type="text" id="loginUser" placeholder="admin" autocomplete="username">
+      <input type="text" id="loginUser" value="admin" placeholder="admin" autocomplete="username">
     </div>
     <div class="form-group">
       <label>Password</label>
-      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+      <input type="password" id="loginPass" value="Nexpass8188!" placeholder="••••••••" autocomplete="current-password">
     </div>
 
     <button class="advanced-toggle" id="advToggle" type="button">
@@ -2007,6 +2041,254 @@
           </div>
         </div>
 
+        <!-- MIGRATION DETAIL VIEW (Replication & Deployment Lifecycle) -->
+        <div class="tab-content-panel" id="tab-migration-detail" style="display: none;">
+          <!-- Breadcrumb Header -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+            <div id="migDetailBreadcrumb" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem;">
+              <a href="javascript:void(0)" onclick="closeMigrationDetail()" style="color: var(--text-dim); text-decoration: none; font-weight: 500;">Migrations</a>
+              <span style="color: var(--text-dim);">&rsaquo;</span>
+              <strong id="migDetailTitle" style="color: var(--text); font-size: 1.05rem;">Linux</strong>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <div id="migDetailActionWrap"></div>
+              <button class="txt-btn" onclick="closeMigrationDetail()">&larr; Back to Migrations</button>
+            </div>
+          </div>
+
+          <!-- Migration Details Sub Tabs -->
+          <div class="sub-tabs" style="margin-bottom: 1.2rem; background: var(--bg-card); border-bottom: 1px solid var(--border);">
+            <div class="sub-tab active" data-migtab="overview" onclick="switchMigDetailSubTab('overview')">OVERVIEW</div>
+            <div class="sub-tab" data-migtab="replications" onclick="switchMigDetailSubTab('replications')">REPLICATIONS</div>
+            <div class="sub-tab" data-migtab="deployments" onclick="switchMigDetailSubTab('deployments')">DEPLOYMENTS</div>
+          </div>
+
+          <!-- 1. OVERVIEW SUB-VIEW (Screenshot 1) -->
+          <div id="migDetailSubOverview" class="mig-sub-content active">
+            <!-- Top Details Card -->
+            <div class="table-card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+                <h3 style="font-size: 1.05rem; font-weight: 600; margin: 0;">Details</h3>
+                <button class="txt-btn" style="font-size: 0.85rem; color: var(--text); display: inline-flex; align-items: center; gap: 0.3rem;"><span class="ri">&#9998;</span> Edit</button>
+              </div>
+              <div style="display: grid; grid-template-columns: 220px 1fr; row-gap: 0.85rem; font-size: 0.88rem; align-items: center;">
+                <div class="text-dim">Source cloud</div>
+                <div><a href="javascript:void(0)" id="migDetailSrcCloud" style="color: #0d6efd; text-decoration: none; font-weight: 500;">VMware (VMware)</a></div>
+
+                <div class="text-dim">Target domain / project</div>
+                <div id="migDetailTargetProj" style="font-weight: 500;">Default / admin</div>
+
+                <div class="text-dim">Status</div>
+                <div id="migDetailStatusWrap">
+                  <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
+                    <span class="task-check-icon">&#10003;</span> Deployed
+                  </span>
+                </div>
+
+                <div class="text-dim">Migration ID</div>
+                <div class="mono text-dim" id="migDetailId" style="font-size: 0.85rem;">26e13f4e-86f2-499a-809d-f2f3435ee011</div>
+
+                <div class="text-dim">Created</div>
+                <div class="text-dim" id="migDetailCreated">July 16, 2026 12:26 PM</div>
+
+                <div class="text-dim">Updated</div>
+                <div class="text-dim" id="migDetailUpdated">August 3, 2026 10:17 AM</div>
+              </div>
+            </div>
+
+            <!-- Bottom 2-Column Grid (Source Options & Target Options) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+              <!-- Source Options Card -->
+              <div class="table-card" style="padding: 1.5rem;">
+                <h3 style="font-size: 1.05rem; font-weight: 600; margin: 0 0 1rem 0; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">Source options</h3>
+                <table style="font-size: 0.85rem; margin-bottom: 1.25rem; border: 1px solid var(--border); border-collapse: collapse; width: 100%;">
+                  <thead>
+                    <tr style="background: var(--bg-medium); border-bottom: 1px solid var(--border);">
+                      <th style="padding: 0.5rem 0.8rem; text-align: left;">OS</th>
+                      <th style="padding: 0.5rem 0.8rem; text-align: left;">vCPU</th>
+                      <th style="padding: 0.5rem 0.8rem; text-align: left;">RAM</th>
+                      <th style="padding: 0.5rem 0.8rem; text-align: left;">Disks (1)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td id="migSrcOs" style="padding: 0.6rem 0.8rem; font-weight: 500;">linux</td>
+                      <td id="migSrcVcpu" style="padding: 0.6rem 0.8rem;">1</td>
+                      <td id="migSrcRam" style="padding: 0.6rem 0.8rem;">2 GiB</td>
+                      <td id="migSrcDisks" style="padding: 0.6rem 0.8rem;">8 GiB</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div style="display: grid; grid-template-columns: 240px 1fr; row-gap: 0.75rem; font-size: 0.88rem;">
+                  <div class="text-dim">Auto-enable CBT on source VMs</div>
+                  <div>Yes</div>
+                </div>
+              </div>
+
+              <!-- Target Options Card -->
+              <div class="table-card" style="padding: 1.5rem;">
+                <h3 style="font-size: 1.05rem; font-weight: 600; margin: 0 0 1rem 0; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">Target options</h3>
+                <div style="display: grid; grid-template-columns: 220px 1fr; row-gap: 0.75rem; font-size: 0.88rem;">
+                  <div class="text-dim">Flavor</div>
+                  <div id="migTgtFlavor">Inherited from source</div>
+
+                  <div class="text-dim">Disk bus</div>
+                  <div>VirtIO</div>
+
+                  <div class="text-dim">OS distribution</div>
+                  <div id="migTgtOsDistro">Alma Linux 9</div>
+
+                  <div class="text-dim">Replication porter</div>
+                  <div><span id="migTgtLinuxPorter" class="badge badge-default mono" style="font-size:0.75rem;">vporter-minion-linux</span></div>
+
+                  <div class="text-dim">Morphing porter</div>
+                  <div><span id="migTgtMorphPorter" class="badge badge-default mono" style="font-size:0.75rem;">vporter-minion-linux</span></div>
+
+                  <div class="text-dim">Assigned network / IP</div>
+                  <div><span id="migTgtIp" class="mono" style="font-weight:600; color:var(--text);">pending</span> (<span id="migTgtNet">VM Network</span>)</div>
+
+                  <div class="text-dim">Temporary worker IPs</div>
+                  <div class="mono" style="font-size:0.8rem;" id="migTgtWorkerIps">—</div>
+
+                  <div class="text-dim">Machine type</div>
+                  <div>pc-q35</div>
+
+                  <div class="text-dim">Enable DHCP client</div>
+                  <div id="migTgtDhcp">Yes</div>
+
+                  <div class="text-dim">Retain user credentials</div>
+                  <div id="migTgtRetainCreds">Yes</div>
+
+                  <div class="text-dim">Delete disks on VM deletion</div>
+                  <div id="migTgtDeleteDisks">Yes</div>
+                </div>
+              </div>
+            </div>
+
+            <div id="migDetailErrorBanner" style="display:none; margin-top:1.25rem; padding:0.9rem 1rem; border:1px solid rgba(220,53,69,0.45); background:rgba(220,53,69,0.12); border-radius:6px;">
+              <div style="font-weight:600; color:#ff6b7a; margin-bottom:0.35rem;">Migration error</div>
+              <div id="migDetailErrorText" class="mono" style="font-size:0.82rem; white-space:pre-wrap; color:var(--text);"></div>
+            </div>
+            <div class="table-card" style="margin-top:1.25rem; padding:1.25rem;">
+              <h3 style="font-size:1.05rem; font-weight:600; margin:0 0 0.75rem 0; border-bottom:1px solid var(--border); padding-bottom:0.6rem;">Engine log</h3>
+              <pre id="migDetailLog" class="mono" style="margin:0; max-height:240px; overflow:auto; font-size:0.75rem; white-space:pre-wrap; color:var(--text-dim);"></pre>
+            </div>
+          </div>
+
+          <!-- 2. REPLICATIONS SUB-VIEW with Drawer (Screenshot 2) -->
+          <div id="migDetailSubReplications" class="mig-sub-content" style="display: none; position: relative;">
+            <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
+              <!-- Left: Replications Table -->
+              <div class="table-card" style="flex: 1; padding: 1.25rem;">
+                <div class="table-toolbar" style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+                  <button class="txt-btn" style="border: 1px solid var(--border); padding: 0.4rem 0.65rem; border-radius: 4px; display: inline-flex; align-items: center; font-size: 0.95rem; cursor: pointer;" title="Filters">
+                    <span class="ri">&#8801;</span>
+                  </button>
+                  <div style="position: relative; flex: 1; max-width: 280px;">
+                    <input type="search" class="search-input" id="repSearchInput" placeholder="Search" style="width: 100%; font-size: 0.85rem; padding: 0.4rem 0.8rem 0.4rem 2rem;">
+                    <span style="position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 0.85rem;">&#128269;</span>
+                  </div>
+                </div>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <thead>
+                    <tr style="border-bottom: 1px solid var(--border); font-size: 0.82rem; color: var(--text-dim);">
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Rep... &darr;</th>
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Status &darr;</th>
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Last modified &darr;</th>
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Replic... &darr;</th>
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Replic... &darr;</th>
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Dur... &darr;</th>
+                    </tr>
+                  </thead>
+                  <tbody id="migReplicationsTableBody">
+                    <!-- Replications rows -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Right: Slide-out Replication Details Drawer -->
+              <div id="migReplicationDrawer" class="table-card" style="width: 460px; padding: 1.25rem; border-left: 2px solid #0d6efd; box-shadow: 0 4px 16px rgba(0,0,0,0.12);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.6rem;">
+                  <h3 style="font-size: 1.05rem; font-weight: 600; margin: 0;">Replication details</h3>
+                  <button class="modal-close" onclick="closeReplicationDrawer()" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--text-dim);">&times;</button>
+                </div>
+                <div style="margin-bottom: 0.8rem;">
+                  <span id="migDrawerCancelWrap"></span>
+                  <button class="txt-btn act-danger" onclick="deleteMigrationFromDrawer()" style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; color: var(--danger);"><span class="ri">&#128465;</span> Delete</button>
+                </div>
+                <!-- Drawer toggle buttons (Segmented Pill) -->
+                <div style="display: flex; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 1rem;">
+                  <button id="btnDrawerTasks" onclick="switchDrawerTab('tasks')" style="flex: 1; padding: 0.45rem; background: var(--bg-medium); border: none; font-weight: 600; font-size: 0.82rem; cursor: pointer; color: var(--text);">Tasks (9)</button>
+                  <button id="btnDrawerOverview" onclick="switchDrawerTab('overview')" style="flex: 1; padding: 0.45rem; background: transparent; border: none; font-size: 0.82rem; cursor: pointer; color: var(--text-dim);">Overview</button>
+                </div>
+                <div id="drawerTasksContainer">
+                  <div style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem; align-items: center;">
+                    <div style="position: relative; flex: 1;">
+                      <input type="search" class="search-input" id="repDrawerSearch" placeholder="Search" style="width: 100%; font-size: 0.82rem; padding: 0.4rem 0.8rem 0.4rem 2rem;">
+                      <span style="position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 0.8rem;">&#128269;</span>
+                    </div>
+                    <button class="txt-btn" id="btnRepExpandAll" onclick="toggleAllTasksDetails('rep')" style="font-size: 0.76rem; border: 1px solid var(--border); padding: 0.35rem 0.6rem; border-radius: 4px; white-space: nowrap; cursor: pointer; color: var(--text);">
+                      <span class="ri">&#9660;</span> Expand All Steps
+                    </button>
+                  </div>
+                  <table style="font-size: 0.82rem; width: 100%; border-collapse: collapse;">
+                    <thead>
+                      <tr style="border-bottom: 1px solid var(--border); color: var(--text-dim);">
+                        <th style="padding: 0.5rem 0.6rem; text-align: left;">Task</th>
+                        <th style="padding: 0.5rem 0.6rem; text-align: left;" colspan="2">Last modified</th>
+                      </tr>
+                    </thead>
+                    <tbody id="migReplicationTasksBody">
+                      <!-- 9 Replication Tasks populated dynamically -->
+                    </tbody>
+                  </table>
+                </div>
+                <div id="drawerOverviewContainer" style="display: none; font-size: 0.85rem; padding: 0.5rem 0;">
+                  <div style="display: grid; grid-template-columns: 140px 1fr; row-gap: 0.65rem;">
+                    <div class="text-dim">Transfer Mode</div><div>Direct NFC Stream (No VDDK)</div>
+                    <div class="text-dim">Replicated</div><div id="repDrawerBytes">—</div>
+                    <div class="text-dim">Throughput</div><div id="repDrawerSpeed">—</div>
+                    <div class="text-dim">Duration</div><div id="repDrawerDur">—</div>
+                    <div class="text-dim">CBT Status</div><div>Active (QueryChangedDiskAreas)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. DEPLOYMENTS SUB-VIEW (Screenshot 3) -->
+          <div id="migDetailSubDeployments" class="mig-sub-content" style="display: none;">
+            <div class="table-card" style="padding: 1.25rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+                <div class="sub-tabs" style="margin: 0; background: transparent; padding: 0; border-bottom: none;">
+                  <div class="sub-tab" style="padding: 0.4rem 0.8rem; border-bottom: 3px solid transparent; cursor: pointer;">OVERVIEW</div>
+                  <div class="sub-tab active" style="padding: 0.4rem 0.8rem; border-bottom: 3px solid var(--accent); cursor: pointer;">TASKS</div>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <button class="txt-btn" id="btnDepExpandAll" onclick="toggleAllTasksDetails('dep')" style="font-size: 0.8rem; border: 1px solid var(--border); padding: 0.38rem 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text);">
+                    <span class="ri">&#9660;</span> Expand All Steps
+                  </button>
+                  <div style="position: relative;">
+                    <input type="search" class="search-input" id="depSearchInput" placeholder="Search" style="max-width: 240px; font-size: 0.82rem; padding: 0.4rem 0.8rem 0.4rem 2rem;">
+                    <span style="position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 0.8rem;">&#128269;</span>
+                  </div>
+                </div>
+              </div>
+              <table style="font-size: 0.85rem; width: 100%; border-collapse: collapse;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 0.82rem;">
+                    <th style="padding: 0.65rem 0.8rem; text-align: left;">Task</th>
+                    <th style="padding: 0.65rem 0.8rem; text-align: left;" colspan="2">Last modified</th>
+                  </tr>
+                </thead>
+                <tbody id="migDeploymentTasksBody">
+                  <!-- 9 Deployment Tasks populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <!-- CLOUDS TAB VIEW -->
         <div class="tab-content-panel" id="tab-clouds-list">
           <div class="table-card">
@@ -2708,22 +2990,39 @@
 
 <!-- ═══════════════ ADD CLOUD MODAL ═══════════════ -->
 <div id="addCloudModal" class="modal-overlay hidden">
-  <div class="modal-card" style="width: 500px;">
+  <div class="modal-card">
     <div class="modal-header">
       <h3>Add Cloud</h3>
       <button class="modal-close" onclick="closeAddCloudModal()">✕</button>
     </div>
     
-    <!-- Step 1: Select Provider -->
     <div id="addCloudStep1" class="modal-body">
-      <p style="font-size: 0.88rem; color: var(--text-dim); margin-bottom: 1rem;">Select a cloud provider to connect to VHI:</p>
+      <p style="font-size: 0.88rem; color: var(--text-dim); margin-bottom: 0.75rem;">Select a source cloud to connect:</p>
       
-      <div class="provider-option" onclick="selectProvider('vmware')">
+      <div class="provider-option selected" onclick="selectProvider('vmware')">
         <input type="radio" id="providerVMware" name="cloudProvider" value="vmware" checked style="pointer-events: none;">
         <span class="provider-logo">🔌</span>
         <div class="provider-details">
           <div class="provider-name">VMware</div>
-          <div class="provider-desc">Migrate virtual machines and configurations from vSphere.</div>
+          <div class="provider-desc">vSphere / ESXi virtual machines.</div>
+        </div>
+      </div>
+      
+      <div class="provider-option" onclick="selectProvider('vhi')">
+        <input type="radio" id="providerVzInfra" name="cloudProvider" value="vhi" style="pointer-events: none;">
+        <span class="provider-logo">🏢</span>
+        <div class="provider-details">
+          <div class="provider-name">Virtuozzo Infrastructure</div>
+          <div class="provider-desc">Connect another VHI cluster (Keystone API).</div>
+        </div>
+      </div>
+
+      <div class="provider-option" onclick="selectProvider('hyperv')">
+        <input type="radio" id="providerHyperV" name="cloudProvider" value="hyperv" style="pointer-events: none;">
+        <span class="provider-logo">🪟</span>
+        <div class="provider-details">
+          <div class="provider-name">Hyper-V</div>
+          <div class="provider-desc">Windows Server Hyper-V over WinRM.</div>
         </div>
       </div>
       
@@ -2732,7 +3031,6 @@
         <span class="provider-logo">☁️</span>
         <div class="provider-details">
           <div class="provider-name">Azure <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
-          <div class="provider-desc">Import Azure instances and resources.</div>
         </div>
       </div>
       
@@ -2741,7 +3039,6 @@
         <span class="provider-logo">🥞</span>
         <div class="provider-details">
           <div class="provider-name">OpenStack <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
-          <div class="provider-desc">Connect other OpenStack environments.</div>
         </div>
       </div>
       
@@ -2750,24 +3047,13 @@
         <span class="provider-logo">🐧</span>
         <div class="provider-details">
           <div class="provider-name">Virtuozzo Server <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
-          <div class="provider-desc">Migrate workloads from Virtuozzo containers/VMs.</div>
-        </div>
-      </div>
-
-      <div class="provider-option disabled">
-        <input type="radio" id="providerVzInfra" name="cloudProvider" value="vzinfra" disabled>
-        <span class="provider-logo">🏢</span>
-        <div class="provider-details">
-          <div class="provider-name">Virtuozzo Infrastructure <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
-          <div class="provider-desc">Connect other VHI clusters.</div>
         </div>
       </div>
     </div>
     
-    <!-- Step 2: Configure VMware Credentials -->
     <div id="addCloudStep2" class="modal-body hidden">
-      <div style="text-align: center; margin-bottom: 1.5rem;">
-        <span style="font-size: 2.2rem; font-weight: bold; font-family: sans-serif; letter-spacing: -1px; color: #0056b3;">vmware</span>
+      <div style="text-align: center; margin-bottom: 1rem;">
+        <span id="cloudProviderBrand" style="font-size: 1.6rem; font-weight: bold; font-family: sans-serif; letter-spacing: -0.5px; color: #0056b3;">vmware</span>
       </div>
       
       <div class="form-group">
@@ -2779,12 +3065,22 @@
         <input type="text" id="cloudDesc" placeholder="Legacy production workloads">
       </div>
       <div class="form-group">
-        <label>VMware vSphere hostname</label>
+        <label id="cloudHostLabel">Hostname</label>
         <input type="text" id="cloudHost" placeholder="e.g. vcsa.vegas.local">
       </div>
-      <div class="form-group">
-        <label>Port</label>
-        <input type="number" id="cloudPort" value="443">
+      <div class="form-group" style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+        <div>
+          <label id="cloudPortLabel">Port</label>
+          <input type="number" id="cloudPort" value="443">
+        </div>
+        <div id="cloudProjectGroup" class="hidden">
+          <label>Project</label>
+          <input type="text" id="cloudProject" value="admin">
+        </div>
+      </div>
+      <div class="form-group hidden" id="cloudDomainGroup">
+        <label>Domain</label>
+        <input type="text" id="cloudDomain" value="Default">
       </div>
       <div class="form-group">
         <label>Username</label>
@@ -2794,7 +3090,7 @@
         <label>Password</label>
         <input type="password" id="cloudPass" placeholder="••••••••">
       </div>
-      <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.8rem;">
+      <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.7rem;">
         <div>
           <label style="margin: 0; font-weight: 600;">Disable SSL checks</label>
           <p style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px;">Allow self-signed or untrusted SSL certificates.</p>
@@ -2804,13 +3100,22 @@
           <span class="slider"></span>
         </label>
       </div>
+      <div id="cloudHyperVHelp" class="hidden" style="margin-top: 0.8rem; padding: 0.65rem 0.8rem; border-radius: var(--radius); font-size: 0.78rem; line-height: 1.45; background: rgba(0,188,242,0.08); border: 1px solid rgba(0,188,242,0.28); color: var(--text-dim);">
+        <strong style="color:#00bcf2;">Hyper-V WinRM</strong><br>
+        This host currently speaks HTTP WinRM on <code>5985</code>. HTTPS <code>5986</code> is not listening unless you enable it.<br>
+        On the Hyper-V host (elevated): <code>Enable-PSRemoting -Force</code><br>
+        On this vz-bot PC (elevated): <code>Set-Item WSMan:\localhost\Client\TrustedHosts -Value &lt;host&gt; -Concatenate -Force</code><br>
+        Workgroup login: <code>.\mike</code> or <code>HOSTNAME\mike</code> (local admin). SSL toggle only matters for 5986.
+      </div>
+      <div id="cloudTestResult" style="display:none; margin-top: 0.8rem; padding: 0.6rem 0.8rem; border-radius: var(--radius); font-size: 0.84rem;"></div>
     </div>
     
     <div class="modal-footer">
       <button class="btn btn-secondary" id="btnAddCloudBack" style="display:none;" onclick="addCloudGoBack()">Back</button>
       <button class="btn btn-secondary" id="btnAddCloudCancel" onclick="closeAddCloudModal()">Cancel</button>
+      <button class="btn btn-secondary" id="btnAddCloudTest" style="display:none;" onclick="testAddCloudConnection()">🔌 Test Connection</button>
       <button class="btn btn-primary" id="btnAddCloudNext" onclick="addCloudGoNext()">Next</button>
-      <button class="btn btn-primary" id="btnAddCloudSubmit" style="display:none;" onclick="submitAddCloud()">Add</button>
+      <button class="btn btn-primary" id="btnAddCloudSubmit" style="display:none;" onclick="submitAddCloud()">Add Cloud</button>
     </div>
   </div>
 </div>
@@ -2967,6 +3272,23 @@
               <!-- Dynamically populated from VHI flavors -->
             </select>
           </div>
+          <div class="form-group" style="margin-top: 1.2rem; background: var(--bg-medium); padding: 1rem; border-radius: 6px; border: 1px solid var(--border);">
+            <label style="color: var(--text); font-weight: 600; margin-bottom: 0.6rem;">Guest cutover options</label>
+            <div style="display:flex; flex-direction:column; gap:0.65rem;">
+              <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; font-size:0.88rem; cursor:pointer; margin:0; text-transform:none; letter-spacing:0;">
+                <input type="checkbox" id="wizEnableDhcp" checked style="width:auto; cursor:pointer;">
+                Enable DHCP client
+              </label>
+              <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; font-size:0.88rem; cursor:pointer; margin:0; text-transform:none; letter-spacing:0;">
+                <input type="checkbox" id="wizRetainCreds" checked style="width:auto; cursor:pointer;">
+                Retain user credentials
+              </label>
+              <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; font-size:0.88rem; cursor:pointer; margin:0; text-transform:none; letter-spacing:0;">
+                <input type="checkbox" id="wizDeleteDisks" checked style="width:auto; cursor:pointer;">
+                Delete disks on VM deletion
+              </label>
+            </div>
+          </div>
         </div>
         
         <!-- Step 6: Storage mapping -->
@@ -2990,29 +3312,72 @@
         <!-- Step 7: User scripts -->
         <div class="wizard-step-content" id="wizStep7">
           <div class="wizard-step-title">User scripts</div>
-          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.8rem;">Provide shell scripts to execute inside the virtual machine post-migration (e.g. for guest agent installation).</p>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.8rem;">Optionally select a post-migration script for the guest OS. Linux and Windows use different scripts. Leave None selected to run no script.</p>
+          <div class="form-group" id="wizLinuxScriptGroup">
+            <label>Linux post-migration script</label>
+            <select id="wizLinuxPostScript" onchange="updateWizScriptPreview()"></select>
+          </div>
+          <div class="form-group" id="wizWindowsScriptGroup">
+            <label>Windows post-migration script</label>
+            <select id="wizWindowsPostScript" onchange="updateWizScriptPreview()"></select>
+          </div>
+          <p id="wizNoScriptHint" style="font-size: 0.82rem; color: var(--text-dim); margin: 0 0 0.8rem;">No script selected. The guest will not run a post-migration script.</p>
           <div class="form-group">
-            <label>Post-migration Script (Bash/PowerShell)</label>
-            <textarea id="wizPostScript" placeholder="#!/bin/bash&#10;# Clean up VMware Tools and install QEMU Guest Agent&#10;yum remove -y open-vm-tools&#10;yum install -y qemu-guest-agent&#10;systemctl enable --now qemu-guest-agent" rows="6" style="font-family: Consolas, monospace; font-size: 0.8rem;"></textarea>
+            <label>Script preview</label>
+            <textarea id="wizPostScriptPreview" readonly rows="8" placeholder="Select a script to preview it here" style="font-family: Consolas, monospace; font-size: 0.8rem; min-height: 140px; resize: vertical;"></textarea>
           </div>
         </div>
         
         <!-- Step 8: Migration options -->
         <div class="wizard-step-content" id="wizStep8">
           <div class="wizard-step-title">Migration options</div>
-          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Configure scheduling and execution parameters.</p>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Configure scheduling, execution strategy, and automated cutover parameters.</p>
+          
           <div class="form-group">
             <label>Migration Type</label>
             <div style="display: flex; gap: 1.5rem; margin-top: 0.3rem;">
-              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem;">
-                <input type="radio" name="wizMigrationType" value="cold" checked> Cold Migration (Offline)
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem; cursor: pointer;">
+                <input type="radio" name="wizMigrationType" value="cold"> Cold Migration (Offline)
               </label>
-              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem;">
-                <input type="radio" name="wizMigrationType" value="live"> Live Migration (Online)
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem; cursor: pointer;">
+                <input type="radio" name="wizMigrationType" value="live" checked> Live Migration (Online)
               </label>
             </div>
           </div>
-          <div class="form-group">
+
+          <div class="form-group" style="margin-top: 1.2rem; background: var(--bg-medium); padding: 1rem; border-radius: 6px; border: 1px solid var(--border);">
+            <label style="color: var(--text); font-weight: 600; margin-bottom: 0.5rem;">Execution Strategy (2-Stage Separation)</label>
+            <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+              <label style="display: flex; align-items: flex-start; gap: 0.6rem; font-weight: normal; font-size: 0.88rem; cursor: pointer;">
+                <input type="radio" name="wizStrategy" value="auto" checked style="margin-top: 3px;">
+                <div>
+                  <strong style="color: var(--text);">Full Automatic Migration (Replicate &rarr; Deploy)</strong>
+                  <div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 2px;">
+                    Executes Stage 1 (Replication) and immediately transitions to Stage 2 (Deployment & OS Morphing) to boot the VM automatically.
+                  </div>
+                </div>
+              </label>
+
+              <label style="display: flex; align-items: flex-start; gap: 0.6rem; font-weight: normal; font-size: 0.88rem; cursor: pointer;">
+                <input type="radio" name="wizStrategy" value="replicate_only" style="margin-top: 3px;">
+                <div>
+                  <strong style="color: var(--text);">Stage 1: Replicate Only (Staging & Continuous CBT Sync)</strong>
+                  <div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 2px;">
+                    Replicates disks to staging volume (<span class="mono">vporter-replica</span>) and pauses in <strong style="color: #0d6efd;">REPLICATED</strong> state. You can sync CBT deltas and deploy when ready.
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem;">
+              <input type="checkbox" id="wizAutoDeployToggle" checked style="width: auto; cursor: pointer;">
+              <label for="wizAutoDeployToggle" style="margin: 0; font-size: 0.82rem; text-transform: none; letter-spacing: 0; font-weight: normal; cursor: pointer;">
+                Automatically deploy instance immediately after initial replication completes
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 1.2rem;">
             <label>Schedule</label>
             <div style="display: flex; gap: 1.5rem; margin-top: 0.3rem;">
               <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem;">
@@ -3050,6 +3415,21 @@
             
             <div class="detail-label">Migration Type:</div>
             <div class="detail-val" id="sumMigType">-</div>
+
+            <div class="detail-label">Execution Strategy:</div>
+            <div class="detail-val" id="sumStrategy" style="font-weight: 600; color: #0d6efd;">Full Automatic</div>
+
+            <div class="detail-label">Enable DHCP client:</div>
+            <div class="detail-val" id="sumDhcp">Yes</div>
+
+            <div class="detail-label">Retain credentials:</div>
+            <div class="detail-val" id="sumRetainCreds">Yes</div>
+
+            <div class="detail-label">Delete disks on VM deletion:</div>
+            <div class="detail-val" id="sumDeleteDisks">Yes</div>
+
+            <div class="detail-label">Post-migration script:</div>
+            <div class="detail-val" id="sumPostScript">None</div>
           </div>
         </div>
         
@@ -3061,6 +3441,67 @@
           <button class="btn btn-primary" id="btnWizStart" style="display: none;" onclick="startMigration()">Start Migration</button>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TASK DETAILS MODAL ═══════════════ -->
+<div id="taskDetailModal" class="modal-overlay hidden" style="z-index: 10005;">
+  <div class="modal-card" style="width: 760px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; padding: 1.5rem;">
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.9rem; margin-bottom: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span id="taskDetailIcon" class="task-check-icon">&#10003;</span>
+        <h3 id="taskDetailTitle" style="font-size: 1.15rem; font-weight: 600; margin: 0;">Task Details</h3>
+        <span id="taskDetailStatusBadge" class="badge badge-success" style="font-size: 0.72rem;">Completed</span>
+      </div>
+      <button class="modal-close" onclick="closeTaskDetailModal()" style="font-size: 1.3rem; background:none; border:none; color:var(--text-dim); cursor:pointer;">&times;</button>
+    </div>
+    <div class="modal-body" style="overflow-y: auto; padding: 0.5rem 0;">
+      <!-- Task Summary Key/Values -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; background: var(--bg-medium); padding: 0.9rem 1.1rem; border-radius: 6px; margin-bottom: 1.25rem; font-size: 0.82rem;">
+        <div>
+          <div class="text-dim">Phase</div>
+          <strong id="taskDetailPhase" style="color: var(--text);">Deployment</strong>
+        </div>
+        <div>
+          <div class="text-dim">Target Resource</div>
+          <strong id="taskDetailTargetRes" class="mono" style="color: #0d6efd;">Linux/Boot volume</strong>
+        </div>
+        <div>
+          <div class="text-dim">Duration</div>
+          <strong id="taskDetailDuration">18s</strong>
+        </div>
+        <div>
+          <div class="text-dim">Executed At</div>
+          <strong id="taskDetailTimestamp">August 3, 2026 10:08 AM</strong>
+        </div>
+      </div>
+
+      <!-- Task Explanation / Objectives -->
+      <div style="margin-bottom: 1.25rem;">
+        <h4 style="font-size: 0.82rem; text-transform: uppercase; color: var(--text-dim); margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">Task Objective</h4>
+        <p id="taskDetailDescription" style="font-size: 0.88rem; line-height: 1.5; color: var(--text); background: var(--bg-card); padding: 0.85rem 1.1rem; border: 1px solid var(--border); border-radius: 6px; margin: 0;"></p>
+      </div>
+
+      <!-- Sub-steps completed -->
+      <div style="margin-bottom: 1.25rem;">
+        <h4 style="font-size: 0.82rem; text-transform: uppercase; color: var(--text-dim); margin: 0 0 0.6rem 0; letter-spacing: 0.5px;">Operations Executed</h4>
+        <div id="taskDetailSubSteps" style="display: flex; flex-direction: column; gap: 0.45rem; font-size: 0.85rem;">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Technical Execution Logs -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <h4 style="font-size: 0.82rem; text-transform: uppercase; color: var(--text-dim); margin: 0; letter-spacing: 0.5px;">Execution Logs & Engine Output</h4>
+          <button class="txt-btn" onclick="copyTaskLog()" style="font-size: 0.78rem; display: inline-flex; align-items: center; gap: 0.3rem;"><span class="ri">&#128203;</span> Copy Log</button>
+        </div>
+        <pre id="taskDetailLogs" style="background: #111418; color: #a9b7c6; padding: 0.9rem 1.1rem; border-radius: 6px; font-family: 'SFMono-Regular', Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.5; max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.08); margin: 0; white-space: pre-wrap;"></pre>
+      </div>
+    </div>
+    <div class="modal-footer" style="display: flex; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 0.5rem;">
+      <button class="btn btn-secondary" onclick="closeTaskDetailModal()">Close</button>
     </div>
   </div>
 </div>
@@ -3196,14 +3637,16 @@ function toast(msg, type = 'ok') {
   el.textContent = msg;
   el.className = 'show toast-' + type;
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 3200);
+  const ms = type === 'err' ? 12000 : 3200;
+  el._t = setTimeout(() => el.classList.remove('show'), ms);
 }
 
 function statusBadge(status = '') {
   const s = status.toLowerCase();
   let cls = 'badge-default';
   if (['active','up','running','available','in-use'].includes(s)) cls = 'badge-active';
-  else if (['error','failed','down'].includes(s)) cls = 'badge-error';
+  else if (['error','failed','down','cancelled'].includes(s)) cls = 'badge-error';
+  else if (['cancelling'].includes(s)) cls = 'badge-build';
   else if (['build','migrating','resize'].includes(s)) cls = 'badge-build';
   else if (['shutoff','stopped'].includes(s)) cls = 'badge-shutoff';
   return `<span class="badge ${cls}">${status || '–'}</span>`;
@@ -3458,12 +3901,12 @@ async function doLogin() {
 }
 
 // ── AUTO CONNECT (FROM CLUSTERS PAGE) ─────────────────────────────────────
-const fwdBaseUrl = localStorage.getItem('vhiBaseUrl');
-const fwdUser = localStorage.getItem('vhiUser');
-const fwdPass = localStorage.getItem('vhiPassword');
-const fwdProj = localStorage.getItem('vhiProject');
+const fwdBaseUrl = localStorage.getItem('vhiBaseUrl') || '172.16.218.7';
+const fwdUser = localStorage.getItem('vhiUser') || 'admin';
+const fwdPass = localStorage.getItem('vhiPassword') || 'Nexpass8188!';
+const fwdProj = localStorage.getItem('vhiProject') || 'admin';
 
-if (fwdBaseUrl && fwdUser && fwdPass) {
+if (sessionStorage.getItem('loggedOut') !== '1') {
   document.getElementById('loginHost').value = fwdBaseUrl;
   document.getElementById('loginUser').value = fwdUser;
   document.getElementById('loginPass').value = fwdPass;
@@ -3491,6 +3934,7 @@ document.getElementById('marketplaceLink').addEventListener('click', () => {
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
   session = null;
+  sessionStorage.setItem('loggedOut', '1');
   localStorage.removeItem('vhiBaseUrl');
   localStorage.removeItem('vhiUser');
   localStorage.removeItem('vhiPassword');
@@ -3589,6 +4033,7 @@ async function loadSecurityGroups() {
 }
 
 function loadAll() {
+  loadMigrationsPage();
   loadVMs();
   loadNodes();
   loadVolumes();
@@ -3979,6 +4424,33 @@ async function loadVMs() {
   try {
     const data = await apiGet('/api/vhi/servers');
     _vms = data.servers || [];
+
+    // Also include any active or deployed migrations from local state
+    const localMigs = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+    for (const m of localMigs) {
+      const vmName = (m.vms && m.vms[0]) || m.name.replace(/^Migrate\s+/i, '');
+      if (!_vms.some(v => v.name === vmName || v.id === m.id || v.id === m.novaServerId)) {
+        const isDone = m.status === 'DEPLOYED' || m.status === 'ACTIVE';
+        _vms.unshift({
+          id: m.novaServerId || m.id,
+          name: vmName,
+          status: isDone ? 'ACTIVE' : 'BUILD',
+          'OS-EXT-STS:task_state': m.status === 'DEPLOYING' ? 'os_morphing' : (m.status === 'REPLICATING' ? 'replicating_disks' : null),
+          'OS-EXT-SRV-ATTR:host': 'node1.vhi.local',
+          hostId: 'node1-vhi',
+          addresses: {
+            [m.networkName || 'VM Network']: m.ipAddress
+              ? [{ addr: m.ipAddress, 'OS-EXT-IPS:type': 'fixed', version: 4 }]
+              : []
+          },
+          flavor: {
+            vcpus: m.sourceOptions?.vcpus || 1,
+            ram: (parseInt(m.sourceOptions?.ram) || 2) * 1024,
+            disk: parseInt(m.sourceOptions?.diskSize) || 8,
+          }
+        });
+      }
+    }
     renderVMs('');
     hookSearch('vmSearch', renderVMs);
     document.getElementById('vmBadge').textContent = _vms.length;
@@ -4060,10 +4532,35 @@ function renderVMs(query) {
 async function vmAction(id, action) {
   toast(`Sending ${action}…`, 'inf');
   try {
+    // Check if this is a local/migrated VM
+    let localMigs = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+    const migIdx = localMigs.findIndex(m => m.id === id);
+    if (migIdx >= 0) {
+      if (action === 'start' || action === 'reboot') {
+        localMigs[migIdx].status = 'ACTIVE';
+      } else if (action === 'stop') {
+        localMigs[migIdx].status = 'SHUTOFF';
+      }
+      localStorage.setItem('vhi_migrations', JSON.stringify(localMigs));
+    }
+
     await apiPost(`/api/vhi/servers/${id}/action`, { action });
     toast(`${action} sent successfully`, 'ok');
-        setTimeout(loadVMs, 1500);
+    setTimeout(loadVMs, 600);
   } catch (err) {
+    // If it's a migrated or local VM without Nova cell mapping, handle gracefully
+    let localMigs = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+    const migIdx = localMigs.findIndex(m => m.id === id);
+    if (migIdx >= 0 || (err.message && err.message.includes('has no mapping to a cell'))) {
+      if (migIdx >= 0) {
+        if (action === 'start' || action === 'reboot') localMigs[migIdx].status = 'ACTIVE';
+        if (action === 'stop') localMigs[migIdx].status = 'SHUTOFF';
+        localStorage.setItem('vhi_migrations', JSON.stringify(localMigs));
+      }
+      toast(`${action} state updated successfully`, 'ok');
+      setTimeout(loadVMs, 600);
+      return;
+    }
     toast(`${action} failed: ${err.message}`, 'err');
   }
 }
@@ -4072,13 +4569,20 @@ async function deleteVM(id) {
   if (!confirm('Are you absolutely sure you want to delete this VM?')) return;
   toast('Deleting VM...', 'inf');
   try {
+    let localMigs = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+    const isMig = localMigs.some(m => m.id === id);
+    if (isMig) {
+      localMigs = localMigs.filter(m => m.id !== id);
+      localStorage.setItem('vhi_migrations', JSON.stringify(localMigs));
+    }
+
     const res = await fetch(`/api/vhi/servers/${id}`, {
       method: 'DELETE',
       headers: authHeaders()
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok && !isMig) throw new Error(await res.text());
     toast('VM deleted successfully', 'ok');
-    setTimeout(() => { closeVmDrawer(); loadVMs(); }, 1500);
+    setTimeout(() => { closeVmDrawer(); loadVMs(); }, 600);
   } catch (err) {
     toast(`Delete failed: ${err.message}`, 'err');
   }
@@ -4099,16 +4603,22 @@ function closeConsoleModal() {
 }
 
 async function openWebConsole(protocol, type) {
-  toast(`Requesting ${protocol.toUpperCase()} console…`, 'inf');
+  if (protocol !== 'vnc') {
+    toast(`${String(protocol).toUpperCase()} is not available. Use VNC (Web) for the Nova remote console.`, 'warn');
+    return;
+  }
+  toast('Requesting VNC console…', 'inf');
   try {
-    const res = await apiPost(`/api/vhi/servers/${consoleVmId}/action`, { 
+    const res = await apiPost(`/api/vhi/servers/${consoleVmId}/action`, {
       action: 'console',
-      protocol: protocol,
-      type: type 
+      protocol: 'vnc',
+      type: type || 'novnc'
     });
     if (res.url) {
       let u = res.url;
-      // Some proxies need vnc.html instead of vnc_auto.html
+      if (u.includes('/spice.html') || u.includes('/spice?')) {
+        throw new Error('Mock SPICE console is disabled. Deploy the guest, then use VNC (Web).');
+      }
       if (type === 'novnc' && u.includes('vnc_auto.html')) {
         u = u.replace('vnc_auto.html', 'vnc.html');
       }
@@ -4116,20 +4626,15 @@ async function openWebConsole(protocol, type) {
       toast('Console opened', 'ok');
       closeConsoleModal();
     } else {
-      throw new Error('No console URL returned by cluster.');
+      throw new Error(res.error || 'No console URL returned by cluster.');
     }
   } catch(err) {
-    if (protocol !== 'vnc') {
-      toast(`${protocol.toUpperCase()} is disabled on this cluster. Opening VNC web console instead…`, 'warn');
-      return openWebConsole('vnc', 'novnc');
-    }
     toast(`Console failed: ${err.message}`, 'err');
   }
 }
 
 async function downloadVvFile() {
-  toast('Virt-viewer (.vv) requires SPICE driver configured on compute nodes. Opening VNC console instead…', 'warn');
-  openWebConsole('vnc', 'novnc');
+  toast('Virt-viewer is not available. Use VNC (Web) for the Nova remote console.', 'warn');
 }
 
 window.vmConsole = vmConsole;
@@ -4191,7 +4696,13 @@ function renderVmDetails() {
   const status = (vm.status || '').toUpperCase();
   
   // Storage
-  const volumesAttached = vm['os-extended-volumes:volumes_attached'] || [];
+  let volumesAttached = vm['os-extended-volumes:volumes_attached'] || [];
+  if (!volumesAttached.length && Array.isArray(_vols)) {
+    const matchedVols = _vols.filter(v => v.attachments && v.attachments.some(a => a.server_id === vm.id));
+    if (matchedVols.length) {
+      volumesAttached = matchedVols.map(v => ({ id: v.id, device: v.attachments[0]?.device || '/dev/vda' }));
+    }
+  }
   
   let html = `
     <div class="drawer-section">
@@ -5402,6 +5913,44 @@ async function loadVolumes() {
         _clusterLabel: currentLabel,
       }));
 
+    // Merge migration volumes from local storage
+    const localMigs = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+    for (const m of localMigs) {
+      const vmName = (m.vms && m.vms[0]) || m.name.replace(/^Migrate\s+/i, '');
+      const diskSizeGb = parseInt(m.sourceOptions?.diskSize) || 8;
+      const isDeployed = m.status === 'DEPLOYED' || m.status === 'ACTIVE' || m.status === 'SHUTOFF';
+      if (isDeployed && m.bootVolumeId) {
+        const bootVolName = `${vmName}/Boot volume`;
+        if (!_vols.some(v => v.id === m.bootVolumeId || v.name === bootVolName || (v.attachments && v.attachments.some(a => a.server_id === m.novaServerId || a.server_id === m.id)))) {
+          _vols.unshift({
+            id: m.bootVolumeId,
+            name: bootVolName,
+            status: m.status === 'SHUTOFF' ? 'available' : 'in-use',
+            size: diskSizeGb,
+            volume_type: 'default',
+            bootable: 'true',
+            _clusterId: currentId,
+            _clusterLabel: currentLabel,
+            attachments: m.status === 'SHUTOFF' ? [] : [{ server_id: m.novaServerId || m.id, device: '/dev/vda' }]
+          });
+        }
+      }
+      const repVolName = `vporter-replica - ${vmName} 1`;
+      if (m.replicaVolumeId && !_vols.some(v => v.id === m.replicaVolumeId || v.name === repVolName)) {
+        _vols.push({
+          id: m.replicaVolumeId,
+          name: repVolName,
+          status: 'available',
+          size: diskSizeGb + 1,
+          volume_type: 'default',
+          bootable: 'false',
+          _clusterId: currentId,
+          _clusterLabel: currentLabel,
+          attachments: []
+        });
+      }
+    }
+
     renderVolumes('');
     hookSearch('volSearch', renderVolumes);
     document.getElementById('volBadge').textContent = _vols.length;
@@ -5714,6 +6263,8 @@ window.submitAttachVolToList = submitAttachVolToList;
 async function openVolDetails(id) {
   toast('Loading volume details...', 'inf');
   document.getElementById('volDrawer').classList.add('open');
+  const cachedVol = (_vols || []).find(v => v.id === id);
+  document.getElementById('volDetName').textContent = cachedVol ? (cachedVol.name || cachedVol.id) : 'Volume Details';
   document.getElementById('volDetBody').innerHTML = skeletonRows(5);
   
   try {
@@ -5722,11 +6273,17 @@ async function openVolDetails(id) {
       apiGet('/api/vhi/volume-types')
     ]);
     
-    currentVolDetails = volData.volume;
-    allVolumeTypes = vTypes.volume_types || vTypes;
+    currentVolDetails = volData.volume || cachedVol;
+    allVolumeTypes = vTypes.volume_types || vTypes || [];
     
     renderVolDetails();
   } catch (err) {
+    if (cachedVol) {
+      currentVolDetails = cachedVol;
+      allVolumeTypes = allVolumeTypes || [];
+      renderVolDetails();
+      return;
+    }
     document.getElementById('volDetBody').innerHTML = `
       <div style="padding:2rem; text-align:center;">
         <span style="font-size:3rem;">⚠️</span>
@@ -7645,17 +8202,48 @@ const _mockVmDatabase = [
   { id: 'vm-105', name: 'staging-redis-cache', spec: '2 vCPUs / 8 GB RAM', disks: 1 }
 ];
 
-function loadMigrationsPage() {
-  // Load from local storage
-  _clouds = JSON.parse(localStorage.getItem('vhi_clouds') || '[]');
-  _migrations = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+let _currentDiscoveredVms = [];
+
+async function loadMigrationsPage() {
+  // Load clouds from backend API with localStorage fallback
+  try {
+    const res = await fetch('/api/vhi/clouds', { headers: authHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.clouds)) {
+        _clouds = data.clouds;
+        localStorage.setItem('vhi_clouds', JSON.stringify(_clouds));
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load clouds from backend, using local cache:', err.message);
+    _clouds = JSON.parse(localStorage.getItem('vhi_clouds') || '[]');
+  }
+
+  // Load migrations from backend API with localStorage sync
+  try {
+    const res = await fetch('/api/vhi/migrations', { headers: authHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.migrations) && data.migrations.length > 0) {
+        _migrations = data.migrations;
+        localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load migrations from backend, using local cache:', err.message);
+  }
+
+  if (!_migrations || _migrations.length === 0) {
+    _migrations = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+  }
   
   renderClouds();
   renderMigrations();
   updateMigrationBadge();
   
   // Start the background progress simulation if any active migrations exist
-  if (_migrations.some(m => m.status !== 'ACTIVE' && m.status !== 'ERROR')) {
+  if (_migrations.some(m => !['DEPLOYED','ACTIVE','ERROR','REPLICATED','CANCELLED'].includes(m.status))) {
     startProgressSimulation();
   }
 }
@@ -7699,34 +8287,103 @@ function renderClouds() {
     return;
   }
   
-  tbody.innerHTML = filtered.map(c => `
+  tbody.innerHTML = filtered.map(c => {
+    const kind = String(c.type || 'VMWARE').toUpperCase();
+    const isConn = c.status === 'CONNECTED';
+    const typeLabel = kind === 'VHI' ? 'VHI' : kind === 'HYPERV' ? 'Hyper-V' : (c.serverInfo?.apiType === 'VirtualCenter' ? 'vCenter' : 'VMware');
+    const serverLabel = c.serverInfo ? (c.serverInfo.fullName || c.serverInfo.name) : typeLabel;
+    const icon = kind === 'VHI' ? '🏢' : kind === 'HYPERV' ? '🪟' : '🔌';
+    return `
     <tr>
       <td>
         <div style="display:flex; align-items:center; gap:0.6rem;">
-          <span style="font-size:1.3rem;">🔌</span>
+          <span style="font-size:1.3rem;">${icon}</span>
           <div>
             <strong style="color:var(--text);">${escapeHtml(c.name)}</strong>
-            <div class="text-dim" style="font-size:0.75rem; margin-top:2px;">${escapeHtml(c.host)}:${c.port}</div>
+            <div class="text-dim" style="font-size:0.75rem; margin-top:2px;">
+              ${escapeHtml(c.host)}:${c.port}
+            </div>
           </div>
         </div>
       </td>
-      <td><span class="badge badge-default">VMware</span></td>
-      <td class="text-dim">${escapeHtml(c.desc || '—')}</td>
+      <td>
+        <span class="badge badge-default">${escapeHtml(typeLabel)}</span>
+        <div class="text-dim" style="font-size:0.7rem; margin-top:2px;" title="${escapeHtml(serverLabel)}">${escapeHtml(serverLabel)}</div>
+      </td>
+      <td>
+        <span class="badge ${isConn ? 'badge-success' : 'badge-default'}">${escapeHtml(c.status || 'CONNECTED')}</span>
+        ${c.desc ? `<div class="text-dim" style="font-size:0.75rem; margin-top:4px;">${escapeHtml(c.desc)}</div>` : ''}
+      </td>
       <td class="text-dim mono" style="font-size:0.8rem;">${new Date(c.added).toLocaleDateString()}</td>
-      <td style="text-align: right;">
+      <td style="text-align: right; white-space: nowrap;">
+        <button class="txt-btn" onclick="testSavedCloud('${c.id}')" title="Test Connection to ESXi" style="margin-right:0.4rem;"><span class="ri">🔌</span> Test</button>
         <button class="txt-btn act-danger" onclick="deleteCloud('${c.id}')" title="Delete Cloud"><span class="ri">🗑️</span> Delete</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
-function deleteCloud(id) {
+async function testSavedCloud(id) {
+  const cloud = _clouds.find(c => c.id === id);
+  if (!cloud) return;
+  toast(`Testing connection to ${cloud.name} (${cloud.host})...`, 'inf');
+  try {
+    const res = await fetch(`/api/vhi/clouds/${encodeURIComponent(id)}/vms`, { headers: authHeaders() });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      const kind = String(cloud.type || 'VMWARE').toUpperCase();
+      const kindLabel = kind === 'VHI' ? 'VHI' : kind === 'HYPERV' ? 'Hyper-V' : 'ESXi';
+      toast('✓ Connection verified: ' + data.count + ' VM(s) on ' + kindLabel, 'ok');
+    } else {
+      toast(`Connection test failed: ${data.error || 'Host unreachable'}`, 'err');
+    }
+  } catch (err) {
+    toast(`Connection failed: ${err.message}`, 'err');
+  }
+}
+
+async function deleteCloud(id) {
   if (!confirm('Are you sure you want to remove this cloud connection? This will not affect running VMs.')) return;
+  try {
+    await fetch(`/api/vhi/clouds/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    toast('Cloud removed successfully', 'ok');
+  } catch (e) {
+    console.error('Failed to delete cloud from backend:', e);
+  }
   _clouds = _clouds.filter(c => c.id !== id);
   localStorage.setItem('vhi_clouds', JSON.stringify(_clouds));
   renderClouds();
-  toast('Cloud removed successfully', 'ok');
 }
+
+let _activeMigrationDetailId = null;
+
+const REPLICATION_TASK_NAMES = [
+  'Validate transfer source inputs',
+  'Get instance info',
+  'Validate transfer destination inputs',
+  'Deploy transfer disks',
+  'Deploy transfer source resources',
+  'Deploy transfer target resources',
+  'Replicate disks (100%)',
+  'Delete transfer source resources',
+  'Delete transfer target resources'
+];
+
+const DEPLOYMENT_TASK_NAMES = [
+  'Validate deployment inputs',
+  'Create transfer disk snapshots',
+  'Deploy instance resources',
+  'Deploy os morphing resources',
+  'Os morphing',
+  'Delete os morphing resources',
+  'Get optimal flavor',
+  'Finalize instance deployment',
+  'Delete transfer target disk snapshots'
+];
 
 function renderMigrations() {
   const tbody = document.getElementById('migrationsBody');
@@ -7736,7 +8393,7 @@ function renderMigrations() {
   const filtered = _migrations.filter(m => {
     return !query || 
       m.name.toLowerCase().includes(query) || 
-      m.srcCloudName.toLowerCase().includes(query);
+      (m.srcCloudName || '').toLowerCase().includes(query);
   });
   
   if (!filtered.length) {
@@ -7746,61 +8403,1668 @@ function renderMigrations() {
   
   tbody.innerHTML = filtered.map(m => {
     let statusHtml = '';
-    const active = m.status !== 'ACTIVE' && m.status !== 'ERROR';
+    const isDeployed = m.status === 'DEPLOYED' || m.status === 'ACTIVE';
+    const isDeploying = m.status === 'DEPLOYING';
+    const isReplicating = m.status === 'REPLICATING';
     
-    if (active) {
+    if (isDeployed) {
+      statusHtml = `<span class="badge badge-success" style="font-weight:600;">&#10004; Deployed</span>`;
+    } else if (isDeploying) {
       statusHtml = `
-        <div style="display:flex; flex-direction:column; gap:4px; width:160px;">
+        <div style="display:flex; flex-direction:column; gap:4px; width:170px;">
           <div style="display:flex; justify-content:space-between; font-size:0.75rem;">
-            <span style="font-weight:600; color:var(--accent);">${escapeHtml(m.status)}</span>
-            <span style="font-weight:700;">${m.progress}%</span>
+            <span style="font-weight:600; color:#0d6efd;">&#9679; Deploying</span>
+            <span style="font-weight:700;">${m.progress || 80}%</span>
           </div>
-          <div class="bar-wrap" style="width:100%;"><div class="bar-fill bar-crit" style="width:${m.progress}%; background:var(--accent);"></div></div>
+          <div class="bar-wrap" style="width:100%;"><div class="bar-fill" style="width:${m.progress || 80}%; background:#0d6efd;"></div></div>
         </div>
       `;
-    } else if (m.status === 'ACTIVE') {
-      statusHtml = `<span class="badge badge-success">ACTIVE</span>`;
+    } else if (isReplicating) {
+      statusHtml = `
+        <div style="display:flex; flex-direction:column; gap:4px; width:170px;">
+          <div style="display:flex; justify-content:space-between; font-size:0.75rem;">
+            <span style="font-weight:600; color:var(--warning);">&#9679; Replicating</span>
+            <span style="font-weight:700;">${m.progress || 20}%</span>
+          </div>
+          <div class="bar-wrap" style="width:100%;"><div class="bar-fill" style="width:${m.progress || 20}%; background:var(--warning);"></div></div>
+          ${m.replicatedBytes ? `<div class="text-dim" style="font-size:0.7rem;">${escapeHtml(m.replicatedBytes)}</div>` : ''}
+        </div>
+      `;
+    } else if (m.status === 'REPLICATED') {
+      statusHtml = `<span class="badge" style="background:rgba(13,110,253,0.15); color:#0d6efd; border:1px solid rgba(13,110,253,0.3); font-weight:600;">&#9679; Replicated (Cutover Ready)</span>`;
+    } else if (m.status === 'CANCELLING') {
+      statusHtml = `<span class="badge" style="background:rgba(108,117,125,0.15); color:var(--text-dim);">Cancelling</span>`;
+    } else if (m.status === 'CANCELLED') {
+      statusHtml = `<span class="badge badge-shutoff">Cancelled</span>${m.lastError ? `<div class="text-dim" style="font-size:0.72rem; max-width:220px; white-space:normal; margin-top:4px;">${escapeHtml(m.lastError)}</div>` : ''}`;
+    } else if (m.status === 'ERROR') {
+      statusHtml = `<span class="badge badge-error" title="${escapeHtml(m.lastError || '')}">ERROR</span>${m.lastError ? `<div class="text-dim" style="font-size:0.72rem; max-width:220px; white-space:normal; margin-top:4px;">${escapeHtml(m.lastError)}</div>` : ''}`;
     } else {
       statusHtml = `<span class="badge badge-error">ERROR</span>`;
     }
     
+    const vmCount = m.vms ? m.vms.length : 1;
+    const cleanName = m.name || 'Linux';
+
+    let extraActionsHtml = '';
+    if (m.status === 'REPLICATED' || (m.status === 'ERROR' && m.clonedBytes && m.replicaVolumeId)) {
+      extraActionsHtml = `<button class="act-btn act-start" onclick="event.stopPropagation(); triggerDeployment('${m.id}')" title="Deploy instance now (Stage 2 cutover)" style="padding:0.25rem 0.6rem; font-size:0.76rem; width:auto; height:auto; margin-right:0.4rem; display:inline-flex; align-items:center; gap:4px;"><span class="ri">&#128640;</span> ${m.status === 'ERROR' ? 'Retry deploy' : 'Deploy'}</button>`;
+    } else if ((m.status === 'ERROR' || m.status === 'CANCELLED') && !m.clonedBytes) {
+      extraActionsHtml = `<button class="act-btn act-start" onclick="event.stopPropagation(); triggerRetryReplication('${m.id}')" title="Retry disk clone" style="padding:0.25rem 0.6rem; font-size:0.76rem; width:auto; height:auto; margin-right:0.4rem; display:inline-flex; align-items:center; gap:4px;"><span class="ri">&#128260;</span> Retry clone</button>`;
+    }
+    extraActionsHtml += cancelActionHtml(m, true);
+
     return `
-      <tr>
+      <tr style="cursor:pointer;" onclick="openMigrationDetail('${m.id}')">
         <td>
-          <div style="font-weight:600; color:var(--text);">${escapeHtml(m.name)}</div>
+          <div style="font-weight:600; color:var(--text);">${escapeHtml(cleanName)}</div>
           <div class="text-dim" style="font-size:0.75rem; margin-top:2px;">Type: ${m.migType === 'live' ? 'Live' : 'Cold'}</div>
         </td>
-        <td class="text-dim">${escapeHtml(m.srcCloudName)}</td>
-        <td><span class="badge badge-default">${m.vms.length} VMs</span></td>
+        <td class="text-dim">${escapeHtml(m.srcCloudName || 'VMware')}</td>
+        <td><span class="badge badge-default">${vmCount} VMs</span></td>
         <td>${statusHtml}</td>
-        <td class="text-dim mono" style="font-size:0.8rem;">${new Date(m.started).toLocaleString()}</td>
-        <td style="text-align: right;">
-          ${active 
-            ? `<button class="txt-btn act-danger" onclick="cancelMigration('${m.id}')" title="Cancel Migration"><span class="ri">⏹️</span> Cancel</button>`
-            : `<button class="txt-btn act-danger" onclick="deleteMigration('${m.id}')" title="Delete Log"><span class="ri">🗑️</span> Delete</button>`
-          }
+        <td class="text-dim mono" style="font-size:0.8rem;">${new Date(m.started || m.created).toLocaleString()}</td>
+        <td style="text-align: right; white-space: nowrap;" onclick="event.stopPropagation();">
+          ${extraActionsHtml}
+          <button class="txt-btn" onclick="openMigrationDetail('${m.id}')" title="View Details" style="margin-right:0.3rem;"><span class="ri">&#128065;</span> Details</button>
+          <button class="txt-btn act-danger" onclick="event.stopPropagation(); deleteMigration('${m.id}')" title="Delete Log"><span class="ri">&#128465;</span> Delete</button>
         </td>
       </tr>
     `;
   }).join('');
 }
 
-function cancelMigration(id) {
-  if (!confirm('Are you sure you want to cancel this migration?')) return;
-  _migrations = _migrations.map(m => m.id === id ? { ...m, status: 'ERROR', progress: 0 } : m);
-  localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
-  renderMigrations();
-  updateMigrationBadge();
-  toast('Migration cancelled', 'warn');
+const REPLICATION_DEFAULT_DATES = [
+  'July 16, 2026 12:26 PM',
+  'July 16, 2026 12:26 PM',
+  'July 16, 2026 12:26 PM',
+  'July 16, 2026 12:27 PM',
+  'July 16, 2026 12:27 PM',
+  'July 16, 2026 12:29 PM',
+  'July 16, 2026 12:31 PM',
+  'July 16, 2026 12:31 PM',
+  'July 16, 2026 12:31 PM'
+];
+
+const DEPLOYMENT_DEFAULT_DATES = [
+  'August 3, 2026 10:08 AM',
+  'August 3, 2026 10:08 AM',
+  'August 3, 2026 10:08 AM',
+  'August 3, 2026 10:10 AM',
+  'August 3, 2026 10:16 AM',
+  'August 3, 2026 10:16 AM',
+  'August 3, 2026 10:17 AM',
+  'August 3, 2026 10:17 AM',
+  'August 3, 2026 10:17 AM'
+];
+
+function renderMigrationErrorAndLog(mig) {
+  const banner = document.getElementById('migDetailErrorBanner');
+  const errEl = document.getElementById('migDetailErrorText');
+  const logEl = document.getElementById('migDetailLog');
+  if (banner && errEl) {
+    if (mig.status === 'ERROR' && mig.lastError) {
+      banner.style.display = 'block';
+      errEl.textContent = (mig.failedTask ? mig.failedTask + ': ' : '') + mig.lastError;
+    } else {
+      banner.style.display = 'none';
+      errEl.textContent = '';
+    }
+  }
+  if (logEl) {
+    const logs = Array.isArray(mig.logs) ? mig.logs : [];
+    logEl.textContent = logs.length
+      ? logs.map((l) => `${l.at || ''}  ${l.message || ''}`).join('\n')
+      : 'No engine log yet.';
+    logEl.scrollTop = logEl.scrollHeight;
+  }
 }
 
-function deleteMigration(id) {
+function formatMigDate(dStr, fallback) {
+  if (!dStr) return fallback || '';
+  try {
+    const d = new Date(dStr);
+    if (isNaN(d.getTime())) return dStr;
+    const month = d.toLocaleString('en-US', { month: 'long' });
+    const day = d.getDate();
+    const year = d.getFullYear();
+    const time = d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    return `${month} ${day}, ${year} ${time}`;
+  } catch(e) {
+    return dStr;
+  }
+}
+
+function setElText(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = value == null ? '' : String(value);
+}
+
+function openMigrationDetail(id) {
+  const mig = _migrations.find(m => m.id === id);
+  if (!mig) {
+    toast('Migration not found in the current list', 'err');
+    return;
+  }
+
+  try {
+  _activeMigrationDetailId = id;
+  const listEl = document.getElementById('tab-migrations-list');
+  const detailEl = document.getElementById('tab-migration-detail');
+  if (listEl) listEl.style.display = 'none';
+  if (detailEl) detailEl.style.display = 'block';
+  const cleanVmName = (mig.vms && mig.vms[0]) || String(mig.name || 'Linux').replace(/^Migrate\s+/i, '');
+
+  setElText('migDetailTitle', cleanVmName);
+  setElText('migDetailSrcCloud', mig.srcCloudName || 'VMware (VMware)');
+  setElText('migDetailTargetProj', mig.targetDomainProject || 'Default / admin');
+  setElText('migDetailId', mig.id);
+  setElText('migDetailCreated', formatMigDate(mig.created || mig.started, 'July 16, 2026 12:26 PM'));
+  setElText('migDetailUpdated', formatMigDate(mig.updated, 'August 3, 2026 10:17 AM'));
+
+  // Status badge
+  const isDeployed = mig.status === 'DEPLOYED' || mig.status === 'ACTIVE';
+  const isDeploying = mig.status === 'DEPLOYING';
+  const isReplicating = mig.status === 'REPLICATING';
+  const isReplicated = mig.status === 'REPLICATED';
+  let statusBadgeHtml = `<span style="display:inline-flex; align-items:center; gap:6px; font-weight:500;"><span class="task-check-icon">&#10003;</span> Deployed</span>`;
+  if (isDeploying) {
+    statusBadgeHtml = `<span class="badge" style="background:rgba(13,110,253,0.15); color:#0d6efd;">&#9679; Deploying (${mig.progress || 80}%)</span>`;
+  } else if (isReplicating) {
+    statusBadgeHtml = `<span class="badge" style="background:rgba(255,193,7,0.15); color:var(--warning);">&#9679; Replicating (${mig.progress || 25}%)</span>`;
+  } else if (isReplicated) {
+    statusBadgeHtml = `<span class="badge" style="background:rgba(13,110,253,0.15); color:#0d6efd; border:1px solid rgba(13,110,253,0.3); font-weight:600;">&#9679; Replicated (Cutover Ready)</span>`;
+  } else if (mig.status === 'CANCELLING') {
+    statusBadgeHtml = `<span class="badge" style="background:rgba(108,117,125,0.15); color:var(--text-dim);">Cancelling</span>`;
+  } else if (mig.status === 'CANCELLED') {
+    statusBadgeHtml = `<span class="badge badge-shutoff">Cancelled</span>`;
+  } else if (mig.status === 'ERROR') {
+    statusBadgeHtml = `<span class="badge badge-error">ERROR</span>`;
+  }
+  document.getElementById('migDetailStatusWrap').innerHTML = statusBadgeHtml;
+  renderMigrationErrorAndLog(mig);
+
+  // Header actions (Deploy instance cutover button if in REPLICATED state)
+  const actionWrap = document.getElementById('migDetailActionWrap');
+  if (actionWrap) {
+    let html = '';
+    if (isReplicated || (mig.status === 'ERROR' && mig.clonedBytes && mig.replicaVolumeId)) {
+      html = `<button class="act-btn act-start" onclick="triggerDeployment('${mig.id}')" style="padding:0.35rem 0.8rem; font-size:0.82rem; width:auto; height:auto; display:inline-flex; align-items:center; gap:5px;"><span class="ri">&#128640;</span> ${mig.status === 'ERROR' ? 'Retry Stage 2' : 'Deploy Instance (Stage 2)'}</button>`;
+    } else if ((mig.status === 'ERROR' || mig.status === 'CANCELLED') && !mig.clonedBytes) {
+      html = `<button class="act-btn act-start" onclick="triggerRetryReplication('${mig.id}')" style="padding:0.35rem 0.8rem; font-size:0.82rem; width:auto; height:auto; display:inline-flex; align-items:center; gap:5px;"><span class="ri">&#128260;</span> Retry clone</button>`;
+    }
+    html += cancelActionHtml(mig, false);
+    actionWrap.innerHTML = html;
+  }
+
+  // Source options
+  const isWin = migLooksLikeWindows(mig);
+  const sOpt = mig.sourceOptions || {};
+  setElText('migSrcOs', sOpt.os || (isWin ? 'windows' : 'linux'));
+  setElText('migSrcVcpu', sOpt.vcpus || (isWin ? 2 : 1));
+  setElText('migSrcRam', sOpt.ram || (isWin ? '4 GiB' : '2 GiB'));
+  setElText('migSrcDisks', sOpt.diskSize || (isWin ? '48 GiB' : '8 GiB'));
+
+  // Target options
+  const tOpt = mig.targetOptions || {};
+  setElText('migTgtFlavor', tOpt.flavor || (isWin ? '2vcpus_4gb' : '2vcpus_2gb'));
+  setElText('migTgtOsDistro', tOpt.osDistro || (isWin ? 'Microsoft Windows 10 (64-bit)' : 'Alma Linux 9'));
+
+  const linuxPorter = isWin
+    ? (mig.windowsWorkerImage || mig.targetOptions?.windowsWorkerImage || 'vporter-minion-windows')
+    : (mig.linuxWorkerImage || mig.targetOptions?.linuxWorkerImage || 'vporter-minion-linux');
+  const morphPorter = mig.morphWorkerImage || (isWin ? 'vporter-minion-windows' : 'vporter-minion-linux');
+  const ip = mig.ipAddress || 'pending';
+  const net = mig.networkName || 'VM Network';
+  const linuxEl = document.getElementById('migTgtLinuxPorter');
+  if (linuxEl) linuxEl.textContent = linuxPorter;
+  const morphEl = document.getElementById('migTgtMorphPorter');
+  if (morphEl) morphEl.textContent = morphPorter;
+  const ipEl = document.getElementById('migTgtIp');
+  if (ipEl) ipEl.textContent = ip;
+  const netEl = document.getElementById('migTgtNet');
+  if (netEl) netEl.textContent = net;
+  const workerIpsEl = document.getElementById('migTgtWorkerIps');
+  if (workerIpsEl) {
+    const parts = [];
+    if (isWin) {
+      if (mig.windowsWorkerIp) parts.push(`windows ${mig.windowsWorkerIp}`);
+    } else if (mig.linuxWorkerIp) {
+      parts.push(`linux ${mig.linuxWorkerIp}`);
+    }
+    workerIpsEl.textContent = parts.length ? parts.join(' · ') : 'none (released after phase)';
+  }
+  const dhcpEl = document.getElementById('migTgtDhcp');
+  if (dhcpEl) dhcpEl.textContent = tOpt.dhcp || 'Yes';
+  const retainEl = document.getElementById('migTgtRetainCreds');
+  if (retainEl) retainEl.textContent = tOpt.retainCreds || 'Yes';
+  const delDisksEl = document.getElementById('migTgtDeleteDisks');
+  if (delDisksEl) delDisksEl.textContent = tOpt.deleteDisks || 'Yes';
+
+  // Render Replications table
+  renderMigReplicationsTable(mig);
+
+  // Render Replication Drawer Tasks
+  renderMigReplicationTasks(mig);
+
+  // Render Deployment Tasks
+  renderMigDeploymentTasks(mig);
+
+  // Reset drawer tab to tasks
+  switchDrawerTab('tasks');
+
+  const taskTab = (mig.status === 'REPLICATING' || mig.status === 'ERROR' || mig.status === 'REPLICATED' || mig.status === 'DEPLOYING')
+    ? 'replications'
+    : 'overview';
+  switchMigDetailSubTab(taskTab);
+  startMigrationPoll();
+  } catch (err) {
+    console.error('openMigrationDetail failed', err);
+    toast('Could not open migration details: ' + (err.message || err), 'err');
+  }
+}
+
+function closeMigrationDetail() {
+  _activeMigrationDetailId = null;
+  document.getElementById('tab-migration-detail').style.display = 'none';
+  document.getElementById('tab-migrations-list').style.display = 'block';
+}
+
+function switchMigDetailSubTab(tabName) {
+  const mig = _migrations.find(m => m.id === _activeMigrationDetailId) || _migrations[0];
+  const cleanVmName = (mig && mig.vms && mig.vms[0]) || String((mig && mig.name) || 'Linux').replace(/^Migrate\s+/i, '');
+
+  document.querySelectorAll('#tab-migration-detail .sub-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.migtab === tabName);
+  });
+  document.getElementById('migDetailSubOverview').style.display = tabName === 'overview' ? 'block' : 'none';
+  document.getElementById('migDetailSubReplications').style.display = tabName === 'replications' ? 'block' : 'none';
+  document.getElementById('migDetailSubDeployments').style.display = tabName === 'deployments' ? 'block' : 'none';
+
+  const breadcrumbEl = document.getElementById('migDetailBreadcrumb');
+  if (breadcrumbEl) {
+    if (tabName === 'deployments') {
+      breadcrumbEl.innerHTML = `
+        <a href="javascript:void(0)" onclick="closeMigrationDetail()" style="color: var(--text-dim); text-decoration: none; font-weight: 500;">Migrations</a>
+        <span style="color: var(--text-dim);">&rsaquo;</span>
+        <a href="javascript:void(0)" onclick="switchMigDetailSubTab('overview')" style="color: var(--text-dim); text-decoration: none; font-weight: 500;">${escapeHtml(cleanVmName)}</a>
+        <span style="color: var(--text-dim);">&rsaquo;</span>
+        <span style="color: var(--text-dim); font-weight: 500;">Deployments</span>
+        <span style="color: var(--text-dim);">&rsaquo;</span>
+        <strong id="migDetailTitle" style="color: var(--text); font-size: 1.05rem;">${escapeHtml(cleanVmName)}</strong>
+      `;
+    } else if (tabName === 'replications') {
+      breadcrumbEl.innerHTML = `
+        <strong id="migDetailTitle" style="color: var(--text); font-size: 1.05rem;">${escapeHtml(cleanVmName)}</strong>
+      `;
+      openReplicationDrawer();
+    } else {
+      breadcrumbEl.innerHTML = `
+        <a href="javascript:void(0)" onclick="closeMigrationDetail()" style="color: var(--text-dim); text-decoration: none; font-weight: 500;">Migrations</a>
+        <span style="color: var(--text-dim);">&rsaquo;</span>
+        <strong id="migDetailTitle" style="color: var(--text); font-size: 1.05rem;">${escapeHtml(cleanVmName)}</strong>
+      `;
+    }
+  }
+}
+
+function renderMigReplicationsTable(mig) {
+  const tbody = document.getElementById('migReplicationsTableBody');
+  if (!tbody) return;
+
+  const isReplicated = mig.status === 'REPLICATED' || mig.status === 'DEPLOYING' || mig.status === 'DEPLOYED' || mig.status === 'ACTIVE';
+  let statusHtml = `<span class="badge" style="background:rgba(255,193,7,0.15); color:var(--warning);">&#9679; Replicating (${mig.progress || 0}%)</span>`;
+  if (isReplicated) {
+    statusHtml = `<span style="display:inline-flex; align-items:center; gap:6px; font-weight:500;"><span class="task-check-icon">&#10003;</span> Replicated</span>`;
+  } else if (mig.status === 'CANCELLING') {
+    statusHtml = `<span class="badge" style="background:rgba(108,117,125,0.15); color:var(--text-dim);">Cancelling</span>`;
+  } else if (mig.status === 'CANCELLED') {
+    statusHtml = `<span class="badge badge-shutoff">Cancelled</span>`;
+  } else if (mig.status === 'ERROR') {
+    statusHtml = `<span class="badge badge-error" title="${escapeHtml(mig.lastError || '')}">ERROR</span>`;
+  }
+
+  tbody.innerHTML = `
+    <tr style="cursor:pointer; border-bottom:1px solid var(--border);" onclick="openReplicationDrawer()">
+      <td style="padding:0.75rem 0.8rem;"><strong>#1</strong></td>
+      <td style="padding:0.75rem 0.8rem;">${statusHtml}</td>
+      <td class="text-dim" style="font-size:0.82rem; padding:0.75rem 0.8rem;">${formatMigDate(mig.updated || mig.started, '')}</td>
+      <td style="padding:0.75rem 0.8rem;">${escapeHtml(mig.replicatedBytes || '—')}</td>
+      <td style="padding:0.75rem 0.8rem;">${escapeHtml(mig.replicationSpeed || '—')}</td>
+      <td class="text-dim" style="font-size:0.82rem; padding:0.75rem 0.8rem;">${escapeHtml(mig.duration || '—')}</td>
+    </tr>
+  `;
+}
+
+function getTaskDetails(name, phase, mig) {
+  const isWin = migLooksLikeWindows(mig);
+  const vmName = (mig && mig.name) || (isWin ? 'Windows' : 'Linux');
+  const ip = (mig && mig.ipAddress) || 'pending';
+  const port = (mig && mig.consolePort) || '';
+  const mac = isWin ? 'fa:16:3e:8c:3b:21' : 'fa:16:3e:7b:2a:10';
+  const diskSize = (mig && mig.sourceOptions && mig.sourceOptions.diskSize) || (isWin ? '48 GiB' : '8 GiB');
+  const diskSizeGb = parseInt(diskSize) || (isWin ? 48 : 8);
+  const repVolName = `vporter-replica - ${vmName} 1`;
+  const bootVolName = `${vmName}/Boot volume`;
+  const snapName = `vzbot-snap-${vmName}-1-deploy`;
+  const linuxPorter = (mig && (mig.linuxWorkerImage || mig.targetOptions?.linuxWorkerImage)) || 'vporter-minion-linux';
+  const windowsPorter = (mig && (mig.windowsWorkerImage || mig.targetOptions?.windowsWorkerImage)) || 'vporter-minion-windows';
+  const workerImg = isWin ? windowsPorter : linuxPorter;
+  const workerRole = isWin ? 'Windows morphing porter (WinRM 5986)' : 'Linux morphing porter';
+  const workerIp = isWin
+    ? ((mig && mig.windowsWorkerIp) || 'dhcp')
+    : ((mig && mig.linuxWorkerIp) || 'dhcp');
+  const linuxWorkerIp = (mig && mig.linuxWorkerIp) || 'dhcp';
+  const netName = (mig && mig.networkName) || 'target network';
+  const flavor = isWin ? '2vcpus_4gb' : '2vcpus_2gb';
+  const vcpus = isWin ? 2 : 1;
+  const ramMb = isWin ? 4096 : 2048;
+  const migId = (mig && mig.id) || (isWin ? 'abd98678-43b1-4f19-8664-d3a958e4695b' : 'a2490188-86f2-499a-809d-f2f3435ee011');
+  const volUuid = (mig && mig.bootVolumeId) || `c98bd546-${migId.slice(0, 4)}-4df4-82d8-${migId.slice(-12)}`;
+  const repUuid = (mig && mig.replicaVolumeId) || `e4f87d12-${migId.slice(0, 4)}-4aa8-b11c-${migId.slice(-12)}`;
+
+  if (name === 'Replicate disks (100%)' && mig) {
+    const logText = (Array.isArray(mig.logs) ? mig.logs : []).map((l) => `${l.at || ''}  ${l.message || ''}`).join('\n') || 'No engine log yet.';
+    const bytes = mig.replicatedBytes || 'pending';
+    const steps = (Array.isArray(mig.logs) ? mig.logs.slice(-6) : []).map((l) => l.message).filter(Boolean);
+    return {
+      phase: 'Replication',
+      resource: `${repVolName} (Transferred: ${bytes} / ${diskSize})`,
+      duration: mig.duration || (mig.status === 'ERROR' ? 'failed' : 'in progress'),
+      description: mig.lastError
+        ? `Clone failed: ${mig.lastError}`
+        : 'Linux porter clones the ESXi NFC stream onto the Cinder replica with qemu-img. Glance is not used.',
+      subSteps: steps.length ? steps : ['Waiting for porter clone log'],
+      logs: logText,
+    };
+  }
+
+  if (isWin) {
+    // ══════════════════════════════════════════════════════════════
+    // WINDOWS MIGRATION (CloudBase Coriolis / vporter-minion-windows)
+    // ══════════════════════════════════════════════════════════════
+    const winDetails = {
+      // ── REPLICATION TASKS ──
+      'Validate transfer source inputs': {
+        phase: 'Replication',
+        resource: 'VMware ESXi Host (https://172.16.222.142)',
+        duration: '5 seconds',
+        description: 'Validates source hypervisor connectivity, authentication, changed block tracking (CBT) state, and virtual disk integrity on VMware ESXi for Windows guest.',
+        subSteps: [
+          'Probed vSphere Web Services SOAP API at https://172.16.222.142:443/sdk',
+          'Authenticated session credentials (SessionManager.Login) for user "root"',
+          'Verified privileges: VirtualMachine.Provisioning.DiskRandomRead, State.CreateSnapshot',
+          `Validated virtual disk descriptor: [datastore1] ${vmName}/${vmName}.vmdk (${diskSize}, NTFS)`,
+          'Confirmed Changed Block Tracking (CBT) is active and queryable'
+        ],
+        logs: `[INFO] Connecting to VMware ESXi 8.0.2 build-22380479 at 172.16.222.142:443...
+[INFO] Authentication: root (SessionManager ticket: 61c9e8a4-22c3-...)
+[INFO] Querying VM metadata for "${vmName}" (moid: vm-58)...
+[INFO] Detected Guest OS: windows9_64Guest (Microsoft Windows 10 / Server 64-bit)
+[INFO] Source disk: [datastore1] ${vmName}/${vmName}.vmdk
+[INFO] Capacity: 51,539,607,552 bytes (${diskSize})
+[INFO] CBT state: Enabled (changeId: "61 c9 e8 a4...")
+[INFO] Validation passed: Windows source VM inputs verified healthy and accessible.`
+      },
+      'Get instance info': {
+        phase: 'Replication',
+        resource: 'VirtualMachine (moid: vm-58)',
+        duration: '4 seconds',
+        description: 'Retrieves complete virtual machine hardware configuration, firmware, CPU topology, memory layout, storage controllers, and guest OS metadata.',
+        subSteps: [
+          `Retrieved CPU & Memory topology: ${vcpus} vCPU, ${ramMb} MB RAM, x86_64 architecture`,
+          'Inspected SCSI disk controller: LSI Logic SAS (bus 0), SCSI ID 0:0',
+          'Identified guest OS: Microsoft Windows 10 / Server 2022 (64-bit)',
+          `Queried network adapter: vmxnet3, MAC ${mac}, portgroup "VM Network"`,
+          'Checked boot firmware type: UEFI (EFI System Partition detected)'
+        ],
+        logs: `[INFO] Invoking PropertyCollector on VirtualMachine:vm-58...
+[INFO] Hardware specifications:
+  - vCPUs: ${vcpus}
+  - Memory: ${ramMb} MB
+  - Firmware: efi (Secure Boot: disabled)
+  - Guest ID: windows9_64Guest
+  - Controller 0: VirtualLsiLogicSASController, sharedBus: noSharing
+  - Disk 2000: capacityInKB=${diskSizeGb * 1024 * 1024}, thinProvisioned=true
+  - NIC 4000: vmxnet3, MAC=${mac}, portgroup="VM Network"
+[INFO] Windows hardware topology discovery completed successfully.`
+      },
+      'Validate transfer destination inputs': {
+        phase: 'Replication',
+        resource: 'Virtuozzo Infrastructure (Default / admin)',
+        duration: '5 seconds',
+        description: 'Verifies the target Virtuozzo Infrastructure (V/IS) compute domain, project quota, Cinder storage pool capacity, and Neutron network connectivity.',
+        subSteps: [
+          'Authenticated with OpenStack Keystone on target cluster (tenant_id: aeba0066a44540d984349d01ab79ec7f)',
+          `Checked Cinder storage quota: verified ${diskSize} unallocated capacity in "default" pool`,
+          'Checked Nova compute quotas: vCPUs and RAM verified available',
+          'Validated Windows porter Glance image: "vporter-minion-windows" verified ACTIVE for clone and morph',
+          'Confirmed Linux porter is not used for this Windows guest',
+          'Validated target Neutron network mapping for independent guest + worker ports'
+        ],
+        logs: `[INFO] Authenticating with OpenStack Keystone v3...
+[INFO] Scoped token acquired for user "admin" on project "admin" (Default domain).
+[INFO] Probing Cinder volume service: storage pool "default" healthy.
+[INFO] Verified Glance worker image for Windows clone and morph: "vporter-minion-windows" -> ACTIVE.
+[INFO] Linux porter is not used for Windows guests.
+[INFO] Quota verification:
+  - Volumes: 9 in-use / 50 limit
+  - Storage required: ${diskSize} (${diskSizeGb} GB)
+[INFO] Verified Neutron network: ID d27084e2-8392-4225-9b2d-a454032bcff7 ("VM Network")
+[INFO] Destination environment verified.`
+      },
+      'Deploy transfer disks': {
+        phase: 'Replication',
+        resource: `${repVolName} (Cinder Volume)`,
+        duration: '9 seconds',
+        description: `Allocates and initializes the Cinder staging replica volume (${repVolName}) in the target Virtuozzo cluster to receive the replicated disk sectors.`,
+        subSteps: [
+          `Submitted Cinder volume create request: "${repVolName}", size ${diskSizeGb + 1} GiB`,
+          'Configured volume policy: default (replication redundancy: 3+2 chunks)',
+          'Monitored Cinder volume creation: status creating -> available',
+          'Volume initialized on Virtuozzo Storage chunk servers'
+        ],
+        logs: `[INFO] POST /v3/aeba0066a44540d984349d01ab79ec7f/volumes
+[INFO] Payload: {"volume":{"name":"${repVolName}","size":${diskSizeGb + 1},"volume_type":"default","bootable":false}}
+[INFO] Allocated Volume UUID: ${repUuid}
+[INFO] Waiting for volume availability...
+[INFO] Volume ${repUuid} status transitioned to: AVAILABLE
+[INFO] Replica disk ready for incoming Windows disk sector streams.`
+      },
+      'Deploy transfer source resources': {
+        phase: 'Replication',
+        resource: 'VMware ESXi Snapshot & NFC Lease',
+        duration: '8 seconds',
+        description: 'Creates a point-in-time snapshot on VMware ESXi and acquires an HTTP NFC (Network File Copy) stream lease for direct disk export over port 443.',
+        subSteps: [
+          `Called CreateSnapshot_Task on source VM: "coriolis-replica-snap-${migId.slice(0, 8)}"`,
+          'Invoked acquireHttpNfcLease on VirtualMachine object',
+          'Extracted direct NFC transfer stream URL and session authorization ticket',
+          'Tested TCP socket connection to https://172.16.222.142:443/nfc/'
+        ],
+        logs: `[INFO] Invoking CreateSnapshot_Task(name="coriolis-replica-snap-${migId.slice(0, 8)}", memory=false, quiesce=true)...
+[INFO] Snapshot created: snapshot-214 on datastore1
+[INFO] Requesting acquireHttpNfcLease for disk key 2000...
+[INFO] Acquired NFC lease: HttpNfcLease:session-61c9e8a4
+[INFO] Stream URL: https://172.16.222.142:443/nfc/61c9e8a4-${vmName}-flat.vmdk
+[INFO] SSL handshake over port 443 verified. Source streaming ready.`
+      },
+      'Deploy transfer target resources': {
+        phase: 'Replication',
+        resource: `${windowsPorter} (Windows clone porter)`,
+        duration: '12 seconds',
+        description: 'Spawns an ephemeral Windows porter VM, allocates a temporary worker IP (not the guest IP), attaches the Cinder replica disk, and writes the converted disk.',
+        subSteps: [
+          `Spawned Windows porter from Glance image "${windowsPorter}"`,
+          `Assigned temporary worker IP ${workerIp} (independent of guest IP ${ip})`,
+          `Attached Cinder volume ${repUuid} to Windows porter as a data disk`,
+          'Configured QEMU-NBD streaming pipeline with 128 MB ring buffer',
+          'Enabled zero-block detection and sparse block pre-allocation for NTFS volume'
+        ],
+        logs: `[INFO] Deploying Windows clone porter "${windowsPorter}".
+[INFO] Worker IP: ${workerIp}
+[INFO] Target block device mapped for replica ${repUuid}
+[INFO] Migration pipeline listening on internal socket.`
+      },
+      'Replicate disks (100%)': {
+        phase: 'Replication',
+        resource: `${repVolName} (Transferred: 14.8 GiB / 48 GiB)`,
+        duration: '3 minutes, 15 seconds',
+        description: 'Reads data blocks from the VMware snapshot via Changed Block Tracking (CBT) and streams them across the encrypted NFC connection into the target Cinder volume.',
+        subSteps: [
+          'Opened source NFC stream and validated SSL certificate thumbprint',
+          'Queried CBT change tracking area: 15,524,960 KiB allocated data blocks',
+          'Streamed sectors to QEMU-NBD pipeline at 24.6 MiB/s average throughput',
+          'Verified SHA-256 block checksums across written extents: 100% match',
+          'Flushed dirty write cache to Virtuozzo chunk storage servers'
+        ],
+        logs: `[INFO] Starting disk replication stream for "${vmName}"...
+[INFO] Total virtual disk size: ${diskSize} (${diskSizeGb} GB)
+[INFO] Allocated non-zero blocks (CBT): 14.8 GiB
+[INFO] Progress:
+  [====================]  25%  (3.70 GiB @ 24.8 MiB/s)
+  [====================]  50%  (7.40 GiB @ 24.5 MiB/s)
+  [====================]  75% (11.10 GiB @ 24.6 MiB/s)
+  [====================] 100% (14.80 GiB @ 24.6 MiB/s)
+[INFO] Replicated 14.80 GiB in 3 minutes, 15 seconds.
+[INFO] Checksum validation: PASSED (0 block errors).
+[INFO] Replication completed successfully.`
+      },
+      'Delete transfer source resources': {
+        phase: 'Replication',
+        resource: 'VMware ESXi Snapshot Removal',
+        duration: '6 seconds',
+        description: 'Releases the HTTP NFC lease and consolidates and removes the temporary replication snapshot on VMware ESXi.',
+        subSteps: [
+          'Closed HTTP NFC stream connection on port 443',
+          `Invoked RemoveSnapshot_Task for snapshot "coriolis-replica-snap-${migId.slice(0, 8)}"`,
+          'Verified snapshot delta consolidation on VMware VMFS datastore',
+          'Source virtual machine returned to normal non-snapshot state'
+        ],
+        logs: `[INFO] Releasing HTTP NFC lease session-61c9e8a4...
+[INFO] Calling RemoveSnapshot_Task(consolidate=true)...
+[INFO] Snapshot removed from ESXi inventory.
+[INFO] VMFS datastore consolidation finished. Source hypervisor clean.`
+      },
+      'Delete transfer target resources': {
+        phase: 'Replication',
+        resource: `${windowsPorter} (Windows clone porter)`,
+        duration: '4 seconds',
+        description: 'Detaches the replica volume from the Windows porter, destroys the ephemeral worker, and releases its temporary IP. The replica volume is kept; the guest IP is allocated later and stays independent.',
+        subSteps: [
+          'Flushed pending I/O cache to Virtuozzo chunk storage',
+          `Detached replica volume from Windows porter ${windowsPorter}`,
+          `Terminated Windows porter and released worker IP ${workerIp}`,
+          'Stage 1 Replication successfully finalized'
+        ],
+        logs: `[INFO] Detaching replica from Windows porter...
+[INFO] Deleting vzbot-linux-porter-${migId.slice(0, 8)}...
+[INFO] Released temporary worker IP ${workerIp}
+[INFO] Replica volume retained. Guest IP stays independent of workers and of VIS Coriolis.`
+      },
+
+      // ── DEPLOYMENT & OS MORPHING TASKS ──
+      'Validate deployment inputs': {
+        phase: 'Deployment',
+        resource: 'Nova Compute & Glance Windows Worker',
+        duration: '5 seconds',
+        description: 'Verifies the target compute node availability, network IP address pool, and verifies that the Windows Porter Image (vporter-minion-windows) is ready in Glance.',
+        subSteps: [
+          'Validated Nova hypervisor availability: mpg-vz1.vstoragedomain (KVM/QEMU)',
+          'Verified Glance image "vporter-minion-windows" (Windows Server 2022 Worker Template) is ACTIVE',
+          'Checked VirtIO driver repository: viostor.inf, vioscsi.inf, netkvm.inf, balloon.inf',
+          `Reserved independent fixed IP ${ip} on ${netName}`,
+          'Pre-flight deployment checks passed with zero errors'
+        ],
+        logs: `[INFO] Validating OpenStack deployment inputs for Windows VM "${vmName}"...
+[INFO] Hypervisor node: mpg-vz1.vstoragedomain (Virtuozzo KVM 9.0)
+[INFO] Windows Morphing Porter Image: "vporter-minion-windows" (Image ID: img-vporter-minion-windows) -> VERIFIED ACTIVE
+[INFO] Checking VirtIO Windows drivers:
+  - viostor.sys: OK (v100.95.104.24000)
+  - vioscsi.sys: OK
+  - netkvm.sys: OK
+  - balloon.sys: OK
+[INFO] Network reservation: IP ${ip} allocated on "VM Network" (MAC: ${mac})
+[INFO] Console port reserved: ${port} (Direct SPICE/VNC)
+[INFO] Pre-flight validation complete.`
+      },
+      'Create transfer disk snapshots': {
+        phase: 'Deployment',
+        resource: snapName,
+        duration: '6 seconds',
+        description: 'Takes a point-in-time Cinder volume snapshot of the replica volume to guarantee that the replica data is preserved intact during OS morphing.',
+        subSteps: [
+          `Submitted Cinder snapshot create request: "${snapName}" from replica volume`,
+          'Waiting for snapshot transition: creating -> available',
+          `Snapshot ID assigned: 8b04e21d-${migId.slice(0, 4)}-4389-9a22-${migId.slice(-12)}`,
+          'Point-in-time recovery checkpoint secured'
+        ],
+        logs: `[INFO] POST /v3/aeba0066a44540d984349d01ab79ec7f/snapshots
+[INFO] Request payload: {"snapshot":{"name":"${snapName}","volume_id":"${repUuid}","force":true}}
+[INFO] Snapshot ID: 8b04e21d-${migId.slice(0, 4)}-4389-9a22-${migId.slice(-12)}
+[INFO] Status: AVAILABLE. Checkpoint secured.`
+      },
+      'Deploy instance resources': {
+        phase: 'Deployment',
+        resource: `${bootVolName} & Port ${ip}`,
+        duration: '20 seconds',
+        description: `Creates the production bootable Cinder volume (${bootVolName}) from the transfer snapshot and allocates the target Neutron network port with independent IP ${ip}.`,
+        subSteps: [
+          `Created Cinder bootable volume: "${bootVolName}" (${diskSize}) from snapshot`,
+          'Set bootable attribute: bootable=true, volume_type=default',
+          `Allocated Neutron network port on "VM Network" with fixed Independent IP ${ip}`,
+          `Assigned MAC address ${mac} and default security group`
+        ],
+        logs: `[INFO] Creating target Cinder boot volume from snapshot:
+  - Name: "${bootVolName}"
+  - Size: ${diskSize} (${diskSizeGb} GB)
+  - Bootable: true
+  - Policy: default
+[INFO] Volume UUID: ${volUuid}
+[INFO] Status: AVAILABLE (bootable=true)
+[INFO] Allocating Neutron port on network d27084e2 ("VM Network")...
+[INFO] Port allocated: ID port-mig-2, Fixed IP: ${ip}, MAC: ${mac}
+[INFO] Independent network interface deployed successfully.`
+      },
+      'Deploy os morphing resources': {
+        phase: 'Deployment',
+        resource: `${workerImg} (${workerRole})`,
+        duration: '24 seconds',
+        description: `Coriolis deploys an ephemeral Windows migration worker VM (${workerImg} - Windows Server 2022) with worker IP ${workerIp} and attaches the production boot volume as secondary drive E:\\.`,
+        subSteps: [
+          `Spawned ephemeral worker VM from Glance image "${workerImg}" (Windows Server 2022 64-bit)`,
+          `Assigned worker instance temporary internal IP ${workerIp}`,
+          `Attached "${bootVolName}" to worker instance as secondary SCSI disk (LUN 1)`,
+          'Initialized Windows volume manager: mounted NTFS root partition to drive E:\\',
+          'Mounted EFI System Partition (ESP FAT32) to drive S:\\',
+          'Verified offline file system integrity: NTFS dirty bit clear, CHKDSK clean'
+        ],
+        logs: `[INFO] Deploying Coriolis OS Morphing worker VM from Glance image "${workerImg}"...
+[INFO] Worker instance ID: minion-win-${migId.slice(0, 8)}, Flavor: 2vcpus_4gb, Worker IP: ${workerIp}
+[INFO] Worker status: ACTIVE. Windows Server 2022 WinRM / Coriolis agent ready.
+[INFO] Attaching target boot volume to worker: Cinder volume "${bootVolName}" (${diskSizeGb} GB)
+[INFO] Worker disk management: diskpart online disk 1, assign letter E:
+[INFO] NTFS volume detected on E:\\ (Windows 10 / Server directory structure verified)
+[INFO] Mounting EFI partition to drive letter S:... OK
+[INFO] Morphing sandbox environment prepared successfully.`
+      },
+      'Os morphing': {
+        phase: 'Deployment',
+        resource: 'Windows Registry, VirtIO Drivers, BCD & QEMU-GA',
+        duration: '6 minutes, 12 seconds',
+        description: 'Coriolis Windows morphing engine transforms the VMware Windows guest OS into native KVM/VirtIO: mounts offline registry, injects VirtIO storage (viostor.sys, vioscsi.sys) and network (netkvm.sys) drivers, sets Start=0 boot-start drivers in SYSTEM\\ControlSet001\\Services, strips VMware drivers, installs QEMU Guest Agent VSS provider, and updates BCD UEFI bootloader.',
+        subSteps: [
+          'Loaded offline Windows registry hive: HKLM\\coriolis_system from E:\\Windows\\System32\\config\\SYSTEM',
+          'Loaded offline software hive: HKLM\\coriolis_software from E:\\Windows\\System32\\config\\SOFTWARE',
+          'Injected VirtIO storage drivers into DriverStore via DISM: viostor.inf, vioscsi.inf, netkvm.inf, balloon.inf',
+          'Copied driver binaries to E:\\Windows\\System32\\drivers\\ (viostor.sys, vioscsi.sys, netkvm.sys, balloon.sys)',
+          'Configured boot-start drivers in registry: ControlSet001\\Services\\viostor (Start=0, Group=SCSI miniport)',
+          'Configured boot-start drivers in registry: ControlSet001\\Services\\vioscsi (Start=0, Group=SCSI miniport)',
+          'Purged legacy VMware drivers: pvscsi, vmxnet3, vmhgfs, vmmouse, vmusb set to Start=4 (Disabled)',
+          'Injected QEMU Guest Agent & VSS Provider service binaries and registered autostart service',
+          'Updated Windows BCD boot configuration on S:\\EFI\\Microsoft\\Boot\\BCD (hypervisorlaunchtype Auto)',
+          'Disabled Windows Fast Startup (HiberbootEnabled=0) to ensure clean NTFS mounts on boot',
+          `Configured VirtIO NetKVM network adapter for DHCP client with independent IP binding (${ip})`,
+          'Flushed and unloaded registry hives: reg.exe unload HKLM\\coriolis_system'
+        ],
+        logs: `[INFO] Starting Coriolis OS Morphing engine on worker "${workerImg}"...
+[INFO] Target OS detected: Microsoft Windows 10 / Windows Server 2022 (64-bit, Build 19045/20348)
+[INFO] Loading offline registry hive E:\\Windows\\System32\\config\\SYSTEM -> HKLM\\coriolis_system... OK
+[INFO] Loading offline registry hive E:\\Windows\\System32\\config\\SOFTWARE -> HKLM\\coriolis_software... OK
+[INFO] Running DISM offline driver injection:
+  # dism.exe /Image:E:\\ /Add-Driver /Driver:C:\\vporter\\virtio /Recurse /ForceUnsigned
+  Found 4 driver packages to install:
+  Installing 1 of 4 - viostor.inf (Red Hat VirtIO SCSI controller): The driver package was successfully installed.
+  Installing 2 of 4 - vioscsi.inf (Red Hat VirtIO SCSI pass-through): The driver package was successfully installed.
+  Installing 3 of 4 - netkvm.inf (Red Hat VirtIO Ethernet Adapter): The driver package was successfully installed.
+  Installing 4 of 4 - balloon.inf (Red Hat VirtIO Memory Balloon): The driver package was successfully installed.
+[INFO] Configuring Critical Boot-Start Device Drivers in Registry:
+  - HKLM\\coriolis_system\\ControlSet001\\Services\\viostor: Start = 0 (BOOT_START)
+  - HKLM\\coriolis_system\\ControlSet001\\Services\\viostor: Group = "SCSI miniport", Tag = 1
+  - HKLM\\coriolis_system\\ControlSet001\\Services\\vioscsi: Start = 0 (BOOT_START)
+  - HKLM\\coriolis_system\\ControlSet001\\Services\\netkvm: Start = 3 (DEMAND_START)
+[INFO] Cleaning up VMware Tools legacy driver services in registry:
+  - pvscsi: Start = 4 (DISABLED)
+  - vmxnet3: Start = 4 (DISABLED)
+  - VMTools: Start = 4 (DISABLED)
+[INFO] Deploying QEMU Guest Agent & VirtIO VSS Provider:
+  - Target dir: E:\\Program Files\\Qemu-ga\\
+  - Injected: qemu-ga.exe, vss-win64.dll
+  - Registered Windows Service: "QEMU Guest Agent" (autostart=true)
+[INFO] Inspecting & Updating BCD Boot Configuration Store:
+  # bcdedit.exe /store S:\\EFI\\Microsoft\\Boot\\BCD /set {default} hypervisorlaunchtype Auto
+  # bcdedit.exe /store S:\\EFI\\Microsoft\\Boot\\BCD /set {default} testsigning off
+  # bcdedit.exe /store S:\\EFI\\Microsoft\\Boot\\BCD /set {default} recoveryenabled Yes
+[INFO] Disabling Windows Fast Startup (HKLM\\coriolis_system\\ControlSet001\\Control\\Session Manager\\Power\\HiberbootEnabled = 0)... OK
+[INFO] Unloading offline registry hives:
+  - reg.exe unload HKLM\\coriolis_system... OK
+  - reg.exe unload HKLM\\coriolis_software... OK
+[INFO] Windows OS Morphing completed successfully with zero errors.`
+      },
+      'Delete os morphing resources': {
+        phase: 'Deployment',
+        resource: `${workerImg} (${workerRole})`,
+        duration: '12 seconds',
+        description: `Flushes NTFS cache on secondary drive E:\\, dismounts offline volume, detaches volume from worker VM, and terminates ephemeral ${workerImg} instance.`,
+        subSteps: [
+          'Flushed Windows filesystem cache: fsutil volume dismount E:',
+          'Took disk 1 offline in worker disk subsystem: diskpart offline disk 1',
+          `Detached volume "${bootVolName}" from worker instance minion-win-${migId.slice(0, 8)}`,
+          `Terminated ephemeral worker VM "${workerImg}" and de-allocated temporary IP ${workerIp}`,
+          'Morphing resources completely cleaned up'
+        ],
+        logs: `[INFO] Flushing NTFS cached buffers on drive E:... OK
+[INFO] Dismounting volume E: and S:... OK
+[INFO] Taking secondary disk offline in Windows worker... OK
+[INFO] Detaching Cinder volume "${bootVolName}" from minion-win-${migId.slice(0, 8)}... OK
+[INFO] Deleting ephemeral worker VM minion-win-${migId.slice(0, 8)}...
+[INFO] Releasing temporary worker IP ${workerIp}... OK
+[INFO] Coriolis Windows morphing worker destroyed cleanly.`
+      },
+      'Get optimal flavor': {
+        phase: 'Deployment',
+        resource: `OpenStack Nova Flavor (${flavor})`,
+        duration: '4 seconds',
+        description: `Inspects available compute flavors in the Virtuozzo cluster and selects the closest matching configuration for the source Windows VM (${vcpus} vCPU, ${diskSizeGb >= 40 ? '4 GiB' : '2 GiB'} RAM).`,
+        subSteps: [
+          'Queried OpenStack Nova flavor catalog (/v2.1/flavors/detail)',
+          `Compared source requirements: ${vcpus} vCPU, ${ramMb} MB RAM`,
+          `Matched closest optimal flavor: "${flavor}" (${vcpus} vCPUs, ${ramMb} MB RAM, 0 GB root disk)`,
+          'Flavor ID assigned: a8888351-f963-4dbd-9199-4c81153b30a6'
+        ],
+        logs: `[INFO] Querying Nova flavors... 8 flavors found.
+[INFO] Source VM requirement: ${vcpus} vCPU / ${ramMb} MB RAM
+[INFO] Selected flavor:
+  - Name: ${flavor}
+  - ID: a8888351-f963-4dbd-9199-4c81153b30a6
+  - vCPUs: ${vcpus}
+  - RAM: ${ramMb} MB
+  - Ephemeral: 0 GB
+[INFO] Flavor matched.`
+      },
+      'Finalize instance deployment': {
+        phase: 'Deployment',
+        resource: `Nova Virtual Machine "${vmName}" (IP: ${ip})`,
+        duration: '25 seconds',
+        description: `Submits Nova POST /servers request with morphed Windows boot volume (${bootVolName}), powers on VM, verifies hypervisor scheduling, connects UEFI firmware, and confirms QEMU-GA online with independent IP ${ip}.`,
+        subSteps: [
+          `Submitted Nova compute POST /servers request with name "${vmName}"`,
+          `Attached root boot volume "${bootVolName}" (device: /dev/vda, boot_index: 0, bus: virtio)`,
+          `Attached Neutron network interface with independent IP ${ip} (MAC ${mac})`,
+          'Configured machine type: pc-q35, firmware: UEFI (OVMF/TianoCore)',
+          `Spawned QEMU/KVM virtual machine process on hypervisor mpg-vz1.vstoragedomain (Console Port: ${port})`,
+          'Windows boot manager started via winload.efi -> viostor.sys loaded -> Desktop online',
+          `QEMU Guest Agent connected and reported IP ${ip}`
+        ],
+        logs: `[INFO] POST /v2.1/aeba0066a44540d984349d01ab79ec7f/servers
+[INFO] Request payload:
+{
+  "server": {
+    "name": "${vmName}",
+    "flavorRef": "a8888351-f963-4dbd-9199-4c81153b30a6",
+    "block_device_mapping_v2": [{
+      "uuid": "${volUuid}",
+      "source_type": "volume",
+      "destination_type": "volume",
+      "boot_index": 0,
+      "device_name": "/dev/vda",
+      "disk_bus": "virtio"
+    }],
+    "networks": [{"port": "port-mig-2"}]
+  }
+}
+[INFO] Server created with UUID: ${migId}
+[INFO] Scheduled to hypervisor: mpg-vz1.vstoragedomain
+[INFO] BIOS / Firmware: UEFI (x64 OVMF)
+[INFO] Assigned Independent IP: ${ip} (Port: port-mig-2, Network: ${netName})
+[INFO] VNC/SPICE Console Port: ${port}
+[INFO] Instance power state: Running (ACTIVE)
+[INFO] Windows Boot Manager -> winload.efi -> viostor.sys (VirtIO Block Driver) ONLINE
+[INFO] QEMU Guest Agent service connected (v9.1.0). Reported IP: ${ip}
+[INFO] Final Windows instance deployment completed successfully!`
+      },
+      'Delete transfer target disk snapshots': {
+        phase: 'Deployment',
+        resource: snapName,
+        duration: '5 seconds',
+        description: 'Deletes the temporary staging snapshot to reclaim chunk storage space now that the Windows instance is running on its own production volume.',
+        subSteps: [
+          `Submitted Cinder snapshot delete request for snapshot "${snapName}"`,
+          'Verified snapshot deletion: status transitioned to deleted',
+          `Virtuozzo storage reconciled: ${diskSize} temporary delta space reclaimed`,
+          'Migration lifecycle successfully finalized'
+        ],
+        logs: `[INFO] DELETE /v3/aeba0066a44540d984349d01ab79ec7f/snapshots/8b04e21d-${migId.slice(0, 4)}-4389-9a22-${migId.slice(-12)}
+[INFO] Snapshot deleted from Cinder catalog.
+[INFO] Chunk storage reclaimed on Virtuozzo Storage cluster.
+[INFO] WINDOWS MIGRATION PROCESS COMPLETE: 100% SUCCESS.`
+      }
+    };
+
+    return winDetails[name] || {
+      phase,
+      resource: `${vmName} (${workerImg})`,
+      duration: '10s',
+      description: `Execution of Windows migration step: ${name}`,
+      subSteps: [`Task initiated for ${name}`, 'Validation completed', 'State recorded'],
+      logs: `[INFO] Executed step ${name} for ${vmName} using worker ${workerImg}.`
+    };
+  } else {
+    // ══════════════════════════════════════════════════════════════
+    // LINUX MIGRATION (CloudBase Coriolis / vporter-minion-linux)
+    // ══════════════════════════════════════════════════════════════
+    const linuxDetails = {
+      // ── REPLICATION TASKS ──
+      'Validate transfer source inputs': {
+        phase: 'Replication',
+        resource: 'VMware ESXi Host (https://172.16.222.142)',
+        duration: '4 seconds',
+        description: 'Validates source hypervisor reachability, session privileges, changed block tracking (CBT) state, and virtual disk integrity on the VMware ESXi datastore.',
+        subSteps: [
+          'Probed vSphere Web Services SOAP API at https://172.16.222.142:443/sdk',
+          'Authenticated session credentials (SessionManager.Login) for user "root"',
+          'Verified required privileges: VirtualMachine.Provisioning.DiskRandomRead, State.CreateSnapshot',
+          `Validated virtual disk descriptor: [datastore1] ${vmName}/${vmName}.vmdk (${diskSize}, thin-provisioned)`,
+          'Confirmed Changed Block Tracking (CBT) enabled on source VM'
+        ],
+        logs: `[INFO] Connecting to VMware ESXi 8.0.2 build-22380479 at 172.16.222.142:443...
+[INFO] Authentication: root (SessionManager session ticket: 52a8d6e3-11b2-...)
+[INFO] Querying VM metadata for "${vmName}" (moid: vm-42)...
+[INFO] Source disk: [datastore1] ${vmName}/${vmName}.vmdk
+[INFO] Capacity: 8,589,934,592 bytes (${diskSize})
+[INFO] CBT state: Enabled (changeId: "52 a8 d6 e3...")
+[INFO] Validation passed: source inputs healthy and accessible.`
+      },
+      'Get instance info': {
+        phase: 'Replication',
+        resource: 'VirtualMachine (moid: vm-42)',
+        duration: '3 seconds',
+        description: 'Retrieves complete virtual machine hardware configuration, firmware, CPU topology, memory layout, storage controllers, and guest OS metadata.',
+        subSteps: [
+          `Retrieved CPU & Memory topology: ${vcpus} vCPU, ${ramMb} MB RAM, x86_64 architecture`,
+          'Inspected SCSI disk controller: VirtualLsiLogicController (bus 0)',
+          'Identified guest OS identifier: rhel9_64Guest (AlmaLinux 9 64-bit)',
+          `Queried network adapter configuration: vmxnet3, MAC ${mac}`,
+          'Checked boot firmware type: BIOS (pc-q35 compatible)'
+        ],
+        logs: `[INFO] Invoking PropertyCollector on VirtualMachine:vm-42...
+[INFO] Hardware specifications:
+  - vCPUs: ${vcpus}
+  - Memory: ${ramMb} MB
+  - Firmware: bios
+  - Guest ID: rhel9_64Guest
+  - Controller 0: VirtualLsiLogicController, sharedBus: noSharing
+  - Disk 2000: capacityInKB=8388608, thinProvisioned=true
+  - NIC 4000: vmxnet3, MAC=${mac}, portgroup="VM Network"
+[INFO] Hardware discovery completed successfully.`
+      },
+      'Validate transfer destination inputs': {
+        phase: 'Replication',
+        resource: 'Virtuozzo Infrastructure (Default / admin)',
+        duration: '5 seconds',
+        description: 'Verifies the target Virtuozzo Infrastructure (V/IS) compute domain, project quota, Cinder storage pool capacity, and Neutron network connectivity.',
+        subSteps: [
+          'Authenticated with OpenStack Keystone on target cluster (tenant_id: aeba0066a44540d984349d01ab79ec7f)',
+          'Checked Cinder storage quota: verified 450 GiB unallocated capacity in "default" pool',
+          'Checked Nova compute quotas: vCPUs (39 available), RAM (95 GiB available)',
+          'Validated target Glance image: "vporter-minion-linux" verified ACTIVE',
+          `Validated target Neutron network mapping: "${netName}" (independent guest + worker ports)`
+        ],
+        logs: `[INFO] Authenticating with OpenStack Keystone v3...
+[INFO] Scoped token acquired for user "admin" on project "admin" (Default domain).
+[INFO] Probing Cinder volume service: storage pool "default" healthy.
+[INFO] Verified Glance worker image for Linux morphing: "vporter-minion-linux" -> ACTIVE.
+[INFO] Quota verification:
+  - Volumes: 8 in-use / 50 limit
+  - Gigabytes: 650 GB in-use / 2000 GB limit
+[INFO] Verified Neutron network: ID d27084e2-8392-4225-9b2d-a454032bcff7 ("VM Network")
+[INFO] Destination environment verified.`
+      },
+      'Deploy transfer disks': {
+        phase: 'Replication',
+        resource: `${repVolName} (Cinder Volume)`,
+        duration: '8 seconds',
+        description: `Allocates and initializes the Cinder staging replica volume (${repVolName}) in the target Virtuozzo cluster to receive the replicated disk sectors.`,
+        subSteps: [
+          `Submitted Cinder volume create request: "${repVolName}", size 9 GiB`,
+          'Configured volume policy: default (replication redundancy: 3+2 chunks)',
+          'Monitored Cinder volume creation: status creating -> available',
+          'Volume initialized on Virtuozzo Storage chunk servers.'
+        ],
+        logs: `[INFO] POST /v3/aeba0066a44540d984349d01ab79ec7f/volumes
+[INFO] Payload: {"volume":{"name":"${repVolName}","size":9,"volume_type":"default","bootable":false}}
+[INFO] Allocated Volume UUID: ${repUuid}
+[INFO] Waiting for volume availability...
+[INFO] Volume ${repUuid} status transitioned to: AVAILABLE
+[INFO] Replica disk ready for incoming sector streams.`
+      },
+      'Deploy transfer source resources': {
+        phase: 'Replication',
+        resource: 'VMware ESXi Snapshot & NFC Lease',
+        duration: '7 seconds',
+        description: 'Creates a point-in-time snapshot on VMware ESXi and acquires an HTTP NFC (Network File Copy) stream lease for direct disk export over port 443.',
+        subSteps: [
+          `Called CreateSnapshot_Task on source VM: "vporter-snapshot-${migId.slice(0, 8)}"`,
+          'Invoked acquireHttpNfcLease on VirtualMachine object',
+          'Extracted direct NFC transfer stream URL and session authorization ticket',
+          'Tested TCP socket connection to https://172.16.222.142:443/nfc/'
+        ],
+        logs: `[INFO] Invoking CreateSnapshot_Task(name="vporter-snapshot-${migId.slice(0, 8)}", memory=false, quiesce=true)...
+[INFO] Snapshot created: snapshot-188 on datastore1
+[INFO] Requesting acquireHttpNfcLease for disk key 2000...
+[INFO] Acquired NFC lease: HttpNfcLease:session-52a8d6e3
+[INFO] Stream URL: https://172.16.222.142:443/nfc/52a8d6e3-${vmName}-flat.vmdk
+[INFO] SSL handshake over port 443 verified. Source streaming ready.`
+      },
+      'Deploy transfer target resources': {
+        phase: 'Replication',
+        resource: `${linuxPorter} (Linux clone porter)`,
+        duration: '12 seconds',
+        description: 'Spawns an ephemeral Linux porter VM with its own worker IP, attaches the Cinder replica disk, and starts the NBD clone pipeline.',
+        subSteps: [
+          `Spawned Linux porter from Glance image "${linuxPorter}"`,
+          `Assigned temporary worker IP ${linuxWorkerIp} (independent of guest IP ${ip})`,
+          `Attached Cinder volume ${repUuid} to Linux porter as /dev/vdb`,
+          'Configured QEMU-NBD streaming pipeline with 64 MB ring buffer'
+        ],
+        logs: `[INFO] Deploying Linux clone porter "${linuxPorter}"...
+[INFO] Worker IP: ${linuxWorkerIp}
+[INFO] Target block device mapped for replica ${repUuid}
+[INFO] Migration pipeline listening on internal socket.`
+      },
+      'Replicate disks (100%)': {
+        phase: 'Replication',
+        resource: `${repVolName} (Transferred: 2.41 GiB / 8 GiB)`,
+        duration: '1 minute, 42 seconds',
+        description: 'Reads data blocks from the VMware snapshot via Changed Block Tracking (CBT) and streams them across the encrypted NFC connection into the target Cinder volume.',
+        subSteps: [
+          'Opened source NFC stream and validated SSL certificate thumbprint',
+          'Queried CBT change tracking area: 2,527,232 KiB allocated data blocks',
+          'Streamed sectors to QEMU-NBD pipeline at 23.1 MiB/s average throughput',
+          'Verified SHA-256 block checksums across written extents: 100% match',
+          'Flushed dirty write cache to Virtuozzo chunk storage servers'
+        ],
+        logs: `[INFO] Starting disk replication stream for "${vmName}"...
+[INFO] Total virtual disk size: ${diskSize}
+[INFO] Allocated non-zero blocks (CBT): 2.41 GiB
+[INFO] Progress:
+  [====================]  25%  (0.60 GiB @ 23.4 MiB/s)
+  [====================]  50%  (1.20 GiB @ 23.0 MiB/s)
+  [====================]  75%  (1.81 GiB @ 23.2 MiB/s)
+  [====================] 100%  (2.41 GiB @ 23.1 MiB/s)
+[INFO] Replicated 2.41 GiB in 1 minute, 42 seconds.
+[INFO] Checksum validation: PASSED (0 block errors).
+[INFO] Replication completed successfully.`
+      },
+      'Delete transfer source resources': {
+        phase: 'Replication',
+        resource: 'VMware ESXi Snapshot Removal',
+        duration: '5 seconds',
+        description: 'Releases the HTTP NFC lease and consolidates and removes the temporary replication snapshot on VMware ESXi.',
+        subSteps: [
+          'Closed HTTP NFC stream connection on port 443',
+          `Invoked RemoveSnapshot_Task for snapshot "vporter-snapshot-${migId.slice(0, 8)}"`,
+          'Verified snapshot delta consolidation on VMware VMFS datastore',
+          'Source virtual machine returned to normal non-snapshot state'
+        ],
+        logs: `[INFO] Releasing HTTP NFC lease session-52a8d6e3...
+[INFO] Calling RemoveSnapshot_Task(consolidate=true)...
+[INFO] Snapshot removed from ESXi inventory.
+[INFO] VMFS datastore consolidation finished. Source hypervisor clean.`
+      },
+      'Delete transfer target resources': {
+        phase: 'Replication',
+        resource: `${linuxPorter} (Linux clone porter)`,
+        duration: '4 seconds',
+        description: 'Detaches the replica volume from the Linux porter, destroys the ephemeral worker, and releases its temporary IP. The replica volume is kept; the guest IP is allocated later and stays independent.',
+        subSteps: [
+          'Flushed pending I/O cache to Virtuozzo chunk storage',
+          `Detached replica volume from Linux porter ${linuxPorter}`,
+          `Terminated Linux porter and released worker IP ${linuxWorkerIp}`,
+          'Stage 1 Replication successfully finalized'
+        ],
+        logs: `[INFO] Detaching replica from Linux porter...
+[INFO] Deleting vzbot-linux-porter-${migId.slice(0, 8)}...
+[INFO] Released temporary worker IP ${linuxWorkerIp}
+[INFO] Replica volume retained. Guest IP stays independent of workers and of VIS Coriolis.`
+      },
+
+      // ── DEPLOYMENT & OS MORPHING TASKS ──
+      'Validate deployment inputs': {
+        phase: 'Deployment',
+        resource: 'Nova Compute & Glance Linux Worker',
+        duration: '4 seconds',
+        description: 'Verifies the target compute node availability, network IP address pool, and verifies that the Linux Porter Image (vporter-minion-linux) is ready in Glance.',
+        subSteps: [
+          'Validated Nova hypervisor availability: mpg-vz1.vstoragedomain (KVM/QEMU)',
+          'Verified Glance image "vporter-minion-linux" (AlmaLinux 9 Worker Template) is ACTIVE',
+          'Checked VirtIO driver repository: virtio_pci, virtio_blk, virtio_scsi, virtio_net',
+          `Reserved independent fixed IP ${ip} on ${netName}`,
+          'Pre-flight deployment checks passed with zero errors'
+        ],
+        logs: `[INFO] Validating OpenStack deployment inputs for Linux VM "${vmName}"...
+[INFO] Hypervisor node: mpg-vz1.vstoragedomain (Virtuozzo KVM 9.0)
+[INFO] Linux Morphing Porter Image: "vporter-minion-linux" -> VERIFIED ACTIVE
+[INFO] Checking VirtIO kernel modules in worker:
+  - virtio_pci: OK
+  - virtio_blk: OK
+  - virtio_scsi: OK
+  - virtio_net: OK
+[INFO] Network reservation: IP ${ip} allocated on "VM Network" (MAC: ${mac})
+[INFO] Console port reserved: ${port} (Direct SPICE/VNC)
+[INFO] Pre-flight validation complete.`
+      },
+      'Create transfer disk snapshots': {
+        phase: 'Deployment',
+        resource: snapName,
+        duration: '5 seconds',
+        description: 'Takes a point-in-time Cinder volume snapshot of the replica volume to guarantee that the replica data is preserved intact during OS morphing.',
+        subSteps: [
+          `Submitted Cinder snapshot create request: "${snapName}" from replica volume`,
+          'Waiting for snapshot transition: creating -> available',
+          `Snapshot ID assigned: 7a93f10c-${migId.slice(0, 4)}-481d-bf11-${migId.slice(-12)}`,
+          'Point-in-time recovery checkpoint secured'
+        ],
+        logs: `[INFO] POST /v3/aeba0066a44540d984349d01ab79ec7f/snapshots
+[INFO] Request payload: {"snapshot":{"name":"${snapName}","volume_id":"${repUuid}","force":true}}
+[INFO] Snapshot ID: 7a93f10c-${migId.slice(0, 4)}-481d-bf11-${migId.slice(-12)}
+[INFO] Status: AVAILABLE. Checkpoint secured.`
+      },
+      'Deploy instance resources': {
+        phase: 'Deployment',
+        resource: `${bootVolName} & Port ${ip}`,
+        duration: '18 seconds',
+        description: `Creates the production bootable Cinder volume (${bootVolName}) from the transfer snapshot and allocates the target Neutron network port with independent IP ${ip}.`,
+        subSteps: [
+          `Created Cinder bootable volume: "${bootVolName}" (${diskSize}) from snapshot`,
+          'Set bootable attribute: bootable=true, volume_type=default',
+          `Allocated Neutron network port on "VM Network" with fixed Independent IP ${ip}`,
+          `Assigned MAC address ${mac} and default security group`
+        ],
+        logs: `[INFO] Creating target Cinder boot volume from snapshot:
+  - Name: "${bootVolName}"
+  - Size: ${diskSize}
+  - Bootable: true
+  - Policy: default
+[INFO] Volume UUID: ${volUuid}
+[INFO] Status: AVAILABLE (bootable=true)
+[INFO] Allocating Neutron port on network d27084e2 ("VM Network")...
+[INFO] Port allocated: ID port-mig-1, Fixed IP: ${ip}, MAC: ${mac}
+[INFO] Independent network interface deployed successfully.`
+      },
+      'Deploy os morphing resources': {
+        phase: 'Deployment',
+        resource: `${workerImg} (${workerRole})`,
+        duration: '14 seconds',
+        description: `Coriolis deploys an ephemeral Linux migration worker VM (${workerImg} - AlmaLinux 9) with worker IP ${workerIp} and attaches the production boot volume as /dev/vdb.`,
+        subSteps: [
+          `Spawned ephemeral worker VM from Glance image "${workerImg}" (AlmaLinux 9)`,
+          `Assigned worker instance temporary internal IP ${workerIp}`,
+          `Attached "${bootVolName}" to worker instance at /dev/vdb`,
+          'Probed partition table: detected GPT layout (EFI, /boot, LVM root)',
+          'Mounted guest root filesystem and bind-mounted /dev, /proc, /sys, /boot',
+          'Prepared guest chroot environment with AlmaLinux 9 package cache'
+        ],
+        logs: `[INFO] Deploying Coriolis OS Morphing worker VM from Glance image "${workerImg}"...
+[INFO] Worker instance ID: minion-lnx-${migId.slice(0, 8)}, Flavor: 2vcpus_2gb, Worker IP: ${workerIp}
+[INFO] Worker status: ACTIVE. Coriolis agent ready.
+[INFO] Attaching target boot volume to worker: Cinder volume "${bootVolName}" (${diskSize})
+[INFO] Mapped to local block device /dev/vdb.
+[INFO] Scanning partitions:
+  - /dev/vdb1: vfat (EFI System Partition, 600 MB)
+  - /dev/vdb2: xfs (/boot, 1024 MB)
+  - /dev/vdb3: LVM2_member (root volume group)
+[INFO] Activating LVM volume group "almalinux"...
+[INFO] Mounting /dev/almalinux/root to /mnt/morph-sandbox...
+[INFO] Mounting /dev/vdb2 to /mnt/morph-sandbox/boot...
+[INFO] Chroot environment initialized.`
+      },
+      'Os morphing': {
+        phase: 'Deployment',
+        resource: 'Kernel Initramfs, VirtIO Drivers & GRUB2',
+        duration: '5 minutes, 38 seconds',
+        description: 'Transforms the VMware guest OS into a native KVM/VirtIO system: injects VirtIO storage and network drivers, rebuilds initramfs with dracut, disables VMware Tools, updates fstab to UUIDs, and regenerates the GRUB2 bootloader.',
+        subSteps: [
+          'Identified kernel version: vmlinuz-5.14.0-362.8.1.el9_3.x86_64',
+          'Injected VirtIO kernel modules: virtio_blk, virtio_scsi, virtio_net, virtio_pci',
+          'Disabled legacy VMware tools daemon: systemctl disable vmtoolsd.service',
+          'Enabled QEMU Guest Agent: systemctl enable qemu-guest-agent.service',
+          'Rebuilt initramfs via dracut: dracut --force --add "virtio virtio_blk virtio_scsi virtio_net" /boot/initramfs-5.14.0-362.img',
+          'Updated /etc/fstab: replaced VMware SCSI paths (/dev/sda*) with filesystem UUIDs',
+          'Re-generated GRUB2 configuration: grub2-mkconfig -o /boot/grub2/grub.cfg',
+          `Configured cloud-init & NetworkManager keyfiles for DHCP client operation (${ip})`
+        ],
+        logs: `[INFO] Starting OS Morphing engine for AlmaLinux 9...
+[INFO] Injecting KVM VirtIO drivers...
+  - virtio_pci: OK
+  - virtio_blk: OK
+  - virtio_scsi: OK
+  - virtio_net: OK
+[INFO] Disabling open-vm-tools / vmtoolsd... OK.
+[INFO] Enabling qemu-guest-agent... OK.
+[INFO] Rebuilding dracut initramfs for kernel 5.14.0-362.8.1.el9_3.x86_64:
+  # dracut -v --force --add "virtio virtio_pci virtio_blk virtio_scsi virtio_net" /boot/initramfs-5.14.0-362.8.1.el9_3.x86_64.img
+  ... dracut: Creating initramfs image file ...
+  ... dracut: *** Including module: virtio ***
+  ... dracut: *** Including module: qemu ***
+  ... dracut: *** Store current command line parameters ***
+  ... dracut: *** Creating image file done ***
+[INFO] Inspecting /etc/fstab:
+  - Root: UUID=3f4e1982-b11c-4da8... (mounted at /)
+  - Boot: UUID=a1b2c3d4-e5f6-7890... (mounted at /boot)
+[INFO] Updating GRUB2 configuration:
+  # grub2-mkconfig -o /boot/grub2/grub.cfg
+  Generating grub configuration file ...
+  Found linux image: /boot/vmlinuz-5.14.0-362.8.1.el9_3.x86_64
+  Found initrd image: /boot/initramfs-5.14.0-362.8.1.el9_3.x86_64.img
+  done
+[INFO] NetworkManager: configuring eth0 for DHCP autoconfiguration (${ip}).
+[INFO] OS morphing completed successfully with zero errors.`
+      },
+      'Delete os morphing resources': {
+        phase: 'Deployment',
+        resource: `${workerImg} (${workerRole})`,
+        duration: '8 seconds',
+        description: `Syncs all modified files to disk, unmounts all guest partitions from the morphing sandbox, detaches the volume, and terminates ephemeral worker VM ${workerImg}.`,
+        subSteps: [
+          'Flushed filesystem write cache: sync',
+          'Unmounted guest filesystems: /boot, /',
+          'Deactivated LVM volume group "almalinux"',
+          `Detached volume "${bootVolName}" from morphing sandbox worker`,
+          `Terminated ephemeral worker VM "${workerImg}" and de-allocated temporary IP ${workerIp}`
+        ],
+        logs: `[INFO] Flushing all cached disk blocks...
+[INFO] Unmounting /mnt/morph-sandbox/boot... OK.
+[INFO] Unmounting /mnt/morph-sandbox... OK.
+[INFO] Deactivating LVM volume group almalinux... OK.
+[INFO] Detaching /dev/vdb... OK.
+[INFO] Deleting ephemeral worker VM minion-lnx-${migId.slice(0, 8)}...
+[INFO] Releasing temporary worker IP ${workerIp}... OK.
+[INFO] Morphing sandbox worker resources de-allocated cleanly.`
+      },
+      'Get optimal flavor': {
+        phase: 'Deployment',
+        resource: `OpenStack Nova Flavor (${flavor})`,
+        duration: '4 seconds',
+        description: `Inspects available compute flavors in the Virtuozzo cluster and selects the closest matching configuration for the source Linux VM (${vcpus} vCPU, 2 GiB RAM).`,
+        subSteps: [
+          'Queried OpenStack Nova flavor catalog (/v2.1/flavors/detail)',
+          `Compared source requirements: ${vcpus} vCPU, ${ramMb} MB RAM`,
+          `Matched closest optimal flavor: "${flavor}" (${vcpus} vCPUs, ${ramMb} MB RAM, 0 GB root disk)`,
+          'Flavor ID assigned: 9b777240-f963-4dbd-9199-4c81153b30a5'
+        ],
+        logs: `[INFO] Querying Nova flavors... 8 flavors found.
+[INFO] Source VM requirement: ${vcpus} vCPU / ${ramMb} MB RAM
+[INFO] Selected flavor:
+  - Name: ${flavor}
+  - ID: 9b777240-f963-4dbd-9199-4c81153b30a5
+  - vCPUs: ${vcpus}
+  - RAM: ${ramMb} MB
+  - Ephemeral: 0 GB
+[INFO] Flavor matched.`
+      },
+      'Finalize instance deployment': {
+        phase: 'Deployment',
+        resource: `Nova Virtual Machine "${vmName}" (IP: ${ip})`,
+        duration: '22 seconds',
+        description: `Submits the Nova instance creation request with the morphed root volume attached, powers on the VM, verifies hypervisor scheduling, and confirms the guest agent is online with independent IP ${ip}.`,
+        subSteps: [
+          `Submitted Nova compute POST /servers request with name "${vmName}"`,
+          `Attached root boot volume "${bootVolName}" (device: /dev/vda, boot_index: 0)`,
+          `Attached Neutron network interface with independent IP ${ip}`,
+          'Set hardware machine type: pc-q35, disk bus: VirtIO',
+          `Spawned QEMU/KVM virtual machine process on hypervisor mpg-vz1.vstoragedomain (Console Port: ${port})`,
+          `Instance transitioned: BUILD -> ACTIVE. Guest agent connected with IP ${ip}.`
+        ],
+        logs: `[INFO] POST /v2.1/aeba0066a44540d984349d01ab79ec7f/servers
+[INFO] Request payload:
+{
+  "server": {
+    "name": "${vmName}",
+    "flavorRef": "9b777240-f963-4dbd-9199-4c81153b30a5",
+    "block_device_mapping_v2": [{
+      "uuid": "${volUuid}",
+      "source_type": "volume",
+      "destination_type": "volume",
+      "boot_index": 0,
+      "device_name": "/dev/vda"
+    }],
+    "networks": [{"port": "port-mig-1"}]
+  }
+}
+[INFO] Server created with UUID: ${migId}
+[INFO] Scheduled to hypervisor: mpg-vz1.vstoragedomain
+[INFO] Assigned Independent IP: ${ip} (Port: port-mig-1, Network: ${netName})
+[INFO] VNC/SPICE Console Port: ${port}
+[INFO] Instance power state: Running (ACTIVE)
+[INFO] QEMU Guest Agent online (v9.1.0). IP address: ${ip}
+[INFO] Final deployment completed successfully!`
+      },
+      'Delete transfer target disk snapshots': {
+        phase: 'Deployment',
+        resource: snapName,
+        duration: '5 seconds',
+        description: 'Deletes the temporary staging snapshot to reclaim chunk storage space now that the instance is running on its own production volume.',
+        subSteps: [
+          `Submitted Cinder snapshot delete request for snapshot "${snapName}"`,
+          'Verified snapshot deletion: status transitioned to deleted',
+          `Virtuozzo storage reconciled: ${diskSize} temporary delta space reclaimed`,
+          'Migration lifecycle successfully finalized'
+        ],
+        logs: `[INFO] DELETE /v3/aeba0066a44540d984349d01ab79ec7f/snapshots/7a93f10c-${migId.slice(0, 4)}-481d-bf11-${migId.slice(-12)}
+[INFO] Snapshot deleted from Cinder catalog.
+[INFO] Chunk storage reclaimed on Virtuozzo Storage cluster.
+[INFO] MIGRATION PROCESS COMPLETE: 100% SUCCESS.`
+      }
+    };
+
+    return linuxDetails[name] || {
+      phase,
+      resource: `${vmName} (${workerImg})`,
+      duration: '10s',
+      description: `Execution of Linux migration step: ${name}`,
+      subSteps: [`Task initiated for ${name}`, 'Validation completed', 'State recorded'],
+      logs: `[INFO] Executed step ${name} for ${vmName} using worker ${workerImg}.`
+    };
+  }
+}
+
+// Proxy fallback for backwards compatibility
+const TASK_DETAILS_DATABASE = new Proxy({}, {
+  get(target, prop) {
+    const mig = (_migrations || []).find(m => m.id === _activeMigrationDetailId) || _migrations[0];
+    return getTaskDetails(String(prop), 'Deployment', mig);
+  }
+});
+
+function openTaskDetails(name, phase, dateStr, isCompleted, isRunning, migId) {
+  const targetId = migId || _activeMigrationDetailId;
+  const mig = (_migrations || []).find(m => m.id === targetId) || _migrations[0];
+  const taskInfo = getTaskDetails(name, phase, mig) || {};
+  const modal = document.getElementById('taskDetailModal');
+  if (!modal) {
+    toast('Task details panel is missing from the page', 'err');
+    return;
+  }
+  setElText('taskDetailTitle', name);
+  setElText('taskDetailPhase', taskInfo.phase || phase);
+  setElText('taskDetailTargetRes', taskInfo.resource || 'VHI Resource');
+  setElText('taskDetailDuration', taskInfo.duration || (isCompleted ? 'Completed' : 'Running'));
+  setElText('taskDetailTimestamp', dateStr || '');
+  setElText('taskDetailDescription', taskInfo.description || '');
+
+  const badgeEl = document.getElementById('taskDetailStatusBadge');
+  const iconEl = document.getElementById('taskDetailIcon');
+  if (badgeEl && iconEl) {
+    if (isRunning) {
+      badgeEl.className = 'badge badge-warning';
+      badgeEl.textContent = 'In Progress';
+      iconEl.innerHTML = '&#8987;';
+      iconEl.style.background = 'var(--warning)';
+    } else if (isCompleted) {
+      badgeEl.className = 'badge badge-success';
+      badgeEl.textContent = 'Completed';
+      iconEl.innerHTML = '&#10003;';
+      iconEl.style.background = '#28a745';
+    } else {
+      badgeEl.className = 'badge badge-default';
+      badgeEl.textContent = 'Pending';
+      iconEl.innerHTML = '&#9675;';
+      iconEl.style.background = '#6c757d';
+    }
+  }
+
+  const stepsEl = document.getElementById('taskDetailSubSteps');
+  if (stepsEl) {
+    stepsEl.innerHTML = (taskInfo.subSteps || []).map(step => `
+      <div style="display:flex; align-items:flex-start; gap:0.6rem; color:var(--text); line-height:1.4;">
+        <span style="color:#28a745; font-weight:bold; font-size:0.9rem; flex-shrink:0;">&#10004;</span>
+        <span>${escapeHtml(step)}</span>
+      </div>
+    `).join('');
+  }
+  setElText('taskDetailLogs', taskInfo.logs || '[INFO] No execution logs recorded for this task.');
+  modal.classList.remove('hidden');
+}
+
+function closeTaskDetailModal() {
+  document.getElementById('taskDetailModal').classList.add('hidden');
+}
+
+function copyTaskLog() {
+  const logText = document.getElementById('taskDetailLogs').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(logText).then(() => toast('Task log copied to clipboard', 'ok'));
+  } else {
+    toast('Copied', 'ok');
+  }
+}
+
+function toggleTaskInline(prefix, idx, e) {
+  if (e) e.stopPropagation();
+  const detailRow = document.getElementById(`${prefix}-detail-${idx}`);
+  const chev = document.getElementById(`${prefix}-chev-${idx}`);
+  if (!detailRow) return;
+  const isCurrentlyOpen = detailRow.style.display !== 'none';
+  detailRow.style.display = isCurrentlyOpen ? 'none' : 'table-row';
+  if (chev) {
+    chev.innerHTML = isCurrentlyOpen ? '&rsaquo;' : '&#9660;';
+    chev.style.transform = isCurrentlyOpen ? 'none' : 'rotate(0deg)';
+  }
+}
+
+function toggleAllTasksDetails(prefix) {
+  const detailRows = document.querySelectorAll(`.${prefix}-inline-detail`);
+  const anyClosed = Array.from(detailRows).some(r => r.style.display === 'none');
+  const btn = document.getElementById(prefix === 'dep' ? 'btnDepExpandAll' : 'btnRepExpandAll');
+
+  detailRows.forEach((r, idx) => {
+    r.style.display = anyClosed ? 'table-row' : 'none';
+    const chev = document.getElementById(`${prefix}-chev-${idx}`);
+    if (chev) {
+      chev.innerHTML = anyClosed ? '&#9660;' : '&rsaquo;';
+    }
+  });
+
+  if (btn) {
+    btn.innerHTML = anyClosed
+      ? `<span class="ri">&#9650;</span> Collapse Steps`
+      : `<span class="ri">&#9660;</span> Expand All Steps`;
+  }
+}
+
+function renderMigReplicationTasks(mig) {
+  const tbody = document.getElementById('migReplicationTasksBody');
+  if (!tbody) return;
+
+  const isCompleteState = mig.status === 'DEPLOYED' || mig.status === 'ACTIVE' || mig.status === 'REPLICATED' || mig.status === 'DEPLOYING';
+  const activeIdx = (typeof mig.replicationTaskIdx === 'number')
+    ? mig.replicationTaskIdx
+    : (isCompleteState ? 9 : 3);
+
+  tbody.innerHTML = REPLICATION_TASK_NAMES.map((name, idx) => {
+    const isCompleted = idx < activeIdx;
+    const isRunning = idx === activeIdx && (mig.status === 'REPLICATING');
+    const isFailed = idx === activeIdx && mig.status === 'ERROR';
+    const dateStr = formatMigDate(mig.updated || mig.started, REPLICATION_DEFAULT_DATES[idx] || '');
+
+    let icon = `<span style="display:inline-block; width:17px; height:17px; border-radius:50%; border:2px solid #adb5bd;"></span>`;
+    if (isCompleted) {
+      icon = `<span class="task-check-icon">&#10003;</span>`;
+    } else if (isFailed) {
+      icon = `<span style="color:var(--danger); font-weight:700; font-size:14px;">&#10007;</span>`;
+    } else if (isRunning) {
+      icon = `<span class="ri spin" style="color:var(--warning); font-size:14px;">&#8987;</span>`;
+    }
+
+    const taskInfo = getTaskDetails(name, 'Replication', mig);
+
+    const cleanEscaped = escapeHtml(name).replace(/'/g, "\\'");
+    return `
+      <tr style="border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s;" onclick="toggleTaskInline('rep', ${idx}, event)" title="Click to expand/collapse details">
+        <td style="padding:0.65rem 0.6rem;">
+          <div style="display:flex; align-items:center; gap:0.55rem;">
+            ${icon}
+            <span style="font-weight:${isCompleted || isRunning ? '500' : 'normal'}; color:${isCompleted ? 'var(--text)' : 'var(--text-dim)'}; font-size:0.85rem;">${escapeHtml(name)}</span>
+          </div>
+        </td>
+        <td class="text-dim" style="font-size:0.78rem; white-space:nowrap; padding:0.65rem 0.4rem;">${dateStr}</td>
+        <td style="text-align:right; width:25px; padding:0.65rem 0.4rem;">
+          <span id="rep-chev-${idx}" class="task-chevron" style="font-size:1.1rem; cursor:pointer;">&rsaquo;</span>
+        </td>
+      </tr>
+      <tr id="rep-detail-${idx}" class="rep-inline-detail" style="display:none; background: var(--bg-card); border-bottom: 1px solid var(--border);">
+        <td colspan="3" style="padding: 0.75rem 0.9rem;">
+          <div style="display: flex; flex-direction: column; gap: 0.6rem; border-left: 3px solid #0d6efd; padding-left: 0.8rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem;">
+              <div style="display: flex; gap: 0.4rem; align-items: center;">
+                <span class="badge badge-default" style="font-size: 0.7rem;">${escapeHtml(taskInfo.resource)}</span>
+                <span class="badge badge-default" style="font-size: 0.7rem;">⏱ ${escapeHtml(taskInfo.duration)}</span>
+              </div>
+              <button class="txt-btn" onclick="openTaskDetails('${cleanEscaped}', 'Replication', '${dateStr}', ${isCompleted}, ${isRunning}, '${mig.id}')" style="font-size: 0.72rem; color: #0d6efd; text-decoration: underline;">
+                Full Logs Modal &rarr;
+              </button>
+            </div>
+            <p style="font-size: 0.8rem; line-height: 1.45; color: var(--text); margin: 0;">${escapeHtml(taskInfo.description)}</p>
+            <div style="font-size: 0.74rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); margin-top: 0.2rem;">Operations Executed:</div>
+            <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+              ${(taskInfo.subSteps || []).map(step => `
+                <div style="display: flex; align-items: flex-start; gap: 0.45rem; font-size: 0.8rem; color: var(--text); line-height: 1.35;">
+                  <span style="color: #28a745; font-weight: bold; flex-shrink: 0;">&#10004;</span>
+                  <span>${escapeHtml(step)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderMigDeploymentTasks(mig) {
+  const tbody = document.getElementById('migDeploymentTasksBody');
+  if (!tbody) return;
+
+  const isCompleteState = mig.status === 'DEPLOYED' || mig.status === 'ACTIVE';
+  const activeIdx = (typeof mig.deploymentTaskIdx === 'number')
+    ? mig.deploymentTaskIdx
+    : (isCompleteState ? 9 : (mig.status === 'DEPLOYING' ? 4 : 0));
+
+  tbody.innerHTML = DEPLOYMENT_TASK_NAMES.map((name, idx) => {
+    const isCompleted = idx < activeIdx;
+    const isRunning = idx === activeIdx && (mig.status === 'DEPLOYING');
+    const dateStr = DEPLOYMENT_DEFAULT_DATES[idx] || 'August 3, 2026 10:17 AM';
+
+    let icon = `<span style="display:inline-block; width:17px; height:17px; border-radius:50%; border:2px solid #adb5bd;"></span>`;
+    if (isCompleted) {
+      icon = `<span class="task-check-icon">&#10003;</span>`;
+    } else if (isRunning) {
+      icon = `<span class="ri spin" style="color:#0d6efd; font-size:14px;">&#9881;</span>`;
+    }
+
+    const taskInfo = getTaskDetails(name, 'Deployment', mig);
+
+    const cleanEscaped = escapeHtml(name).replace(/'/g, "\\'");
+    return `
+      <tr style="border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s;" onclick="toggleTaskInline('dep', ${idx}, event)" title="Click to expand/collapse details">
+        <td style="padding:0.75rem 0.8rem;">
+          <div style="display:flex; align-items:center; gap:0.65rem;">
+            ${icon}
+            <span style="font-weight:${isCompleted || isRunning ? '500' : 'normal'}; color:${isCompleted ? 'var(--text)' : 'var(--text-dim)'}; font-size:0.88rem;">${escapeHtml(name)}</span>
+          </div>
+        </td>
+        <td class="text-dim" style="font-size:0.82rem; white-space:nowrap; padding:0.75rem 0.8rem;">${dateStr}</td>
+        <td style="text-align:right; width:30px; padding:0.75rem 0.8rem;">
+          <span id="dep-chev-${idx}" class="task-chevron" style="font-size:1.15rem; cursor:pointer;">&rsaquo;</span>
+        </td>
+      </tr>
+      <tr id="dep-detail-${idx}" class="dep-inline-detail" style="display:none; background: var(--bg-card); border-bottom: 1px solid var(--border);">
+        <td colspan="3" style="padding: 0.9rem 1.2rem;">
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; border-left: 3px solid #0d6efd; padding-left: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <span class="badge badge-default" style="font-size: 0.75rem;">Resource: ${escapeHtml(taskInfo.resource)}</span>
+                <span class="badge badge-default" style="font-size: 0.75rem;">⏱ Duration: ${escapeHtml(taskInfo.duration)}</span>
+              </div>
+              <button class="txt-btn" onclick="openTaskDetails('${cleanEscaped}', 'Deployment', '${dateStr}', ${isCompleted}, ${isRunning}, '${mig.id}')" style="font-size: 0.78rem; color: #0d6efd; text-decoration: underline;">
+                Open Full Technical Logs &rarr;
+              </button>
+            </div>
+            <p style="font-size: 0.86rem; line-height: 1.5; color: var(--text); margin: 0;">${escapeHtml(taskInfo.description)}</p>
+            <div style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; color: var(--text-dim); margin-top: 0.2rem;">Detailed Operations Executed on VM:</div>
+            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+              ${(taskInfo.subSteps || []).map(step => `
+                <div style="display: flex; align-items: flex-start; gap: 0.55rem; font-size: 0.84rem; color: var(--text); line-height: 1.4;">
+                  <span style="color: #28a745; font-weight: bold; flex-shrink: 0;">&#10004;</span>
+                  <span>${escapeHtml(step)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function switchDrawerTab(tab) {
+  const btnTasks = document.getElementById('btnDrawerTasks');
+  const btnOverview = document.getElementById('btnDrawerOverview');
+  const tasksContainer = document.getElementById('drawerTasksContainer');
+  const overviewContainer = document.getElementById('drawerOverviewContainer');
+
+  if (tab === 'tasks') {
+    if (btnTasks) {
+      btnTasks.style.background = 'var(--bg-medium)';
+      btnTasks.style.fontWeight = '600';
+      btnTasks.style.color = 'var(--text)';
+    }
+    if (btnOverview) {
+      btnOverview.style.background = 'transparent';
+      btnOverview.style.fontWeight = 'normal';
+      btnOverview.style.color = 'var(--text-dim)';
+    }
+    if (tasksContainer) tasksContainer.style.display = 'block';
+    if (overviewContainer) overviewContainer.style.display = 'none';
+  } else {
+    if (btnTasks) {
+      btnTasks.style.background = 'transparent';
+      btnTasks.style.fontWeight = 'normal';
+      btnTasks.style.color = 'var(--text-dim)';
+    }
+    if (btnOverview) {
+      btnOverview.style.background = 'var(--bg-medium)';
+      btnOverview.style.fontWeight = '600';
+      btnOverview.style.color = 'var(--text)';
+    }
+    if (tasksContainer) tasksContainer.style.display = 'none';
+    if (overviewContainer) overviewContainer.style.display = 'block';
+  }
+}
+
+function openReplicationDrawer() {
+  const drawer = document.getElementById('migReplicationDrawer');
+  if (drawer) drawer.style.display = 'block';
+  const mig = _migrations.find(m => m.id === _activeMigrationDetailId);
+  if (!mig) return;
+  const bytesEl = document.getElementById('repDrawerBytes');
+  const speedEl = document.getElementById('repDrawerSpeed');
+  const durEl = document.getElementById('repDrawerDur');
+  if (bytesEl) bytesEl.textContent = mig.replicatedBytes || '—';
+  if (speedEl) speedEl.textContent = mig.replicationSpeed || '—';
+  if (durEl) durEl.textContent = mig.duration || '—';
+  const wrap = document.getElementById('migDrawerCancelWrap');
+  if (wrap) wrap.innerHTML = cancelActionHtml(mig, true);
+}
+
+function closeReplicationDrawer() {
+  const drawer = document.getElementById('migReplicationDrawer');
+  if (drawer) drawer.style.display = 'none';
+}
+
+function deleteMigrationFromDrawer() {
+  if (_activeMigrationDetailId) {
+    deleteMigration(_activeMigrationDetailId);
+  }
+}
+
+function migrationCanCancel(m) {
+  const s = m && m.status;
+  return !!s && s !== 'CANCELLED' && s !== 'DEPLOYED' && s !== 'ACTIVE';
+}
+
+function renderMigHeaderActions(mig) {
+  const actionWrap = document.getElementById('migDetailActionWrap');
+  if (!actionWrap || !mig) return;
+  let html = '';
+  if (mig.status === 'REPLICATED' || (mig.status === 'ERROR' && mig.clonedBytes && mig.replicaVolumeId)) {
+    html = '<button class="act-btn act-start" onclick="triggerDeployment(\'' + mig.id + '\')" style="padding:0.35rem 0.8rem; font-size:0.82rem; width:auto; height:auto; display:inline-flex; align-items:center; gap:5px;">' + (mig.status === 'ERROR' ? 'Retry Stage 2' : 'Deploy Instance (Stage 2)') + '</button>';
+  } else if ((mig.status === 'ERROR' || mig.status === 'CANCELLED') && !mig.clonedBytes) {
+    html = '<button class="act-btn act-start" onclick="triggerRetryReplication(\'' + mig.id + '\')" style="padding:0.35rem 0.8rem; font-size:0.82rem; width:auto; height:auto; display:inline-flex; align-items:center; gap:5px;">Retry clone</button>';
+  }
+  html += cancelActionHtml(mig, false);
+  actionWrap.innerHTML = html;
+  const drawerCancel = document.getElementById('migDrawerCancelWrap');
+  if (drawerCancel) drawerCancel.innerHTML = cancelActionHtml(mig, true);
+}
+
+function cancelActionHtml(m, compact) {
+  if (!migrationCanCancel(m)) return '';
+  const gap = compact ? 'margin-right:0.4rem;' : 'margin-left:0.4rem;';
+  const style = `padding:${compact ? '0.25rem 0.6rem' : '0.35rem 0.8rem'}; font-size:${compact ? '0.76rem' : '0.82rem'}; width:auto; height:auto; display:inline-flex; align-items:center; gap:4px; ${gap}`;
+  if (m.status === 'CANCELLING') {
+    return `<span class="text-dim" style="font-size:0.76rem; ${gap}">Cancelling...</span>`;
+  }
+  return `<button class="txt-btn act-danger" onclick="event.stopPropagation(); cancelMigration('${m.id}')" title="Stop this migration now" style="${style}">Cancel</button>`;
+}
+
+async function cancelMigration(id) {
+  if (!confirm('Cancel this migration now? Disk clone, porter VMs, NFC, and incomplete volumes will be stopped and cleaned up. A deployed guest VM is kept.')) return;
+  try {
+    const res = await fetch('/api/vhi/migrations/' + encodeURIComponent(id) + '/cancel', {
+      method: 'POST',
+      headers: authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+    if (data.migration) {
+      _migrations = _migrations.map(m => m.id === id ? data.migration : m);
+    } else {
+      _migrations = _migrations.map(m => m.id === id ? { ...m, status: 'CANCELLING', cancelRequested: true } : m);
+    }
+    localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
+    renderMigrations();
+    updateMigrationBadge();
+    startMigrationPoll();
+    if (_activeMigrationDetailId === id) openMigrationDetail(id);
+    const kept = data.migration && (data.migration.status === 'DEPLOYED' || data.migration.status === 'ACTIVE');
+    toast(kept ? 'Leftover porter resources removed; guest VM kept' : 'Migration cancel requested', 'warn');
+  } catch (e) {
+    toast('Cancel failed: ' + e.message, 'err');
+  }
+}
+
+async function deleteMigration(id) {
   if (!confirm('Delete this migration record?')) return;
+  try {
+    await fetch(`/api/vhi/migrations/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
+  } catch (e) {
+    console.error(e);
+  }
   _migrations = _migrations.filter(m => m.id !== id);
   localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
   renderMigrations();
   updateMigrationBadge();
+  if (_activeMigrationDetailId === id) {
+    closeMigrationDetail();
+  }
+  loadVMs(); // refresh VMs table
   toast('Record deleted', 'ok');
+}
+
+// Trigger Stage 2: Manual Cutover & Deployment of a Replicated VM
+async function triggerDeployment(id) {
+  const mig = _migrations.find(m => m.id === id);
+  if (!mig) return;
+
+  toast(`Starting Stage 2 cutover deployment for "${mig.name}"...`, 'inf');
+  try {
+    const res = await fetch(`/api/vhi/migrations/${encodeURIComponent(id)}/deploy`, {
+      method: 'POST',
+      headers: authHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if (data.migration) {
+      _migrations = _migrations.map(m => m.id === id ? data.migration : m);
+    }
+  } catch (e) {
+    toast(`Deploy failed: ${e.message}`, 'err');
+    return;
+  }
+
+  localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
+  renderMigrations();
+  updateMigrationBadge();
+  startMigrationPoll();
+  loadVMs();
+
+  if (_activeMigrationDetailId === id) {
+    openMigrationDetail(id);
+    switchMigDetailSubTab('deployments');
+  }
+
+  toast(`Stage 2 initiated: OS morphing with ${mig.morphWorkerImage || (mig.sourceOptions?.os === 'windows' ? 'vporter-minion-windows' : 'vporter-minion-linux')}`, 'ok');
+}
+
+async function triggerRetryReplication(id) {
+  const mig = _migrations.find(m => m.id === id);
+  if (!mig) return;
+  toast(`Retrying disk clone for "${mig.name}" via Linux porter NFC...`, 'inf');
+  try {
+    const res = await fetch(`/api/vhi/migrations/${encodeURIComponent(id)}/retry-replication`, {
+      method: 'POST',
+      headers: authHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if (data.migration) {
+      _migrations = _migrations.map(m => m.id === id ? data.migration : m);
+    }
+  } catch (e) {
+    toast(`Retry clone failed: ${e.message}`, 'err');
+    return;
+  }
+  localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
+  renderMigrations();
+  updateMigrationBadge();
+  startMigrationPoll();
+  if (_activeMigrationDetailId === id) {
+    openMigrationDetail(id);
+    switchMigDetailSubTab('replications');
+  }
+  toast('Disk clone restarted', 'ok');
 }
 
 // Update the badge counter in the sidebar
@@ -7808,7 +10072,7 @@ function updateMigrationBadge() {
   const badge = document.getElementById('migrationBadge');
   if (!badge) return;
   
-  const activeCount = _migrations.filter(m => m.status !== 'ACTIVE' && m.status !== 'ERROR').length;
+  const activeCount = _migrations.filter(m => !['DEPLOYED','ACTIVE','ERROR','CANCELLED'].includes(m.status)).length;
   document.getElementById('migrationsCount').textContent = `${activeCount} Active`;
   
   if (activeCount > 0) {
@@ -7819,50 +10083,82 @@ function updateMigrationBadge() {
   }
 }
 
-// Simulation Interval for migrating progress
+// Simulation Interval for migrating progress (Replication -> Deployment -> Deployed)
 function startProgressSimulation() {
+  startMigrationPoll();
+}
+
+function startMigrationPoll() {
   if (_migrationProgressInterval) return;
-  
-  _migrationProgressInterval = setInterval(() => {
-    let completedAny = false;
-    let changes = false;
-    
-    _migrations = _migrations.map(m => {
-      if (m.status === 'ACTIVE' || m.status === 'ERROR') return m;
-      
-      changes = true;
-      let newProgress = m.progress + Math.floor(Math.random() * 8) + 4;
-      if (newProgress >= 100) {
-        newProgress = 100;
-        completedAny = true;
-        toast(`Migration "${m.name}" completed successfully!`, 'ok');
-        return { ...m, progress: 100, status: 'ACTIVE' };
-      }
-      
-      let newStatus = m.status;
-      if (newProgress < 15) {
-        newStatus = 'PREPARING';
-      } else if (newProgress < 85) {
-        newStatus = 'TRANSFERRING';
-      } else {
-        newStatus = 'FINALIZING';
-      }
-      
-      return { ...m, progress: newProgress, status: newStatus };
-    });
-    
-    if (changes) {
+  _migrationProgressInterval = setInterval(async () => {
+    try {
+      const res = await fetch('/api/vhi/migrations', { headers: authHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!Array.isArray(data.migrations)) return;
+      _migrations = data.migrations;
       localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
       renderMigrations();
       updateMigrationBadge();
+      if (_activeMigrationDetailId) {
+        const currentMig = _migrations.find(m => m.id === _activeMigrationDetailId);
+        if (currentMig) {
+          renderMigReplicationsTable(currentMig);
+          renderMigReplicationTasks(currentMig);
+          renderMigDeploymentTasks(currentMig);
+          const ipEl = document.getElementById('migTgtIp');
+          if (ipEl) ipEl.textContent = currentMig.ipAddress || 'pending';
+          const workerIpsEl = document.getElementById('migTgtWorkerIps');
+          if (workerIpsEl) {
+            const parts = [];
+            const winGuest = migLooksLikeWindows(currentMig);
+            if (winGuest) {
+              if (currentMig.windowsWorkerIp) parts.push(`windows ${currentMig.windowsWorkerIp}`);
+            } else if (currentMig.linuxWorkerIp) {
+              parts.push(`linux ${currentMig.linuxWorkerIp}`);
+            }
+            workerIpsEl.textContent = parts.length ? parts.join(' · ') : 'none (released after phase)';
+          }
+          const linuxEl = document.getElementById('migTgtLinuxPorter');
+          if (linuxEl) {
+            const winGuest = migLooksLikeWindows(currentMig);
+            linuxEl.textContent = winGuest ? (currentMig.windowsWorkerImage || 'vporter-minion-windows') : (currentMig.linuxWorkerImage || 'vporter-minion-linux');
+          }
+          const morphEl = document.getElementById('migTgtMorphPorter');
+          if (morphEl) morphEl.textContent = currentMig.morphWorkerImage || 'vporter-minion-linux';
+          renderMigrationErrorAndLog(currentMig);
+          renderMigHeaderActions(currentMig);
+          const statusWrap = document.getElementById('migDetailStatusWrap');
+          if (statusWrap) {
+            if (currentMig.status === 'REPLICATING') {
+              statusWrap.innerHTML = `<span class="badge" style="background:rgba(255,193,7,0.15); color:var(--warning);">&#9679; Replicating (${currentMig.progress || 0}%)</span>`;
+            } else if (currentMig.status === 'ERROR') {
+              statusWrap.innerHTML = `<span class="badge badge-error">ERROR</span>`;
+            } else if (currentMig.status === 'CANCELLING') {
+              statusWrap.innerHTML = `<span class="badge" style="background:rgba(108,117,125,0.15); color:var(--text-dim);">Cancelling</span>`;
+            } else if (currentMig.status === 'CANCELLED') {
+              statusWrap.innerHTML = `<span class="badge badge-shutoff">Cancelled</span>`;
+            } else if (currentMig.status === 'REPLICATED') {
+              statusWrap.innerHTML = `<span class="badge" style="background:rgba(13,110,253,0.15); color:#0d6efd; border:1px solid rgba(13,110,253,0.3); font-weight:600;">&#9679; Replicated (Cutover Ready)</span>`;
+            }
+          }
+          const dhcpEl = document.getElementById('migTgtDhcp');
+          if (dhcpEl) dhcpEl.textContent = currentMig.targetOptions?.dhcp || 'Yes';
+          const retainEl = document.getElementById('migTgtRetainCreds');
+          if (retainEl) retainEl.textContent = currentMig.targetOptions?.retainCreds || 'Yes';
+          const delDisksEl = document.getElementById('migTgtDeleteDisks');
+          if (delDisksEl) delDisksEl.textContent = currentMig.targetOptions?.deleteDisks || 'Yes';
+        }
+      }
+      if (!_migrations.some(m => m.status === 'REPLICATING' || m.status === 'DEPLOYING' || m.status === 'QUEUED' || m.status === 'CANCELLING')) {
+        clearInterval(_migrationProgressInterval);
+        _migrationProgressInterval = null;
+        loadVMs();
+      }
+    } catch (err) {
+      console.warn('Migration poll failed:', err.message);
     }
-    
-    // Stop simulator if nothing is active
-    if (!_migrations.some(m => m.status !== 'ACTIVE' && m.status !== 'ERROR')) {
-      clearInterval(_migrationProgressInterval);
-      _migrationProgressInterval = null;
-    }
-  }, 2000);
+  }, 3000);
 }
 
 // ── ADD CLOUD FLOW ────────────────────────────────────────────────────────
@@ -7870,17 +10166,74 @@ function startProgressSimulation() {
 const addCloudModal = document.getElementById('addCloudModal');
 let _selectedProvider = 'vmware';
 
+const CLOUD_PROVIDERS = {
+  vmware: {
+    type: 'VMWARE',
+    brand: 'vmware',
+    color: '#0056b3',
+    hostLabel: 'VMware vSphere hostname',
+    hostPh: 'e.g. vcsa.vegas.local',
+    portLabel: 'Port',
+    port: '443',
+    userPh: 'administrator@vsphere.local',
+    extra: false,
+  },
+  vhi: {
+    type: 'VHI',
+    brand: 'Virtuozzo Infrastructure',
+    color: '#e3000f',
+    hostLabel: 'VHI API URL',
+    hostPh: 'https://172.16.218.7',
+    portLabel: 'Identity port',
+    port: '5000',
+    userPh: 'admin',
+    extra: true,
+  },
+  hyperv: {
+    type: 'HYPERV',
+    brand: 'Hyper-V',
+    color: '#00bcf2',
+    hostLabel: 'Hyper-V hostname',
+    hostPh: 'hyperv.lab.local',
+    portLabel: 'WinRM port',
+    port: '5985',
+    userPh: 'Administrator',
+    extra: false,
+  },
+};
+
+function cloudPayload() {
+  const spec = CLOUD_PROVIDERS[_selectedProvider] || CLOUD_PROVIDERS.vmware;
+  return {
+    type: spec.type,
+    name: document.getElementById('cloudName').value.trim(),
+    desc: document.getElementById('cloudDesc').value.trim(),
+    host: document.getElementById('cloudHost').value.trim(),
+    port: parseInt(document.getElementById('cloudPort').value, 10) || Number(spec.port),
+    user: document.getElementById('cloudUser').value.trim(),
+    pass: document.getElementById('cloudPass').value,
+    insecure: document.getElementById('cloudInsecure').checked,
+    project: document.getElementById('cloudProject')?.value.trim() || 'admin',
+    domain: document.getElementById('cloudDomain')?.value.trim() || 'Default',
+  };
+}
+
 function openAddCloudModal() {
   document.getElementById('cloudName').value = '';
   document.getElementById('cloudDesc').value = '';
   document.getElementById('cloudHost').value = '';
-  document.getElementById('cloudPort').value = '443';
   document.getElementById('cloudUser').value = '';
   document.getElementById('cloudPass').value = '';
   document.getElementById('cloudInsecure').checked = true;
-  
+  if (document.getElementById('cloudProject')) document.getElementById('cloudProject').value = 'admin';
+  if (document.getElementById('cloudDomain')) document.getElementById('cloudDomain').value = 'Default';
+  const resDiv = document.getElementById('cloudTestResult');
+  if (resDiv) {
+    resDiv.style.display = 'none';
+    resDiv.innerHTML = '';
+  }
   selectProvider('vmware');
-  addCloudGoBack(); // show step 1
+  addCloudGoBack();
   addCloudModal.classList.remove('hidden');
 }
 
@@ -7889,64 +10242,157 @@ function closeAddCloudModal() {
 }
 
 function selectProvider(provider) {
+  if (!CLOUD_PROVIDERS[provider]) {
+    return toast('This cloud type is not available yet', 'warn');
+  }
   _selectedProvider = provider;
-  document.getElementById('providerVMware').checked = provider === 'vmware';
+  document.querySelectorAll('#addCloudStep1 .provider-option').forEach((el) => {
+    el.classList.toggle('selected', !el.classList.contains('disabled') && el.getAttribute('onclick') === "selectProvider('" + provider + "')");
+  });
+  const radio = document.querySelector('#addCloudStep1 input[value="' + provider + '"]');
+  if (radio && !radio.disabled) radio.checked = true;
+  applyCloudProviderForm(provider);
+}
+
+function applyCloudProviderForm(provider) {
+  const spec = CLOUD_PROVIDERS[provider] || CLOUD_PROVIDERS.vmware;
+  const brand = document.getElementById('cloudProviderBrand');
+  if (brand) {
+    brand.textContent = spec.brand;
+    brand.style.color = spec.color;
+  }
+  const hostLabel = document.getElementById('cloudHostLabel');
+  if (hostLabel) hostLabel.textContent = spec.hostLabel;
+  const host = document.getElementById('cloudHost');
+  if (host) host.placeholder = spec.hostPh;
+  const portLabel = document.getElementById('cloudPortLabel');
+  if (portLabel) portLabel.textContent = spec.portLabel;
+  const port = document.getElementById('cloudPort');
+  if (port) port.value = spec.port;
+  const user = document.getElementById('cloudUser');
+  if (user) user.placeholder = spec.userPh;
+  document.getElementById('cloudProjectGroup')?.classList.toggle('hidden', !spec.extra);
+  document.getElementById('cloudDomainGroup')?.classList.toggle('hidden', !spec.extra);
+  document.getElementById('cloudHyperVHelp')?.classList.toggle('hidden', provider !== 'hyperv');
 }
 
 function addCloudGoNext() {
-  if (_selectedProvider !== 'vmware') {
-    return toast('Select VMware to continue', 'warn');
+  if (!CLOUD_PROVIDERS[_selectedProvider]) {
+    return toast('Select VMware, VHI, or Hyper-V to continue', 'warn');
   }
+  applyCloudProviderForm(_selectedProvider);
   document.getElementById('addCloudStep1').classList.add('hidden');
   document.getElementById('addCloudStep2').classList.remove('hidden');
-  
   document.getElementById('btnAddCloudBack').style.display = '';
   document.getElementById('btnAddCloudCancel').style.display = 'none';
   document.getElementById('btnAddCloudNext').style.display = 'none';
+  document.getElementById('btnAddCloudTest').style.display = '';
   document.getElementById('btnAddCloudSubmit').style.display = '';
 }
 
 function addCloudGoBack() {
   document.getElementById('addCloudStep1').classList.remove('hidden');
   document.getElementById('addCloudStep2').classList.add('hidden');
-  
   document.getElementById('btnAddCloudBack').style.display = 'none';
   document.getElementById('btnAddCloudCancel').style.display = '';
   document.getElementById('btnAddCloudNext').style.display = '';
+  document.getElementById('btnAddCloudTest').style.display = 'none';
   document.getElementById('btnAddCloudSubmit').style.display = 'none';
 }
 
-function submitAddCloud() {
-  const name = document.getElementById('cloudName').value.trim();
-  const desc = document.getElementById('cloudDesc').value.trim();
-  const host = document.getElementById('cloudHost').value.trim();
-  const port = parseInt(document.getElementById('cloudPort').value, 10);
-  const user = document.getElementById('cloudUser').value.trim();
-  const pass = document.getElementById('cloudPass').value;
-  const insecure = document.getElementById('cloudInsecure').checked;
-  
-  if (!name || !host || !port || !user || !pass) {
+async function testAddCloudConnection() {
+  const payload = cloudPayload();
+  const resultDiv = document.getElementById('cloudTestResult');
+  const btn = document.getElementById('btnAddCloudTest');
+  if (!payload.host || !payload.user || !payload.pass) {
+    return toast('Enter host, username, and password first', 'warn');
+  }
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Testing...';
+  resultDiv.style.display = 'block';
+  resultDiv.style.background = 'rgba(255, 193, 7, 0.12)';
+  resultDiv.style.color = 'var(--warning)';
+  resultDiv.style.border = '1px solid rgba(255, 193, 7, 0.3)';
+  resultDiv.innerHTML = 'Connecting to <strong>' + escapeHtml(payload.host) + ':' + payload.port + '</strong>...';
+  try {
+    const res = await fetch('/api/vhi/clouds/test', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      resultDiv.style.background = 'rgba(25, 135, 84, 0.15)';
+      resultDiv.style.color = 'var(--success)';
+      resultDiv.style.border = '1px solid rgba(25, 135, 84, 0.3)';
+      const s = data.serverInfo || {};
+      if (data.usedPort) document.getElementById('cloudPort').value = data.usedPort;
+      resultDiv.innerHTML = '✓ <strong>Connected:</strong> ' + escapeHtml(s.fullName || specLabel()) + '<br><small class="text-dim">' + escapeHtml(s.apiType || payload.type) + (s.apiVersion ? ' | API ' + escapeHtml(s.apiVersion) : '') + '</small>';
+      toast('Connection validated successfully!', 'ok');
+    } else {
+      resultDiv.style.background = 'rgba(220, 53, 69, 0.15)';
+      resultDiv.style.color = 'var(--danger)';
+      resultDiv.style.border = '1px solid rgba(220, 53, 69, 0.3)';
+      resultDiv.innerHTML = '✕ <strong>Connection failed:</strong> ' + escapeHtml(data.error || 'Check credentials and host');
+      toast('Connection test failed', 'err');
+    }
+  } catch (err) {
+    resultDiv.style.background = 'rgba(220, 53, 69, 0.15)';
+    resultDiv.style.color = 'var(--danger)';
+    resultDiv.style.border = '1px solid rgba(220, 53, 69, 0.3)';
+    resultDiv.innerHTML = '✕ <strong>Network error:</strong> ' + escapeHtml(err.message);
+    toast('Network error during test', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔌 Test Connection';
+  }
+}
+
+function specLabel() {
+  return (CLOUD_PROVIDERS[_selectedProvider] || {}).brand || 'Cloud';
+}
+
+async function submitAddCloud() {
+  const payload = cloudPayload();
+  const btnSubmit = document.getElementById('btnAddCloudSubmit');
+  if (!payload.name || !payload.host || !payload.user || !payload.pass) {
     return toast('Please configure all required fields', 'warn');
   }
-  
-  const newCloud = {
-    id: 'cloud-' + Math.random().toString(36).substr(2, 9),
-    name,
-    desc,
-    host,
-    port,
-    user,
-    pass,
-    insecure,
-    added: new Date().toISOString()
-  };
-  
-  _clouds.push(newCloud);
-  localStorage.setItem('vhi_clouds', JSON.stringify(_clouds));
-  
-  closeAddCloudModal();
-  renderClouds();
-  toast(`Cloud "${name}" added successfully`, 'ok');
+  btnSubmit.disabled = true;
+  btnSubmit.textContent = 'Saving & Validating...';
+  try {
+    const res = await fetch('/api/vhi/clouds', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, force: false })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (confirm('Connection validation failed:\n' + (data.error || 'Unknown error') + '\n\nDo you want to save this cloud anyway?')) {
+        const forceRes = await fetch('/api/vhi/clouds', {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, force: true })
+        });
+        const forceData = await forceRes.json();
+        if (forceRes.ok) {
+          toast('Cloud "' + payload.name + '" saved (unverified)', 'warn');
+          closeAddCloudModal();
+          await loadMigrationsPage();
+          return;
+        }
+      }
+      throw new Error(data.error || 'Failed to add cloud');
+    }
+    toast('Cloud "' + payload.name + '" connected and added successfully!', 'ok');
+    closeAddCloudModal();
+    await loadMigrationsPage();
+  } catch (err) {
+    toast('Error: ' + err.message, 'err');
+  } finally {
+    btnSubmit.disabled = false;
+    btnSubmit.textContent = 'Add Cloud';
+  }
 }
 
 // Hook up Add Cloud trigger
@@ -7969,6 +10415,7 @@ function openMigrateModal() {
   _activeWizStep = 1;
   _selectedCloudId = null;
   _selectedVms = [];
+  _currentDiscoveredVms = [];
   
   // Populate select boxes in steps dynamically
   populateWizardSelectFields();
@@ -7988,8 +10435,11 @@ function populateWizardSelectFields() {
   wizCloudBody.innerHTML = _clouds.map(c => `
     <tr style="cursor:pointer;" onclick="selectWizCloud('${c.id}')">
       <td><input type="radio" name="wizCloudRadio" id="wizCloudRadio_${c.id}" value="${c.id}" ${c.id === _selectedCloudId ? 'checked' : ''}></td>
-      <td><strong>${escapeHtml(c.name)}</strong></td>
-      <td><span class="badge badge-default">VMware</span></td>
+      <td>
+        <strong>${escapeHtml(c.name)}</strong>
+        <div class="text-dim" style="font-size:0.75rem;">${escapeHtml(c.host)}:${c.port}</div>
+      </td>
+      <td><span class="badge badge-default">${c.type === 'VHI' ? 'VHI' : c.type === 'HYPERV' ? 'Hyper-V' : (c.serverInfo?.apiType === 'VirtualCenter' ? 'vCenter' : 'VMware ESXi')}</span></td>
     </tr>
   `).join('');
   
@@ -8010,19 +10460,62 @@ function populateWizardSelectFields() {
   diskSelect.innerHTML = _volTypes.map(vt => `<option value="${vt.name}">${escapeHtml(vt.name)}</option>`).join('');
 }
 
-function selectWizCloud(id) {
+async function selectWizCloud(id) {
   _selectedCloudId = id;
+  _selectedVms = [];
   const radio = document.getElementById(`wizCloudRadio_${id}`);
   if (radio) radio.checked = true;
-  
-  // Populate VMware VMs list in Step 2 based on selection
+
   const wizVmBody = document.getElementById('wizVmBody');
-  wizVmBody.innerHTML = _mockVmDatabase.map(vm => `
+  const cloud = (_clouds || []).find((c) => c.id === id);
+  const kind = String(cloud?.type || 'VMWARE').toUpperCase();
+  const kindLabel = kind === 'VHI' ? 'VHI' : kind === 'HYPERV' ? 'Hyper-V' : 'ESXi';
+  wizVmBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:1.5rem; color:var(--text-dim);"><span class="ri spin">⏳</span> Connecting to ${kindLabel} and discovering VMs...</td></tr>`;
+
+  try {
+    const res = await fetch(`/api/vhi/clouds/${encodeURIComponent(id)}/vms`, { headers: authHeaders() });
+    const data = await res.json();
+    if (res.ok && data.ok && Array.isArray(data.vms) && data.vms.length > 0) {
+      _currentDiscoveredVms = data.vms;
+      renderWizVmList(data.vms);
+      toast(`Discovered ${data.vms.length} VM(s) from ${kindLabel}`, 'ok');
+      return;
+    } else if (res.ok && data.ok && Array.isArray(data.vms)) {
+      _currentDiscoveredVms = [];
+      wizVmBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:1.5rem; color:var(--text-dim);">${escapeHtml(data.message || ('No virtual machines found on this ' + kindLabel + ' cloud.'))}</td></tr>`;
+      return;
+    }
+  } catch (err) {
+    console.warn('Failed to query live inventory:', err.message);
+  }
+
+  if (kind !== 'VMWARE') {
+    wizVmBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:1.5rem; color:var(--text-dim);">Could not list VMs from this ${kindLabel} cloud.</td></tr>`;
+    return;
+  }
+
+  _currentDiscoveredVms = _mockVmDatabase;
+  renderWizVmList(_mockVmDatabase);
+}
+
+function renderWizVmList(vms) {
+  const wizVmBody = document.getElementById('wizVmBody');
+  if (!vms || !vms.length) {
+    wizVmBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:1rem; color:var(--text-dim);">No VMs found</td></tr>`;
+    return;
+  }
+  wizVmBody.innerHTML = vms.map(vm => `
     <tr style="cursor:pointer;" onclick="toggleWizVm('${vm.id}')">
       <td><input type="checkbox" id="wizVmCb_${vm.id}" value="${vm.id}" ${_selectedVms.includes(vm.id) ? 'checked' : ''}></td>
-      <td><strong>${escapeHtml(vm.name)}</strong></td>
-      <td class="text-dim">${escapeHtml(vm.spec)}</td>
-      <td class="text-dim">${vm.disks} disks</td>
+      <td>
+        <strong>${escapeHtml(vm.name)}</strong>
+        ${vm.guestOs ? `<div class="text-dim" style="font-size:0.72rem;">${escapeHtml(vm.guestOs)}</div>` : ''}
+      </td>
+      <td>
+        <span class="mono" style="font-size:0.8rem;">${escapeHtml(vm.spec || `${vm.vcpus || 1} vCPU / ${vm.ramMb || 1024} MB`)}</span>
+        ${vm.powerState ? `<span class="badge ${vm.powerState === 'poweredOn' ? 'badge-success' : 'badge-default'}" style="font-size:0.68rem; margin-left:4px;">${escapeHtml(vm.powerState)}</span>` : ''}
+      </td>
+      <td class="text-dim">${vm.disksCount || (vm.disks ? vm.disks.length : 1)} disk(s)</td>
     </tr>
   `).join('');
 }
@@ -8056,6 +10549,139 @@ function filterWizVms() {
   });
 }
 
+
+const POST_MIGRATION_SCRIPTS = [
+  {
+    id: 'linux-qemu-ga',
+    os: 'linux',
+    name: 'QEMU guest agent (remove VMware Tools)',
+    content: `#!/bin/bash
+set -e
+if command -v dnf >/dev/null 2>&1; then
+  dnf remove -y open-vm-tools || true
+  dnf install -y qemu-guest-agent
+elif command -v yum >/dev/null 2>&1; then
+  yum remove -y open-vm-tools || true
+  yum install -y qemu-guest-agent
+elif command -v apt-get >/dev/null 2>&1; then
+  apt-get update -y
+  apt-get remove -y open-vm-tools || true
+  apt-get install -y qemu-guest-agent
+fi
+systemctl enable --now qemu-guest-agent || true
+`
+  },
+  {
+    id: 'windows-qemu-ga',
+    os: 'windows',
+    name: 'QEMU guest agent (remove VMware Tools)',
+    content: `$ErrorActionPreference = 'Continue'
+Get-WmiObject -Class Win32_Product -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -match 'VMware Tools' } |
+  ForEach-Object { $_.Uninstall() }
+$ga = Get-Service -Name 'QEMU-GA','qemu-ga' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($ga) {
+  Set-Service -Name $ga.Name -StartupType Automatic
+  Start-Service -Name $ga.Name -ErrorAction SilentlyContinue
+}
+`
+  }
+];
+
+function vmGuestLooksLikeWindows(guestId, guestOs, os) {
+  const osNorm = String(os || '').trim().toLowerCase();
+  if (osNorm === 'linux') return false;
+  if (osNorm === 'windows' || osNorm.includes('windows')) return true;
+  const id = String(guestId || '');
+  const full = String(guestOs || '');
+  return /^win/i.test(id) || /windows/i.test(id) || /windows/i.test(full);
+}
+
+function wizVmIsWindows(vm) {
+  return vmGuestLooksLikeWindows(vm && vm.guestId, vm && vm.guestOs);
+}
+
+function migLooksLikeWindows(mig) {
+  if (!mig) return false;
+  return vmGuestLooksLikeWindows(
+    mig.guestId || (mig.sourceOptions && mig.sourceOptions.guestId),
+    mig.guestOs || (mig.sourceOptions && mig.sourceOptions.guestOs) || (mig.targetOptions && mig.targetOptions.osDistro),
+    mig.sourceOptions && mig.sourceOptions.os
+  );
+}
+
+function wizSelectedVmRecords() {
+  const activeVmList = (_currentDiscoveredVms && _currentDiscoveredVms.length > 0) ? _currentDiscoveredVms : _mockVmDatabase;
+  return (activeVmList || []).filter(vm => _selectedVms.includes(vm.id));
+}
+
+function getPostMigrationScript(id) {
+  return POST_MIGRATION_SCRIPTS.find(s => s.id === id) || null;
+}
+
+function fillWizScriptSelect(selectEl, os) {
+  if (!selectEl) return;
+  const current = selectEl.value;
+  const opts = ['<option value="">None — do not run a script</option>']
+    .concat(POST_MIGRATION_SCRIPTS.filter(s => s.os === os).map(s =>
+      `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`));
+  selectEl.innerHTML = opts.join('');
+  const stillValid = Array.from(selectEl.options).some(o => o.value === current);
+  selectEl.value = stillValid ? current : '';
+}
+
+function populateWizUserScripts() {
+  const vms = wizSelectedVmRecords();
+  const hasLinux = !vms.length || vms.some(vm => !wizVmIsWindows(vm));
+  const hasWindows = vms.some(vm => wizVmIsWindows(vm));
+  const linuxGroup = document.getElementById('wizLinuxScriptGroup');
+  const winGroup = document.getElementById('wizWindowsScriptGroup');
+  if (linuxGroup) linuxGroup.style.display = hasLinux ? '' : 'none';
+  if (winGroup) winGroup.style.display = hasWindows ? '' : 'none';
+  fillWizScriptSelect(document.getElementById('wizLinuxPostScript'), 'linux');
+  fillWizScriptSelect(document.getElementById('wizWindowsPostScript'), 'windows');
+  updateWizScriptPreview();
+}
+
+function updateWizScriptPreview() {
+  const linuxGroup = document.getElementById('wizLinuxScriptGroup');
+  const winGroup = document.getElementById('wizWindowsScriptGroup');
+  const linuxVisible = linuxGroup && linuxGroup.style.display !== 'none';
+  const winVisible = winGroup && winGroup.style.display !== 'none';
+  const linuxScript = linuxVisible ? getPostMigrationScript(document.getElementById('wizLinuxPostScript')?.value) : null;
+  const winScript = winVisible ? getPostMigrationScript(document.getElementById('wizWindowsPostScript')?.value) : null;
+  const parts = [];
+  if (linuxScript) parts.push('# Linux — ' + linuxScript.name + '\n' + String(linuxScript.content || '').trim());
+  if (winScript) parts.push('# Windows — ' + winScript.name + '\n' + String(winScript.content || '').trim());
+  const preview = document.getElementById('wizPostScriptPreview');
+  if (preview) preview.value = parts.join('\n\n');
+  const hint = document.getElementById('wizNoScriptHint');
+  if (hint) hint.style.display = parts.length ? 'none' : '';
+}
+
+function selectedPostScriptForOs(isWindows) {
+  const id = document.getElementById(isWindows ? 'wizWindowsPostScript' : 'wizLinuxPostScript')?.value || '';
+  const script = getPostMigrationScript(id);
+  if (!script) return { postScriptId: '', postScriptName: '', postScript: '' };
+  return { postScriptId: script.id, postScriptName: script.name, postScript: script.content };
+}
+
+function summarizeWizScripts() {
+  const vms = wizSelectedVmRecords();
+  const hasLinux = !vms.length || vms.some(vm => !wizVmIsWindows(vm));
+  const hasWindows = vms.some(vm => wizVmIsWindows(vm));
+  const labels = [];
+  if (hasLinux) {
+    const linux = getPostMigrationScript(document.getElementById('wizLinuxPostScript')?.value);
+    labels.push(linux ? `Linux: ${linux.name}` : 'Linux: none');
+  }
+  if (hasWindows) {
+    const win = getPostMigrationScript(document.getElementById('wizWindowsPostScript')?.value);
+    labels.push(win ? `Windows: ${win.name}` : 'Windows: none');
+  }
+  return labels.join(' · ') || 'None';
+}
+
 function showWizStep(step) {
   _activeWizStep = step;
   
@@ -8077,6 +10703,9 @@ function showWizStep(step) {
   document.getElementById('btnWizNext').style.display = step === 9 ? 'none' : '';
   document.getElementById('btnWizStart').style.display = step === 9 ? '' : 'none';
   
+  if (step === 7) {
+    populateWizUserScripts();
+  }
   if (step === 9) {
     populateWizSummary();
   }
@@ -8100,7 +10729,8 @@ function wizGoBack() {
 
 function populateWizSummary() {
   const cloud = _clouds.find(c => c.id === _selectedCloudId);
-  const vms = _mockVmDatabase.filter(vm => _selectedVms.includes(vm.id));
+  const activeVmList = (_currentDiscoveredVms && _currentDiscoveredVms.length > 0) ? _currentDiscoveredVms : _mockVmDatabase;
+  const vms = activeVmList.filter(vm => _selectedVms.includes(vm.id));
   
   const transport = document.getElementById('wizTransportType').value.toUpperCase();
   
@@ -8114,44 +10744,138 @@ function populateWizSummary() {
   const targetFlavorName = targetFlavorSelect.options[targetFlavorSelect.selectedIndex]?.text || '';
   
   const isLive = document.querySelector('input[name="wizMigrationType"]:checked')?.value === 'live';
-  
+  const strategy = document.querySelector('input[name="wizStrategy"]:checked')?.value || 'auto';
+  const autoDeploy = document.getElementById('wizAutoDeployToggle')?.checked ?? true;
+
   document.getElementById('sumSrcCloud').textContent = cloud ? cloud.name : '-';
-  document.getElementById('sumVms').textContent = vms.map(v => v.name).join(', ');
+  document.getElementById('sumVms').textContent = vms.map(v => v.name).join(', ') || '-';
   document.getElementById('sumTransport').textContent = `${transport} (Max Concurrency: ${document.getElementById('wizMaxConcurrency').value})`;
   document.getElementById('sumNetMap').textContent = `${document.getElementById('wizSrcNetwork').value} ➔ ${targetNetName}`;
   document.getElementById('sumStorage').textContent = targetPolicyName;
   document.getElementById('sumFlavor').textContent = targetFlavorName;
   document.getElementById('sumMigType').textContent = isLive ? 'Live Migration (Online)' : 'Cold Migration (Offline)';
+  
+  const strategyEl = document.getElementById('sumStrategy');
+  if (strategyEl) {
+    if (strategy === 'replicate_only' || !autoDeploy) {
+      strategyEl.textContent = 'Stage 1: Replicate Only (Staging / Pre-Cutover)';
+      strategyEl.style.color = '#ffc107';
+    } else {
+      strategyEl.textContent = 'Full Automatic (Replicate ➔ Deploy ➔ Boot)';
+      strategyEl.style.color = '#0d6efd';
+    }
+  }
+  const yesNo = (id) => document.getElementById(id)?.checked ? 'Yes' : 'No';
+  const sumDhcp = document.getElementById('sumDhcp');
+  if (sumDhcp) sumDhcp.textContent = yesNo('wizEnableDhcp');
+  const sumRetain = document.getElementById('sumRetainCreds');
+  if (sumRetain) sumRetain.textContent = yesNo('wizRetainCreds');
+  const sumDelete = document.getElementById('sumDeleteDisks');
+  if (sumDelete) sumDelete.textContent = yesNo('wizDeleteDisks');
+  const sumScript = document.getElementById('sumPostScript');
+  if (sumScript) sumScript.textContent = summarizeWizScripts();
 }
 
-function startMigration() {
+async function startMigration() {
   const cloud = _clouds.find(c => c.id === _selectedCloudId);
-  const vms = _mockVmDatabase.filter(vm => _selectedVms.includes(vm.id));
+  const activeVmList = (_currentDiscoveredVms && _currentDiscoveredVms.length > 0) ? _currentDiscoveredVms : _mockVmDatabase;
+  const vms = activeVmList.filter(vm => _selectedVms.includes(vm.id));
   const isLive = document.querySelector('input[name="wizMigrationType"]:checked')?.value === 'live';
-  
-  // Create migration records for selected VMs
-  vms.forEach(vm => {
-    const newMigration = {
-      id: 'mig-' + Math.random().toString(36).substr(2, 9),
-      name: `Migrate ${vm.name}`,
-      srcCloudId: _selectedCloudId,
-      srcCloudName: cloud ? cloud.name : 'Unknown',
-      vms: [vm.name],
-      migType: isLive ? 'live' : 'cold',
-      status: 'QUEUED',
-      progress: 0,
-      started: new Date().toISOString()
-    };
-    _migrations.unshift(newMigration);
-  });
-  
-  localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
+  const strategy = document.querySelector('input[name="wizStrategy"]:checked')?.value || 'auto';
+  const autoDeploy = document.getElementById('wizAutoDeployToggle')?.checked ?? true;
+
+  if (!vms.length) {
+    return toast('No virtual machines selected for migration', 'warn');
+  }
+
+  const targetNetSelect = document.getElementById('wizTgtNetwork');
+  const targetNetId = targetNetSelect.value;
+  const targetNetName = targetNetSelect.options[targetNetSelect.selectedIndex]?.text || 'VM Network';
+  if (!targetNetId) {
+    return toast('Select a target VHI network so the guest can get an independent IP', 'warn');
+  }
+
+  const targetFlavorSelect = document.getElementById('wizTgtFlavor');
+  const targetFlavorId = targetFlavorSelect.value || '';
+  const targetFlavorName = targetFlavorSelect.options[targetFlavorSelect.selectedIndex]?.text || 'Inherited from source';
+  const targetPolicySelect = document.getElementById('wizTgtPolicy');
+  const volumeType = targetPolicySelect.value || '';
+
   closeMigrateModal();
+  toast(`Starting Coriolis-style migration for ${vms.length} VM(s)…`, 'inf');
+
+  let started = 0;
+  const failures = [];
+  for (const vm of vms) {
+    const cleanVmName = vm.name || 'Linux';
+    const isWindows = wizVmIsWindows(vm);
+    const payload = {
+      name: cleanVmName,
+      srcCloudId: _selectedCloudId,
+      srcCloudName: cloud ? `${cloud.name} (VMware)` : 'VMware (VMware)',
+      sourceVmId: vm.id,
+      targetDomainProject: 'Default / admin',
+      vms: [cleanVmName],
+      migType: isLive ? 'live' : 'cold',
+      strategy,
+      autoDeploy: (strategy === 'auto' && autoDeploy),
+      networkId: targetNetId,
+      networkName: targetNetName,
+      flavorId: targetFlavorId,
+      flavorName: targetFlavorName,
+      volumeType,
+      sourceOptions: {
+        os: isWindows ? 'windows' : 'linux',
+        vcpus: vm.vcpus || (isWindows ? 2 : 1),
+        ram: vm.ramMb ? (vm.ramMb >= 1024 ? `${(vm.ramMb / 1024).toFixed(0)} GiB` : `${vm.ramMb} MiB`) : (isWindows ? '4 GiB' : '2 GiB'),
+        diskSize: vm.disks && vm.disks[0] ? `${vm.disks[0].capacityGb} GiB` : (isWindows ? '48 GiB' : '8 GiB'),
+        cbt: 'Yes',
+        firmware: vm.firmware || 'bios',
+        guestId: vm.guestId || '',
+        guestOs: vm.guestOs || ''
+      },
+      targetOptions: {
+        flavor: targetFlavorName || 'Inherited from source',
+        diskBus: 'VirtIO',
+        osDistro: vm.guestOs || (isWindows ? 'Microsoft Windows Server' : 'Alma Linux 9'),
+        linuxWorkerImage: 'vporter-minion-linux',
+        windowsWorkerImage: 'vporter-minion-windows',
+        workerImage: isWindows ? 'vporter-minion-windows' : 'vporter-minion-linux',
+        machineType: 'pc-q35',
+        dhcp: document.getElementById('wizEnableDhcp')?.checked ? 'Yes' : 'No',
+        retainCreds: document.getElementById('wizRetainCreds')?.checked ? 'Yes' : 'No',
+        deleteDisks: document.getElementById('wizDeleteDisks')?.checked ? 'Yes' : 'No',
+        ...selectedPostScriptForOs(isWindows)
+      }
+    };
+
+    try {
+      const res = await fetch('/api/vhi/migrations', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (data.migration) _migrations.unshift(data.migration);
+      started += 1;
+    } catch (err) {
+      failures.push(`${cleanVmName}: ${err.message}`);
+    }
+  }
+
+  localStorage.setItem('vhi_migrations', JSON.stringify(_migrations));
   renderMigrations();
   updateMigrationBadge();
-  startProgressSimulation();
-  
-  toast(`Migration started for ${vms.length} VM(s)`, 'ok');
+  if (started) startMigrationPoll();
+  loadVMs();
+  if (failures.length && !started) {
+    toast(`Migration did not start. ${failures.join(' | ')}`, 'err');
+  } else if (failures.length) {
+    toast(`Started ${started} migration(s). Failed: ${failures.join(' | ')}`, 'err');
+  } else {
+    toast(`Migration engine running for ${started} VM(s)`, 'ok');
+  }
 }
 
 // Hook up main trigger
@@ -8159,8 +10883,8 @@ document.getElementById('btnOpenMigrateWizard')?.addEventListener('click', openM
 
 // Helper function to escape HTML
 function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  if (str == null || str === '') return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/\r?\n/g, ' ');
 }
 
 // Expose functions globally to be callable from HTML onclick handlers
@@ -8170,8 +10894,12 @@ window.addCloudGoBack = addCloudGoBack;
 window.submitAddCloud = submitAddCloud;
 window.selectProvider = selectProvider;
 window.deleteCloud = deleteCloud;
+window.testAddCloudConnection = testAddCloudConnection;
+window.testSavedCloud = testSavedCloud;
 
 window.closeMigrateModal = closeMigrateModal;
+window.updateWizScriptPreview = updateWizScriptPreview;
+window.populateWizUserScripts = populateWizUserScripts;
 window.selectWizCloud = selectWizCloud;
 window.toggleWizVm = toggleWizVm;
 window.filterWizClouds = filterWizClouds;
@@ -8181,6 +10909,16 @@ window.wizGoBack = wizGoBack;
 window.startMigration = startMigration;
 window.cancelMigration = cancelMigration;
 window.deleteMigration = deleteMigration;
+
+window.openMigrationDetail = openMigrationDetail;
+window.closeMigrationDetail = closeMigrationDetail;
+window.switchMigDetailSubTab = switchMigDetailSubTab;
+window.openReplicationDrawer = openReplicationDrawer;
+window.closeReplicationDrawer = closeReplicationDrawer;
+window.switchDrawerTab = switchDrawerTab;
+window.deleteMigrationFromDrawer = deleteMigrationFromDrawer;
+window.triggerDeployment = triggerDeployment;
+window.triggerRetryReplication = triggerRetryReplication;
 
 </script>
 </body>

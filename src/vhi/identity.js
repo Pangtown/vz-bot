@@ -18,7 +18,7 @@ const getBaseUrl = () => {
 
 export async function getToken() {
   const base = getBaseUrl();
-  const port = process.env.VHI_IDENTITY_PORT || 5000;
+  const port = getContextValue('vhiIdentityPort') || process.env.VHI_IDENTITY_PORT || 5000;
   const url = `${base}:${port}/v3/auth/tokens`;
   const user = getContextValue('vhiUser', 'VHI_USER');
   const password = getContextValue('vhiPassword', 'VHI_PASSWORD');
@@ -82,7 +82,7 @@ export async function getToken() {
 
 export function getIdentityUrl(path = '') {
   const base = getBaseUrl();
-  const port = process.env.VHI_IDENTITY_PORT || 5000;
+  const port = getContextValue('vhiIdentityPort') || process.env.VHI_IDENTITY_PORT || 5000;
   return `${base}:${port}/v3${path}`;
 }
 

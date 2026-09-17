@@ -10,6 +10,8 @@ import * as billingStorage from '../monitoring/billing-storage.js';
 import { runAuditPoll } from '../monitoring/audit-poller.js';
 import { runAlertPoll } from '../monitoring/alert-poller.js';
 import { tickDueJobs } from './jobs.js';
+import { tickMigrations } from '../vmware/migration-engine.js';
+import { getLastValidContext } from './context.js';
 
 let healthJob = null;
 let lastHealthResult = null;
@@ -111,6 +113,11 @@ export function start(config = {}) {
     }
   });
   console.log('Scheduler: user jobs tick every minute');
+
+  setInterval(() => {
+    tickMigrations().catch((err) => console.error('Migration tick error:', err.message));
+  }, 4000);
+  console.log('Scheduler: Coriolis-style migration engine tick every 4s');
 }
 
 /**

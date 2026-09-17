@@ -7,6 +7,8 @@ import { handleVolumeTypes, handleVolumes, handleVolumeGet, handleVolumeUpdate, 
 import { handleProjects, handleProjectItem, handleUsers, handleDomains, handleGroups, handleRoles, handleRoleAssignments } from './vhi-api/identity.js';
 import { handleHealthStatus, handleBillingStatus, handleBillingRefresh, handleBillingExport, handleAuditLogs, handleAuditRefresh, handleGetSshSettings, handlePostSshSettings } from './vhi-api/monitoring.js';
 import { handleJobs, handleJobRun } from './vhi-api/jobs.js';
+import { handleCloudTest, handleGetClouds, handleCreateCloud, handleDeleteCloud, handleGetCloudVms, handleGetMigrations, handleCreateMigration, handleGetMigration, handleDeployMigration, handleRetryReplication, handleCancelMigration, handleDeleteMigration } from './vhi-api/clouds.js';
+import { handleCloneBlob, handleCloneProgress } from '../vmware/porter-clone.js';
 import { searchAlerts } from '../monitoring/alert-storage.js';
 import { runAlertPoll } from '../monitoring/alert-poller.js';
 import { loadGlobalSshConfig } from '../monitoring/ssh-storage.js';
@@ -16,6 +18,18 @@ export async function handleVhiApi(req, res) {
   const m = req.method || 'GET';
   const url = req.url || '';
   const p = url.split('?')[0].replace(/\/$/, '');
+
+  // Porter clone fetch is token-authenticated; the worker has no web password.
+  const cloneBlobMatch = p.match(/^\/api\/vhi\/migrations\/([^/]+)\/clone-blob$/);
+  if (m === 'GET' && cloneBlobMatch) {
+    await handleCloneBlob(req, res, cloneBlobMatch[1], url);
+    return true;
+  }
+  const cloneProgressMatch = p.match(/^\/api\/vhi\/migrations\/([^/]+)\/clone-progress$/);
+  if (m === 'POST' && cloneProgressMatch) {
+    await handleCloneProgress(req, res, cloneProgressMatch[1], url);
+    return true;
+  }
 
   if (!verifyWebPassword(req)) {
     json(res, 401, { error: 'Unauthorized: Invalid or missing web password' });
@@ -37,6 +51,64 @@ export async function handleVhiApi(req, res) {
       const clusterUrls = Object.keys(allConfigs);
       json(res, 200, { clusters: clusterUrls });
       return true;
+  }
+
+  // ── VMware / ESXi Clouds Management (VDDK Bypass) ─────────────────────────
+  if (m === 'POST' && p === '/api/vhi/clouds/test') {
+    await handleCloudTest(req, res);
+    return true;
+  }
+  if (m === 'GET' && p === '/api/vhi/clouds') {
+    await handleGetClouds(req, res);
+    return true;
+  }
+  if (m === 'POST' && p === '/api/vhi/clouds') {
+    await handleCreateCloud(req, res);
+    return true;
+  }
+  const cloudVmsMatch = p.match(/^\/api\/vhi\/clouds\/([^/]+)\/vms$/);
+  if (m === 'GET' && cloudVmsMatch) {
+    await handleGetCloudVms(req, res, cloudVmsMatch[1]);
+    return true;
+  }
+  const cloudDeleteMatch = p.match(/^\/api\/vhi\/clouds\/([^/]+)$/);
+  if (m === 'DELETE' && cloudDeleteMatch) {
+    await handleDeleteCloud(req, res, cloudDeleteMatch[1]);
+    return true;
+  }
+
+  // ── Migrations Management (Replication & Deployment Lifecycle) ───────────
+  if (m === 'GET' && p === '/api/vhi/migrations') {
+    await handleGetMigrations(req, res);
+    return true;
+  }
+  if (m === 'POST' && p === '/api/vhi/migrations') {
+    await handleCreateMigration(req, res);
+    return true;
+  }
+  const migrationItemMatch = p.match(/^\/api\/vhi\/migrations\/([^/]+)$/);
+  if (m === 'GET' && migrationItemMatch) {
+    await handleGetMigration(req, res, migrationItemMatch[1]);
+    return true;
+  }
+  const migrationDeployMatch = p.match(/^\/api\/vhi\/migrations\/([^/]+)\/deploy$/);
+  if (m === 'POST' && migrationDeployMatch) {
+    await handleDeployMigration(req, res, migrationDeployMatch[1]);
+    return true;
+  }
+  const migrationRetryMatch = p.match(/^\/api\/vhi\/migrations\/([^/]+)\/retry-replication$/);
+  if (m === 'POST' && migrationRetryMatch) {
+    await handleRetryReplication(req, res, migrationRetryMatch[1]);
+    return true;
+  }
+  const migrationCancelMatch = p.match(/^\/api\/vhi\/migrations\/([^/]+)\/cancel$/);
+  if (m === 'POST' && migrationCancelMatch) {
+    await handleCancelMigration(req, res, migrationCancelMatch[1]);
+    return true;
+  }
+  if (m === 'DELETE' && migrationItemMatch) {
+    await handleDeleteMigration(req, res, migrationItemMatch[1]);
+    return true;
   }
 
   const ctx = extractContext(req);

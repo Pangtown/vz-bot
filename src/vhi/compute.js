@@ -61,6 +61,21 @@ export async function getServer(serverId) {
   return data.server || null;
 }
 
+export async function getConsoleOutput(serverId, length = 4096) {
+  const client = await getClient();
+  const res = await client.fetch(await computeUrl(`/servers/${serverId}/action`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 'os-getConsoleOutput': { length } }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Compute getConsoleOutput failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.output || '';
+}
+
 export async function serverAction(serverId, action, body = {}) {
   const client = await getClient();
   const res = await client.fetch(await computeUrl(`/servers/${serverId}/action`), {
@@ -76,7 +91,12 @@ export async function serverAction(serverId, action, body = {}) {
 }
 
 export async function startServer(serverId) {
-  return serverAction(serverId, 'os-start');
+  try {
+    return await serverAction(serverId, 'os-start');
+  } catch (err) {
+    if (/409/.test(String(err.message)) && /active/i.test(String(err.message))) return true;
+    throw err;
+  }
 }
 
 export async function stopServer(serverId) {
@@ -99,22 +119,24 @@ export async function deleteServer(serverId) {
 
 export async function createServer(options = {}) {
   const client = await getClient();
-  
-  // Extract BDM options if present
-  const bdm = Array.isArray(options.block_device_mapping_v2) ? options.block_device_mapping_v2[0] : null;
-  const imageRef = options.imageRef || (bdm?.source_type === 'image' ? bdm.uuid : undefined);
+
+  const incomingBdm = Array.isArray(options.block_device_mapping_v2) ? options.block_device_mapping_v2 : null;
+  const volumeBoot = incomingBdm && incomingBdm.some((d) => d.source_type === 'volume');
+  const bdm = incomingBdm ? incomingBdm[0] : null;
+  const imageRef = volumeBoot
+    ? undefined
+    : (options.imageRef || (bdm?.source_type === 'image' ? bdm.uuid : undefined));
   const volumeSize = options.volume_size || bdm?.volume_size || 50;
   const volumeType = options.volume_type || bdm?.volume_type;
 
-  // Abstraction for easier LLM use
   const payload = {
     name: options.name,
-    imageRef: imageRef,
     flavorRef: options.flavorRef,
     networks: options.networks || [],
     min_count: options.min_count || 1,
     max_count: options.max_count || 1,
   };
+  if (imageRef) payload.imageRef = imageRef;
 
   // If networks is just a string (ID), convert to object
   if (typeof payload.networks === 'string') {
@@ -137,9 +159,10 @@ export async function createServer(options = {}) {
     payload.key_name = options.key_name;
   }
 
-  // Default to Boot from Volume (block_device_mapping_v2) if an image or volume specs are provided
-  // to avoid MaxRetriesExceeded scheduling errors on compute nodes without ephemeral storage.
-  if (volumeSize || volumeType || imageRef) {
+  if (volumeBoot) {
+    payload.block_device_mapping_v2 = incomingBdm;
+  } else if (volumeSize || volumeType || imageRef) {
+    // Boot from volume created from a Glance image to avoid nodes without ephemeral disks.
     payload.block_device_mapping_v2 = [{
       boot_index: 0,
       uuid: imageRef,

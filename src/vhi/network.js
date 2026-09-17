@@ -77,6 +77,31 @@ export async function deletePort(portId) {
   return true;
 }
 
+export async function createPort(options = {}) {
+  const client = await getClient();
+  const payload = {
+    network_id: options.network_id,
+    name: options.name || '',
+    admin_state_up: options.admin_state_up !== false,
+  };
+  if (options.description) payload.description = options.description;
+  if (options.fixed_ips) payload.fixed_ips = options.fixed_ips;
+  if (options.device_owner) payload.device_owner = options.device_owner;
+  if (options.security_groups) payload.security_groups = options.security_groups;
+
+  const res = await client.fetch(networkUrl('/ports'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ port: payload }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`VHI Network createPort failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.port || null;
+}
+
 export async function createNetwork(options = {}) {
   const client = await getClient();
   const skip = new Set(['cidr', 'ip_version', 'subnet_name', 'gateway_ip', 'enable_dhcp']);

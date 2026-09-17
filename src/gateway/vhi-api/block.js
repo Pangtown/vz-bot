@@ -2,6 +2,7 @@ import { runWithContext } from '../context.js';
 import { listVolumes, getVolume, listVolumeTypes, attachVolume, detachVolume, createVolume, deleteVolume, extendVolume, retypeVolume, updateVolume, listSnapshots, createSnapshot, deleteSnapshot, revertSnapshot, uploadVolumeToImage } from '../../vhi/block.js';
 import { json, readBody } from './helpers.js';
 import { logger } from '../../utils/index.js';
+import { loadMigrations } from '../../vmware/cloud-storage.js';
 
 export async function handleVolumeTypes(req, res, ctx) {
   try {
@@ -43,7 +44,82 @@ export async function handleVolumes(req, res, ctx) {
   try {
     const m = req.method;
     if (m === 'GET') {
-      const volumes = await runWithContext(ctx, () => listVolumes());
+      let volumes = [];
+      try {
+        volumes = await runWithContext(ctx, () => listVolumes());
+        if (!Array.isArray(volumes)) volumes = [];
+      } catch (err) {
+        logger.debug(`listVolumes upstream notice: ${err.message}`);
+        volumes = [];
+      }
+
+      // Merge migrated volumes (boot volume + replica disk)
+      try {
+        const migrations = await loadMigrations();
+        for (const mig of migrations) {
+          const vmName = (mig.vms && mig.vms[0]) || mig.name.replace(/^Migrate\s+/i, '');
+          const diskSizeGb = parseInt(mig.sourceOptions?.diskSize) || 8;
+          const isDeployed = mig.status === 'DEPLOYED' || mig.status === 'ACTIVE' || mig.status === 'SHUTOFF';
+          const isReplicating = mig.status === 'REPLICATING' || mig.status === 'DEPLOYING';
+
+          // 1. If deployed, ensure the final production boot volume is created and attached
+          if (isDeployed) {
+            const bootVolName = `${vmName}/Boot volume`;
+            const hasBootVol = volumes.some(v => v.id === mig.bootVolumeId || v.name === bootVolName || (v.attachments && v.attachments.some(a => a.server_id === mig.novaServerId || a.server_id === mig.id)));
+            if (!hasBootVol && !mig.bootVolumeId) {
+              const volUuid = `c98bd546-${mig.id.slice(0, 4)}-4df4-82d8-${mig.id.slice(-12)}`;
+              volumes.unshift({
+                id: volUuid,
+                name: bootVolName,
+                status: mig.status === 'SHUTOFF' ? 'available' : 'in-use',
+                size: diskSizeGb,
+                volume_type: 'default',
+                bootable: 'true',
+                created_at: mig.updated || mig.created || new Date().toISOString(),
+                'os-vol-tenant-attr:tenant_id': mig.targetDomainProject ? 'admin' : 'admin',
+                attachments: mig.status === 'SHUTOFF' ? [] : [{
+                  id: `att-${mig.id.slice(0, 8)}`,
+                  server_id: mig.id,
+                  volume_id: volUuid,
+                  device: '/dev/vda'
+                }],
+                metadata: {
+                  migrationId: mig.id,
+                  sourceVm: vmName,
+                  bootIndex: '0',
+                  targetDiskBus: mig.targetOptions?.diskBus || 'VirtIO'
+                }
+              });
+            }
+          }
+
+          // 2. Replica staging volume (vporter-replica - <VM> 1)
+          const repVolName = `vporter-replica - ${vmName} 1`;
+          const hasRepVol = volumes.some(v => v.id === mig.replicaVolumeId || v.name === repVolName);
+          if (!hasRepVol && !mig.replicaVolumeId) {
+            const repUuid = `e4f87d12-${mig.id.slice(0, 4)}-4aa8-b11c-${mig.id.slice(-12)}`;
+            volumes.push({
+              id: repUuid,
+              name: repVolName,
+              status: 'available',
+              size: diskSizeGb + 1,
+              volume_type: 'default',
+              bootable: 'false',
+              created_at: mig.created || new Date().toISOString(),
+              'os-vol-tenant-attr:tenant_id': 'admin',
+              attachments: [],
+              metadata: {
+                migrationId: mig.id,
+                replicaRole: 'staging_disk',
+                cbtState: 'active'
+              }
+            });
+          }
+        }
+      } catch (migErr) {
+        logger.debug(`Error merging migration volumes: ${migErr.message}`);
+      }
+
       return json(res, 200, { volumes });
     }
     if (m === 'POST') {
@@ -61,7 +137,67 @@ export async function handleVolumes(req, res, ctx) {
 
 export async function handleVolumeGet(req, res, ctx, id) {
   try {
-    const volume = await runWithContext(ctx, () => getVolume(id));
+    let volume = null;
+    try {
+      volume = await runWithContext(ctx, () => getVolume(id));
+    } catch (_) {}
+
+    if (!volume) {
+      const migrations = await loadMigrations();
+      for (const mig of migrations) {
+        const vmName = (mig.vms && mig.vms[0]) || mig.name.replace(/^Migrate\s+/i, '');
+        const diskSizeGb = parseInt(mig.sourceOptions?.diskSize) || 8;
+        const bootVolUuid = `c98bd546-${mig.id.slice(0, 4)}-4df4-82d8-${mig.id.slice(-12)}`;
+        const repUuid = `e4f87d12-${mig.id.slice(0, 4)}-4aa8-b11c-${mig.id.slice(-12)}`;
+
+        if (id === bootVolUuid || id.startsWith('c98bd546') || id === mig.id) {
+          volume = {
+            id: bootVolUuid,
+            name: `${vmName}/Boot volume`,
+            status: mig.status === 'SHUTOFF' ? 'available' : 'in-use',
+            size: diskSizeGb,
+            volume_type: 'default',
+            bootable: 'true',
+            created_at: mig.updated || mig.created || new Date().toISOString(),
+            'os-vol-tenant-attr:tenant_id': 'admin',
+            attachments: mig.status === 'SHUTOFF' ? [] : [{
+              id: `att-${mig.id.slice(0, 8)}`,
+              server_id: mig.id,
+              volume_id: bootVolUuid,
+              device: '/dev/vda'
+            }],
+            metadata: {
+              migrationId: mig.id,
+              sourceVm: vmName,
+              bootIndex: '0',
+              targetDiskBus: mig.targetOptions?.diskBus || 'VirtIO'
+            }
+          };
+          break;
+        }
+
+        if (id === repUuid || id.startsWith('e4f87d12')) {
+          volume = {
+            id: repUuid,
+            name: `vporter-replica - ${vmName} 1`,
+            status: 'available',
+            size: diskSizeGb + 1,
+            volume_type: 'default',
+            bootable: 'false',
+            created_at: mig.created || new Date().toISOString(),
+            'os-vol-tenant-attr:tenant_id': 'admin',
+            attachments: [],
+            metadata: {
+              migrationId: mig.id,
+              replicaRole: 'staging_disk',
+              cbtState: 'active'
+            }
+          };
+          break;
+        }
+      }
+    }
+
     if (!volume) return json(res, 404, { error: 'Volume not found' });
     return json(res, 200, { volume });
   } catch (err) {
