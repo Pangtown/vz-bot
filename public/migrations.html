@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>VI Manager – Migrations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/vhi.css">
+</head>
+<body>
+<!-- ═══════════════ LOGIN OVERLAY ═══════════════ -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="vz-brand">Virtuozzo<span> Infrastructure</span></span>
+      <h1>VI Manager</h1>
+      <p>Connect to your infrastructure cluster</p>
+    </div>
+
+    <div class="form-group">
+      <label>Cluster Address</label>
+      <input type="text" id="loginHost" value="172.16.218.7" placeholder="hostname or IP (e.g. 192.168.1.10)" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="loginUser" value="admin" placeholder="admin" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="loginPass" value="Nexpass8188!" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <button class="advanced-toggle" id="advToggle" type="button">
+      <span id="advArrow">▶</span> <span>Advanced Options</span>
+    </button>
+
+    <div class="advanced-fields" id="advFields">
+      <div class="advanced-grid">
+        <div class="form-group">
+          <label>User Domain</label>
+          <input type="text" id="loginUserDomain" value="Default" placeholder="Default">
+        </div>
+        <div class="form-group">
+          <label>Project Domain</label>
+          <input type="text" id="loginProjDomain" value="Default" placeholder="Default">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Project Name</label>
+        <input type="text" id="loginProject" value="admin" placeholder="admin">
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-secondary" id="discoverBtn" type="button">Discover</button>
+      <button class="btn btn-primary" id="connectBtn" type="button">Connect</button>
+    </div>
+    <div class="login-status" id="loginStatus"></div>
+  </div>
+</div>
+
+<div id="appShell">
+<header class="app-header">
+    <span class="logo">Virtuozzo<span> Infrastructure</span></span>
+    <span class="spacer"></span>
+    <a href="/marketplace" class="btn-chat-toggle" id="marketplaceLink" style="text-decoration:none; margin-right:0.5rem;" title="Deploy VMs from templates">🛒 Marketplace</a>
+    <a href="/clusters" class="btn-chat-toggle" style="text-decoration:none; margin-right:0.5rem;" title="Multi-Cluster Dashboard">🌐 Clusters</a>
+    <button class="btn-chat-toggle" id="themeToggle" title="Toggle Theme" style="margin-right:0.5rem">🌓 Theme</button>
+    <button class="btn-logout" id="logoutBtn">Disconnect</button>
+  </header>
+
+  <div class="app-body">
+    <nav class="sidebar">
+      <!-- Brand -->
+      <div class="sidebar-brand">Virtuozzo<span> Infrastructure</span></div>
+
+      <!-- Monitoring -->
+      <div class="sidebar-section">Monitoring</div>
+      <a class="nav-item" href="/?panel=overview">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Dashboard</span>
+      </a>
+      <a class="nav-item" href="/?panel=alerts">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">Alerts</span>
+      </a>
+      <a class="nav-item" href="/?panel=audit">
+        <span class="nav-icon">📜</span>
+        <span class="nav-label">Audit Log</span>
+      </a>
+      <a class="nav-item" href="/?panel=chat">
+        <span class="nav-icon">🤖</span>
+        <span class="nav-label">AI Assistant</span>
+      </a>
+      <a class="nav-item" href="/?panel=scheduler">
+        <span class="nav-icon">⏱</span>
+        <span class="nav-label">Scheduler</span>
+      </a>
+
+      <!-- Compute -->
+      <div class="sidebar-section">Compute</div>
+      <a class="nav-item" href="/?panel=vms">
+        <span class="nav-icon">🖥</span>
+        <span class="nav-label">Virtual Machines</span>
+        <span class="nav-badge" id="vmBadge">–</span>
+      </a>
+      <a class="nav-item" href="/?panel=flavors">
+        <span class="nav-icon">📐</span>
+        <span class="nav-label">Flavors</span>
+      </a>
+      <a class="nav-item" href="/?panel=sshkeys">
+        <span class="nav-icon">🔑</span>
+        <span class="nav-label">SSH Keys</span>
+      </a>
+      <a class="nav-item" href="/?panel=nodes">
+        <span class="nav-icon">📦</span>
+        <span class="nav-label">Nodes</span>
+        <span class="nav-badge" id="nodeBadge">–</span>
+      </a>
+      <a class="nav-item active" href="/migrations" id="migrationsNavLink">
+        <span class="nav-icon">🔄</span>
+        <span class="nav-label">Migrations</span>
+        <span class="nav-badge" id="migrationBadge" style="display: none;">–</span>
+      </a>
+
+      <!-- Storage Services -->
+      <div class="sidebar-section">Storage Services</div>
+      <a class="nav-item" href="/?panel=storage">
+        <span class="nav-icon">💾</span>
+        <span class="nav-label">Volumes</span>
+        <span class="nav-badge" id="volBadge">–</span>
+      </a>
+
+      <!-- Infrastructure -->
+      <div class="sidebar-section">Infrastructure</div>
+      <a class="nav-item" href="/?panel=networks">
+        <span class="nav-icon">🌐</span>
+        <span class="nav-label">Networks</span>
+        <span class="nav-badge" id="netBadge">–</span>
+      </a>
+      <a class="nav-item" href="/?panel=images">
+        <span class="nav-icon">🗂</span>
+        <span class="nav-label">Images</span>
+        <span class="nav-badge" id="imgBadge">–</span>
+      </a>
+
+      <!-- Settings -->
+      <div class="sidebar-section">Settings</div>
+      <a class="nav-item" href="/?panel=domains">
+        <span class="nav-icon">🏛</span>
+        <span class="nav-label">Projects and users</span>
+        <span class="nav-badge" id="domainBadge">–</span>
+      </a>
+      <!-- Cluster footer -->
+      <div class="sidebar-footer">
+        <div class="cluster-dot" id="clusterDot"></div>
+        <select class="cluster-switcher" id="clusterSwitcher" title="Switch cluster">
+          <option value="">Not connected</option>
+        </select>
+      </div>
+    </nav>
+
+    <main class="content">
+      <!-- ── MIGRATIONS & CLOUDS PANEL ── -->
+      <div class="panel active" id="panel-migrations">
+        <div class="panel-header">
+          <h2>Migrations</h2>
+          <span class="panel-badge" id="migrationsCount">0 Active</span>
+        </div>
+        
+        <!-- Sub tabs navigation -->
+        <div class="sub-tabs">
+          <div class="sub-tab active" data-tab="migrations-list">Migrations</div>
+          <div class="sub-tab" data-tab="clouds-list">Clouds</div>
+        </div>
+
+        <!-- MIGRATIONS TAB VIEW -->
+        <div class="tab-content-panel active" id="tab-migrations-list">
+          <div class="table-card">
+            <div class="table-toolbar" style="display: flex; justify-content: space-between; align-items: center;">
+              <input type="search" class="search-input" id="migrationSearch" placeholder="Search migrations…">
+              <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <button class="act-btn" id="btnCleanupClones" style="padding:.4rem .9rem; width: auto; height: auto; display: flex; align-items: center; gap: 0.3rem;">
+                  Clean clones
+                </button>
+                <button class="act-btn act-start" id="btnOpenMigrateWizard" style="padding:.4rem .9rem; width: auto; height: auto; display: flex; align-items: center; gap: 0.3rem;">
+                  <span class="ri">+</span> Migrate
+                </button>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Migration Name</th>
+                  <th>Source Cloud</th>
+                  <th>VMs</th>
+                  <th>Status</th>
+                  <th>Started</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="migrationsBody">
+                <!-- Migrations list will be populated here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- MIGRATION DETAIL VIEW (Replication & Deployment Lifecycle) -->
+        <div class="tab-content-panel" id="tab-migration-detail" style="display: none;">
+          <!-- Breadcrumb Header -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+            <div id="migDetailBreadcrumb" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem;">
+              <a href="javascript:void(0)" onclick="closeMigrationDetail()" style="color: var(--text-dim); text-decoration: none; font-weight: 500;">Migrations</a>
+              <span style="color: var(--text-dim);">&rsaquo;</span>
+              <strong id="migDetailTitle" style="color: var(--text); font-size: 1.05rem;">Linux</strong>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <div id="migDetailActionWrap"></div>
+              <button class="txt-btn" onclick="closeMigrationDetail()">&larr; Back to Migrations</button>
+            </div>
+          </div>
+
+          <!-- Migration Details Sub Tabs -->
+          <div class="sub-tabs" style="margin-bottom: 1.2rem; background: var(--bg-card); border-bottom: 1px solid var(--border);">
+            <div class="sub-tab active" data-migtab="overview" onclick="switchMigDetailSubTab('overview')">OVERVIEW</div>
+            <div class="sub-tab" data-migtab="replications" onclick="switchMigDetailSubTab('replications')">REPLICATIONS</div>
+            <div class="sub-tab" data-migtab="deployments" onclick="switchMigDetailSubTab('deployments')">DEPLOYMENTS</div>
+          </div>
+
+          <!-- 1. OVERVIEW SUB-VIEW (Screenshot 1) -->
+          <div id="migDetailSubOverview" class="mig-sub-content active">
+            <!-- Top Details Card -->
+            <div class="table-card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+                <h3 style="font-size: 1.05rem; font-weight: 600; margin: 0;">Details</h3>
+                <button class="txt-btn" style="font-size: 0.85rem; color: var(--text); display: inline-flex; align-items: center; gap: 0.3rem;"><span class="ri">&#9998;</span> Edit</button>
+              </div>
+              <div style="display: grid; grid-template-columns: 220px 1fr; row-gap: 0.85rem; font-size: 0.88rem; align-items: center;">
+                <div class="text-dim">Source cloud</div>
+                <div><a href="javascript:void(0)" id="migDetailSrcCloud" style="color: #0d6efd; text-decoration: none; font-weight: 500;">VMware (VMware)</a></div>
+
+                <div class="text-dim">Target domain / project</div>
+                <div id="migDetailTargetProj" style="font-weight: 500;">Default / admin</div>
+
+                <div class="text-dim">Status</div>
+                <div id="migDetailStatusWrap">
+                  <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
+                    <span class="task-check-icon">&#10003;</span> Deployed
+                  </span>
+                </div>
+
+                <div class="text-dim">Migration ID</div>
+                <div class="mono text-dim" id="migDetailId" style="font-size: 0.85rem;">26e13f4e-86f2-499a-809d-f2f3435ee011</div>
+
+                <div class="text-dim">Created</div>
+                <div class="text-dim" id="migDetailCreated">July 16, 2026 12:26 PM</div>
+
+                <div class="text-dim">Updated</div>
+                <div class="text-dim" id="migDetailUpdated">August 3, 2026 10:17 AM</div>
+              </div>
+            </div>
+
+            <!-- Bottom 2-Column Grid (Source Options & Target Options) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+              <!-- Source Options Card -->
+              <div class="table-card" style="padding: 1.5rem;">
+                <h3 style="font-size: 1.05rem; font-weight: 600; margin: 0 0 1rem 0; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">Source options</h3>
+                <table style="font-size: 0.85rem; margin-bottom: 1.25rem; border: 1px solid var(--border); border-collapse: collapse; width: 100%;">
+                  <thead>
+                    <tr style="background: var(--bg-medium); border-bottom: 1px solid var(--border);">
+                      <th style="padding: 0.5rem 0.8rem; text-align: left;">OS</th>
+                      <th style="padding: 0.5rem 0.8rem; text-align: left;">vCPU</th>
+                      <th style="padding: 0.5rem 0.8rem; text-align: left;">RAM</th>
+                      <th style="padding: 0.5rem 0.8rem; text-align: left;">Disks (1)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td id="migSrcOs" style="padding: 0.6rem 0.8rem; font-weight: 500;">linux</td>
+                      <td id="migSrcVcpu" style="padding: 0.6rem 0.8rem;">1</td>
+                      <td id="migSrcRam" style="padding: 0.6rem 0.8rem;">2 GiB</td>
+                      <td id="migSrcDisks" style="padding: 0.6rem 0.8rem;">8 GiB</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div style="display: grid; grid-template-columns: 240px 1fr; row-gap: 0.75rem; font-size: 0.88rem;">
+                  <div class="text-dim">Auto-enable CBT on source VMs</div>
+                  <div>Yes</div>
+                </div>
+              </div>
+
+              <!-- Target Options Card -->
+              <div class="table-card" style="padding: 1.5rem;">
+                <h3 style="font-size: 1.05rem; font-weight: 600; margin: 0 0 1rem 0; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">Target options</h3>
+                <div style="display: grid; grid-template-columns: 220px 1fr; row-gap: 0.75rem; font-size: 0.88rem;">
+                  <div class="text-dim">Flavor</div>
+                  <div id="migTgtFlavor">Inherited from source</div>
+
+                  <div class="text-dim">Disk bus</div>
+                  <div>VirtIO</div>
+
+                  <div class="text-dim">OS distribution</div>
+                  <div id="migTgtOsDistro">Alma Linux 9</div>
+
+                  <div class="text-dim">Replication porter</div>
+                  <div><span id="migTgtLinuxPorter" class="badge badge-default mono" style="font-size:0.75rem;">vporter-minion-linux</span></div>
+
+                  <div class="text-dim">Morphing porter</div>
+                  <div><span id="migTgtMorphPorter" class="badge badge-default mono" style="font-size:0.75rem;">vporter-minion-linux</span></div>
+
+                  <div class="text-dim">Assigned network / IP</div>
+                  <div><span id="migTgtIp" class="mono" style="font-weight:600; color:var(--text);">pending</span> (<span id="migTgtNet">VM Network</span>)</div>
+
+                  <div class="text-dim">Temporary worker IPs</div>
+                  <div class="mono" style="font-size:0.8rem;" id="migTgtWorkerIps">—</div>
+
+                  <div class="text-dim">Machine type</div>
+                  <div>pc-q35</div>
+
+                  <div class="text-dim">Enable DHCP client</div>
+                  <div id="migTgtDhcp">Yes</div>
+
+                  <div class="text-dim">Retain user credentials</div>
+                  <div id="migTgtRetainCreds">Yes</div>
+
+                  <div class="text-dim">Delete disks on VM deletion</div>
+                  <div id="migTgtDeleteDisks">Yes</div>
+                </div>
+              </div>
+            </div>
+
+            <div id="migDetailErrorBanner" style="display:none; margin-top:1.25rem; padding:0.9rem 1rem; border:1px solid rgba(220,53,69,0.45); background:rgba(220,53,69,0.12); border-radius:6px;">
+              <div style="font-weight:600; color:#ff6b7a; margin-bottom:0.35rem;">Migration error</div>
+              <div id="migDetailErrorText" class="mono" style="font-size:0.82rem; white-space:pre-wrap; color:var(--text);"></div>
+            </div>
+            <div class="table-card" style="margin-top:1.25rem; padding:1.25rem;">
+              <h3 style="font-size:1.05rem; font-weight:600; margin:0 0 0.75rem 0; border-bottom:1px solid var(--border); padding-bottom:0.6rem;">Engine log</h3>
+              <pre id="migDetailLog" class="mono" style="margin:0; max-height:240px; overflow:auto; font-size:0.75rem; white-space:pre-wrap; color:var(--text-dim);"></pre>
+            </div>
+          </div>
+
+          <!-- 2. REPLICATIONS SUB-VIEW with Drawer (Screenshot 2) -->
+          <div id="migDetailSubReplications" class="mig-sub-content" style="display: none; position: relative;">
+            <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
+              <!-- Left: Replications Table -->
+              <div class="table-card" style="flex: 1; padding: 1.25rem;">
+                <div class="table-toolbar" style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+                  <button class="txt-btn" style="border: 1px solid var(--border); padding: 0.4rem 0.65rem; border-radius: 4px; display: inline-flex; align-items: center; font-size: 0.95rem; cursor: pointer;" title="Filters">
+                    <span class="ri">&#8801;</span>
+                  </button>
+                  <div style="position: relative; flex: 1; max-width: 280px;">
+                    <input type="search" class="search-input" id="repSearchInput" placeholder="Search" style="width: 100%; font-size: 0.85rem; padding: 0.4rem 0.8rem 0.4rem 2rem;">
+                    <span style="position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 0.85rem;">&#128269;</span>
+                  </div>
+                </div>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <thead>
+                    <tr style="border-bottom: 1px solid var(--border); font-size: 0.82rem; color: var(--text-dim);">
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Rep... &darr;</th>
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Status &darr;</th>
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Last modified &darr;</th>
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Replic... &darr;</th>
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Replic... &darr;</th>
+                      <th style="padding: 0.6rem 0.8rem; text-align: left;">Dur... &darr;</th>
+                    </tr>
+                  </thead>
+                  <tbody id="migReplicationsTableBody">
+                    <!-- Replications rows -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Right: Slide-out Replication Details Drawer -->
+              <div id="migReplicationDrawer" class="table-card" style="width: 460px; padding: 1.25rem; border-left: 2px solid #0d6efd; box-shadow: 0 4px 16px rgba(0,0,0,0.12);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.6rem;">
+                  <h3 style="font-size: 1.05rem; font-weight: 600; margin: 0;">Replication details</h3>
+                  <button class="modal-close" onclick="closeReplicationDrawer()" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--text-dim);">&times;</button>
+                </div>
+                <div style="margin-bottom: 0.8rem;">
+                  <span id="migDrawerCancelWrap"></span>
+                  <button class="txt-btn act-danger" onclick="deleteMigrationFromDrawer()" style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; color: var(--danger);"><span class="ri">&#128465;</span> Delete</button>
+                </div>
+                <!-- Drawer toggle buttons (Segmented Pill) -->
+                <div style="display: flex; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 1rem;">
+                  <button id="btnDrawerTasks" onclick="switchDrawerTab('tasks')" style="flex: 1; padding: 0.45rem; background: var(--bg-medium); border: none; font-weight: 600; font-size: 0.82rem; cursor: pointer; color: var(--text);">Tasks (9)</button>
+                  <button id="btnDrawerOverview" onclick="switchDrawerTab('overview')" style="flex: 1; padding: 0.45rem; background: transparent; border: none; font-size: 0.82rem; cursor: pointer; color: var(--text-dim);">Overview</button>
+                </div>
+                <div id="drawerTasksContainer">
+                  <div style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem; align-items: center;">
+                    <div style="position: relative; flex: 1;">
+                      <input type="search" class="search-input" id="repDrawerSearch" placeholder="Search" style="width: 100%; font-size: 0.82rem; padding: 0.4rem 0.8rem 0.4rem 2rem;">
+                      <span style="position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 0.8rem;">&#128269;</span>
+                    </div>
+                    <button class="txt-btn" id="btnRepExpandAll" onclick="toggleAllTasksDetails('rep')" style="font-size: 0.76rem; border: 1px solid var(--border); padding: 0.35rem 0.6rem; border-radius: 4px; white-space: nowrap; cursor: pointer; color: var(--text);">
+                      <span class="ri">&#9660;</span> Expand All Steps
+                    </button>
+                  </div>
+                  <table style="font-size: 0.82rem; width: 100%; border-collapse: collapse;">
+                    <thead>
+                      <tr style="border-bottom: 1px solid var(--border); color: var(--text-dim);">
+                        <th style="padding: 0.5rem 0.6rem; text-align: left;">Task</th>
+                        <th style="padding: 0.5rem 0.6rem; text-align: left;" colspan="2">Last modified</th>
+                      </tr>
+                    </thead>
+                    <tbody id="migReplicationTasksBody">
+                      <!-- 9 Replication Tasks populated dynamically -->
+                    </tbody>
+                  </table>
+                </div>
+                <div id="drawerOverviewContainer" style="display: none; font-size: 0.85rem; padding: 0.5rem 0;">
+                  <div style="display: grid; grid-template-columns: 140px 1fr; row-gap: 0.65rem;">
+                    <div class="text-dim">Transfer Mode</div><div>Direct NFC Stream (No VDDK)</div>
+                    <div class="text-dim">Replicated</div><div id="repDrawerBytes">—</div>
+                    <div class="text-dim">Throughput</div><div id="repDrawerSpeed">—</div>
+                    <div class="text-dim">Duration</div><div id="repDrawerDur">—</div>
+                    <div class="text-dim">CBT Status</div><div>Active (QueryChangedDiskAreas)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. DEPLOYMENTS SUB-VIEW (Screenshot 3) -->
+          <div id="migDetailSubDeployments" class="mig-sub-content" style="display: none;">
+            <div class="table-card" style="padding: 1.25rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+                <div class="sub-tabs" style="margin: 0; background: transparent; padding: 0; border-bottom: none;">
+                  <div class="sub-tab" style="padding: 0.4rem 0.8rem; border-bottom: 3px solid transparent; cursor: pointer;">OVERVIEW</div>
+                  <div class="sub-tab active" style="padding: 0.4rem 0.8rem; border-bottom: 3px solid var(--accent); cursor: pointer;">TASKS</div>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <button class="txt-btn" id="btnDepExpandAll" onclick="toggleAllTasksDetails('dep')" style="font-size: 0.8rem; border: 1px solid var(--border); padding: 0.38rem 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text);">
+                    <span class="ri">&#9660;</span> Expand All Steps
+                  </button>
+                  <div style="position: relative;">
+                    <input type="search" class="search-input" id="depSearchInput" placeholder="Search" style="max-width: 240px; font-size: 0.82rem; padding: 0.4rem 0.8rem 0.4rem 2rem;">
+                    <span style="position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 0.8rem;">&#128269;</span>
+                  </div>
+                </div>
+              </div>
+              <table style="font-size: 0.85rem; width: 100%; border-collapse: collapse;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 0.82rem;">
+                    <th style="padding: 0.65rem 0.8rem; text-align: left;">Task</th>
+                    <th style="padding: 0.65rem 0.8rem; text-align: left;" colspan="2">Last modified</th>
+                  </tr>
+                </thead>
+                <tbody id="migDeploymentTasksBody">
+                  <!-- 9 Deployment Tasks populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- CLOUDS TAB VIEW -->
+        <div class="tab-content-panel" id="tab-clouds-list">
+          <div class="table-card">
+            <div class="table-toolbar" style="display: flex; justify-content: space-between; align-items: center;">
+              <input type="search" class="search-input" id="cloudSearch" placeholder="Search clouds…">
+              <button class="act-btn act-primary" id="btnOpenAddCloudModal" style="padding:.4rem .9rem; width: auto; height: auto; display: flex; align-items: center; gap: 0.3rem;">
+                <span class="ri">+</span> Add cloud
+              </button>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Cloud Name</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th>Added</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="cloudsBody">
+                <!-- Clouds list will be populated here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+
+    </main>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ═══════════════ ADD CLOUD MODAL ═══════════════ -->
+<div id="addCloudModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>Add Cloud</h3>
+      <button class="modal-close" onclick="closeAddCloudModal()">✕</button>
+    </div>
+    
+    <div id="addCloudStep1" class="modal-body">
+      <p style="font-size: 0.88rem; color: var(--text-dim); margin-bottom: 0.75rem;">Select a source cloud to connect:</p>
+      
+      <div class="provider-option selected" onclick="selectProvider('vmware')">
+        <input type="radio" id="providerVMware" name="cloudProvider" value="vmware" checked style="pointer-events: none;">
+        <span class="provider-logo">🔌</span>
+        <div class="provider-details">
+          <div class="provider-name">VMware</div>
+          <div class="provider-desc">vSphere / ESXi virtual machines.</div>
+        </div>
+      </div>
+      
+      <div class="provider-option" onclick="selectProvider('vhi')">
+        <input type="radio" id="providerVzInfra" name="cloudProvider" value="vhi" style="pointer-events: none;">
+        <span class="provider-logo">🏢</span>
+        <div class="provider-details">
+          <div class="provider-name">Virtuozzo Infrastructure</div>
+          <div class="provider-desc">Connect another VHI cluster (Keystone API).</div>
+        </div>
+      </div>
+
+      <div class="provider-option" onclick="selectProvider('hyperv')">
+        <input type="radio" id="providerHyperV" name="cloudProvider" value="hyperv" style="pointer-events: none;">
+        <span class="provider-logo">🪟</span>
+        <div class="provider-details">
+          <div class="provider-name">Hyper-V</div>
+          <div class="provider-desc">Windows Server Hyper-V over WinRM.</div>
+        </div>
+      </div>
+      
+      <div class="provider-option disabled">
+        <input type="radio" id="providerAzure" name="cloudProvider" value="azure" disabled>
+        <span class="provider-logo">☁️</span>
+        <div class="provider-details">
+          <div class="provider-name">Azure <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
+        </div>
+      </div>
+      
+      <div class="provider-option disabled">
+        <input type="radio" id="providerOpenStack" name="cloudProvider" value="openstack" disabled>
+        <span class="provider-logo">🥞</span>
+        <div class="provider-details">
+          <div class="provider-name">OpenStack <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
+        </div>
+      </div>
+      
+      <div class="provider-option disabled">
+        <input type="radio" id="providerVzServer" name="cloudProvider" value="vzserver" disabled>
+        <span class="provider-logo">🐧</span>
+        <div class="provider-details">
+          <div class="provider-name">Virtuozzo Server <span style="font-size:0.7rem; color:var(--accent); font-weight:normal;">(Coming soon)</span></div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="addCloudStep2" class="modal-body hidden">
+      <div style="text-align: center; margin-bottom: 1rem;">
+        <span id="cloudProviderBrand" style="font-size: 1.6rem; font-weight: bold; font-family: sans-serif; letter-spacing: -0.5px; color: #0056b3;">vmware</span>
+      </div>
+      
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="cloudName" placeholder="e.g. Vegas VMware Cluster">
+      </div>
+      <div class="form-group">
+        <label>Description (optional)</label>
+        <input type="text" id="cloudDesc" placeholder="Legacy production workloads">
+      </div>
+      <div class="form-group">
+        <label id="cloudHostLabel">Hostname</label>
+        <input type="text" id="cloudHost" placeholder="e.g. vcsa.vegas.local">
+      </div>
+      <div class="form-group" style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+        <div>
+          <label id="cloudPortLabel">Port</label>
+          <input type="number" id="cloudPort" value="443">
+        </div>
+        <div id="cloudProjectGroup" class="hidden">
+          <label>Project</label>
+          <input type="text" id="cloudProject" value="admin">
+        </div>
+      </div>
+      <div class="form-group hidden" id="cloudDomainGroup">
+        <label>Domain</label>
+        <input type="text" id="cloudDomain" value="Default">
+      </div>
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="cloudUser" placeholder="administrator@vsphere.local">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="cloudPass" placeholder="••••••••">
+      </div>
+      <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.7rem;">
+        <div>
+          <label style="margin: 0; font-weight: 600;">Disable SSL checks</label>
+          <p style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px;">Allow self-signed or untrusted SSL certificates.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="cloudInsecure" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div id="cloudHyperVHelp" class="hidden" style="margin-top: 0.8rem; padding: 0.65rem 0.8rem; border-radius: var(--radius); font-size: 0.78rem; line-height: 1.45; background: rgba(0,188,242,0.08); border: 1px solid rgba(0,188,242,0.28); color: var(--text-dim);">
+        <strong style="color:#00bcf2;">Hyper-V WinRM</strong><br>
+        This host currently speaks HTTP WinRM on <code>5985</code>. HTTPS <code>5986</code> is not listening unless you enable it.<br>
+        On the Hyper-V host (elevated): <code>Enable-PSRemoting -Force</code><br>
+        On this vz-bot PC (elevated): <code>Set-Item WSMan:\localhost\Client\TrustedHosts -Value &lt;host&gt; -Concatenate -Force</code><br>
+        Workgroup login: <code>.\mike</code> or <code>HOSTNAME\mike</code> (local admin). SSL toggle only matters for 5986.
+      </div>
+      <div id="cloudTestResult" style="display:none; margin-top: 0.8rem; padding: 0.6rem 0.8rem; border-radius: var(--radius); font-size: 0.84rem;"></div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btnAddCloudBack" style="display:none;" onclick="addCloudGoBack()">Back</button>
+      <button class="btn btn-secondary" id="btnAddCloudCancel" onclick="closeAddCloudModal()">Cancel</button>
+      <button class="btn btn-secondary" id="btnAddCloudTest" style="display:none;" onclick="testAddCloudConnection()">🔌 Test Connection</button>
+      <button class="btn btn-primary" id="btnAddCloudNext" onclick="addCloudGoNext()">Next</button>
+      <button class="btn btn-primary" id="btnAddCloudSubmit" style="display:none;" onclick="submitAddCloud()">Add Cloud</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MIGRATE WORKLOAD WIZARD ═══════════════ -->
+<div id="migrateVmModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 820px; max-width: 95vw;">
+    <div class="modal-header">
+      <h3>Migrate</h3>
+      <button class="modal-close" onclick="closeMigrateModal()">✕</button>
+    </div>
+    <div class="wizard-container">
+      
+      <!-- Left sidebar steps -->
+      <div class="wizard-sidebar">
+        <div class="wizard-step-item active" data-step="1">
+          <span class="wizard-step-num">1</span>
+          <span>Source cloud</span>
+        </div>
+        <div class="wizard-step-item" data-step="2">
+          <span class="wizard-step-num">2</span>
+          <span>Source VMs</span>
+        </div>
+        <div class="wizard-step-item" data-step="3">
+          <span class="wizard-step-num">3</span>
+          <span>Source options</span>
+        </div>
+        <div class="wizard-step-item" data-step="4">
+          <span class="wizard-step-num">4</span>
+          <span>Network mapping</span>
+        </div>
+        <div class="wizard-step-item" data-step="5">
+          <span class="wizard-step-num">5</span>
+          <span>Target options</span>
+        </div>
+        <div class="wizard-step-item" data-step="6">
+          <span class="wizard-step-num">6</span>
+          <span>Storage mapping</span>
+        </div>
+        <div class="wizard-step-item" data-step="7">
+          <span class="wizard-step-num">7</span>
+          <span>User scripts</span>
+        </div>
+        <div class="wizard-step-item" data-step="8">
+          <span class="wizard-step-num">8</span>
+          <span>Migration options</span>
+        </div>
+        <div class="wizard-step-item" data-step="9">
+          <span class="wizard-step-num">9</span>
+          <span>Summary</span>
+        </div>
+      </div>
+      
+      <!-- Right wizard content area -->
+      <div class="wizard-content-area">
+        
+        <!-- Step 1: Choose Source Cloud -->
+        <div class="wizard-step-content active" id="wizStep1">
+          <div class="wizard-step-title">Choose the source cloud</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.8rem;">Select the configured cloud environment to migrate from.</p>
+          <div class="table-card" style="margin-bottom: 1rem; border-color: var(--border); max-height: 280px; overflow-y: auto;">
+            <div class="table-toolbar">
+              <input type="search" class="search-input" id="wizCloudSearch" placeholder="Search clouds…" oninput="filterWizClouds()">
+            </div>
+            <table style="font-size: 0.85rem;">
+              <thead>
+                <tr>
+                  <th style="width: 50px;">Select</th>
+                  <th>Name</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
+              <tbody id="wizCloudBody">
+                <!-- Added clouds list goes here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- Step 2: Choose Source VMs -->
+        <div class="wizard-step-content" id="wizStep2">
+          <div class="wizard-step-title">Choose VMs to migrate</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.8rem;">Select one or more virtual machines from the source cloud.</p>
+          <div class="table-card" style="margin-bottom: 1rem; border-color: var(--border); max-height: 280px; overflow-y: auto;">
+            <div class="table-toolbar">
+              <input type="search" class="search-input" id="wizVmSearch" placeholder="Search VMs…" oninput="filterWizVms()">
+            </div>
+            <table style="font-size: 0.85rem;">
+              <thead>
+                <tr>
+                  <th style="width: 50px;">Select</th>
+                  <th>VM Name</th>
+                  <th>Cores / RAM</th>
+                  <th>Disk Count</th>
+                </tr>
+              </thead>
+              <tbody id="wizVmBody">
+                <!-- Mock VMs list goes here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- Step 3: Source options -->
+        <div class="wizard-step-content" id="wizStep3">
+          <div class="wizard-step-title">Source options</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Configure connection details for fetching data from the source environment.</p>
+          <div class="form-group">
+            <label>Data Transfer Method</label>
+            <select id="wizTransportType">
+              <option value="ssh">SSH (Default - secure transfer via port 22)</option>
+              <option value="nfc">NFC (vSphere Network File Copy - port 902)</option>
+            </select>
+            <p class="text-dim" id="wizTransportHint" style="font-size: 0.72rem; margin-top: 4px;">Transfer options update from the source cloud type.</p>
+          </div>
+          <div class="form-group">
+            <label>Concurrent Transfers Limit</label>
+            <input type="number" id="wizMaxConcurrency" value="2" min="1" max="5">
+            <p class="text-dim" style="font-size: 0.72rem; margin-top: 4px;">Limit simultaneous VM disk copies to conserve network bandwidth.</p>
+          </div>
+        </div>
+        
+        <!-- Step 4: Network mapping -->
+        <div class="wizard-step-content" id="wizStep4">
+          <div class="wizard-step-title">Network mapping</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.6rem;">Map networks from the source cloud to virtual networks on the VHI cluster you are connected to.</p>
+          <p class="text-dim" id="wizTgtNetworkHint" style="font-size: 0.75rem; margin-bottom: 1.2rem;"></p>
+          <div class="form-group">
+            <label id="wizSrcNetworkLabel">Source network</label>
+            <select id="wizSrcNetwork">
+              <option value="">Select a source VM first</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Target network (this VHI cluster)</label>
+            <select id="wizTgtNetwork">
+              <option value="">Loading cluster networks…</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- Step 5: Target options -->
+        <div class="wizard-step-content" id="wizStep5">
+          <div class="wizard-step-title">Target options</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.6rem;">Configure target storage policies and default flavor sizing from this VHI cluster.</p>
+          <p class="text-dim" id="wizTgtOptionsHint" style="font-size: 0.75rem; margin-bottom: 1.2rem;"></p>
+          <div class="form-group">
+            <label>Default Storage Policy</label>
+            <select id="wizTgtPolicy">
+              <option value="">Loading volume types…</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Target Flavor Mapping</label>
+            <select id="wizTgtFlavor">
+              <option value="">Loading flavors…</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-top: 1.2rem; background: var(--bg-medium); padding: 1rem; border-radius: 6px; border: 1px solid var(--border);">
+            <label style="color: var(--text); font-weight: 600; margin-bottom: 0.6rem;">Guest cutover options</label>
+            <div style="display:flex; flex-direction:column; gap:0.65rem;">
+              <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; font-size:0.88rem; cursor:pointer; margin:0; text-transform:none; letter-spacing:0;">
+                <input type="checkbox" id="wizEnableDhcp" checked style="width:auto; cursor:pointer;">
+                Enable DHCP client
+              </label>
+              <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; font-size:0.88rem; cursor:pointer; margin:0; text-transform:none; letter-spacing:0;">
+                <input type="checkbox" id="wizRetainCreds" checked style="width:auto; cursor:pointer;">
+                Retain user credentials
+              </label>
+              <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; font-size:0.88rem; cursor:pointer; margin:0; text-transform:none; letter-spacing:0;">
+                <input type="checkbox" id="wizDeleteDisks" checked style="width:auto; cursor:pointer;">
+                Delete disks on VM deletion
+              </label>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Step 6: Storage mapping -->
+        <div class="wizard-step-content" id="wizStep6">
+          <div class="wizard-step-title">Storage mapping</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Map each source disk to a volume type on the VHI cluster you are connected to.</p>
+          <div style="border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; background: var(--bg-sidebar);">
+            <div style="display:flex; justify-content:space-between; font-weight:600; font-size:0.85rem; margin-bottom:0.6rem;">
+              <span>Source Disk</span>
+              <span>Target Volume Type</span>
+            </div>
+            <div id="wizDiskMapRows">
+              <div class="text-dim" style="font-size:0.85rem;">Select source VMs to list disks.</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Step 7: User scripts -->
+        <div class="wizard-step-content" id="wizStep7">
+          <div class="wizard-step-title">User scripts</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.8rem;">Optionally select a post-migration script for the guest OS. Linux and Windows use different scripts. Leave None selected to run no script.</p>
+          <div class="form-group" id="wizLinuxScriptGroup">
+            <label>Linux post-migration script</label>
+            <select id="wizLinuxPostScript" onchange="updateWizScriptPreview()"></select>
+          </div>
+          <div class="form-group" id="wizWindowsScriptGroup">
+            <label>Windows post-migration script</label>
+            <select id="wizWindowsPostScript" onchange="updateWizScriptPreview()"></select>
+          </div>
+          <p id="wizNoScriptHint" style="font-size: 0.82rem; color: var(--text-dim); margin: 0 0 0.8rem;">No script selected. The guest will not run a post-migration script.</p>
+          <div class="form-group">
+            <label>Script preview</label>
+            <textarea id="wizPostScriptPreview" readonly rows="8" placeholder="Select a script to preview it here" style="font-family: Consolas, monospace; font-size: 0.8rem; min-height: 140px; resize: vertical;"></textarea>
+          </div>
+        </div>
+        
+        <!-- Step 8: Migration options -->
+        <div class="wizard-step-content" id="wizStep8">
+          <div class="wizard-step-title">Migration options</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Configure scheduling, execution strategy, and automated cutover parameters.</p>
+          
+          <div class="form-group">
+            <label>Migration Type</label>
+            <div style="display: flex; gap: 1.5rem; margin-top: 0.3rem;">
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem; cursor: pointer;">
+                <input type="radio" name="wizMigrationType" value="cold"> Cold Migration (Offline)
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem; cursor: pointer;">
+                <input type="radio" name="wizMigrationType" value="live" checked> Live Migration (Online)
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 1.2rem; background: var(--bg-medium); padding: 1rem; border-radius: 6px; border: 1px solid var(--border);">
+            <label style="color: var(--text); font-weight: 600; margin-bottom: 0.5rem;">Execution Strategy (2-Stage Separation)</label>
+            <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+              <label style="display: flex; align-items: flex-start; gap: 0.6rem; font-weight: normal; font-size: 0.88rem; cursor: pointer;">
+                <input type="radio" name="wizStrategy" value="auto" checked style="margin-top: 3px;">
+                <div>
+                  <strong style="color: var(--text);">Full Automatic Migration (Replicate &rarr; Deploy)</strong>
+                  <div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 2px;">
+                    Executes Stage 1 (Replication) and immediately transitions to Stage 2 (Deployment & OS Morphing) to boot the VM automatically.
+                  </div>
+                </div>
+              </label>
+
+              <label style="display: flex; align-items: flex-start; gap: 0.6rem; font-weight: normal; font-size: 0.88rem; cursor: pointer;">
+                <input type="radio" name="wizStrategy" value="replicate_only" style="margin-top: 3px;">
+                <div>
+                  <strong style="color: var(--text);">Stage 1: Replicate Only (Staging & Continuous CBT Sync)</strong>
+                  <div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 2px;">
+                    Replicates disks to staging volume (<span class="mono">vporter-replica</span>) and pauses in <strong style="color: #0d6efd;">REPLICATED</strong> state. You can sync CBT deltas and deploy when ready.
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem;">
+              <input type="checkbox" id="wizAutoDeployToggle" checked style="width: auto; cursor: pointer;">
+              <label for="wizAutoDeployToggle" style="margin: 0; font-size: 0.82rem; text-transform: none; letter-spacing: 0; font-weight: normal; cursor: pointer;">
+                Automatically deploy instance immediately after initial replication completes
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 1.2rem;">
+            <label>Schedule</label>
+            <div style="display: flex; gap: 1.5rem; margin-top: 0.3rem;">
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem;">
+                <input type="radio" name="wizSchedule" value="now" checked> Start Immediately
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight:normal; font-size:0.88rem;">
+                <input type="radio" name="wizSchedule" value="later" disabled> Run on Schedule (Coming soon)
+              </label>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Step 9: Summary -->
+        <div class="wizard-step-content" id="wizStep9">
+          <div class="wizard-step-title">Summary</div>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1.2rem;">Review your configuration settings before starting the migration.</p>
+          <div style="display: grid; grid-template-columns: 140px 1fr; gap: 0.6rem 0.5rem; font-size: 0.85rem; background: var(--bg-sidebar); padding: 1.2rem; border-radius: var(--radius); border: 1px solid var(--border);">
+            <div class="detail-label">Source Cloud:</div>
+            <div class="detail-val" id="sumSrcCloud">-</div>
+            
+            <div class="detail-label">Selected VMs:</div>
+            <div class="detail-val" id="sumVms">-</div>
+            
+            <div class="detail-label">Transport:</div>
+            <div class="detail-val" id="sumTransport">-</div>
+            
+            <div class="detail-label">Network Map:</div>
+            <div class="detail-val" id="sumNetMap">-</div>
+            
+            <div class="detail-label">Storage Policy:</div>
+            <div class="detail-val" id="sumStorage">-</div>
+            
+            <div class="detail-label">Target Flavor:</div>
+            <div class="detail-val" id="sumFlavor">-</div>
+            
+            <div class="detail-label">Migration Type:</div>
+            <div class="detail-val" id="sumMigType">-</div>
+
+            <div class="detail-label">Execution Strategy:</div>
+            <div class="detail-val" id="sumStrategy" style="font-weight: 600; color: #0d6efd;">Full Automatic</div>
+
+            <div class="detail-label">Enable DHCP client:</div>
+            <div class="detail-val" id="sumDhcp">Yes</div>
+
+            <div class="detail-label">Retain credentials:</div>
+            <div class="detail-val" id="sumRetainCreds">Yes</div>
+
+            <div class="detail-label">Delete disks on VM deletion:</div>
+            <div class="detail-val" id="sumDeleteDisks">Yes</div>
+
+            <div class="detail-label">Post-migration script:</div>
+            <div class="detail-val" id="sumPostScript">None</div>
+          </div>
+        </div>
+        
+        <!-- Footer actions -->
+        <div style="display: flex; justify-content: flex-end; gap: 0.8rem; border-top: 1px solid var(--border); padding-top: 1.2rem; margin-top: 1rem;">
+          <button class="btn btn-secondary" id="btnWizBack" onclick="wizGoBack()" disabled>Back</button>
+          <button class="btn btn-secondary" onclick="closeMigrateModal()">Cancel</button>
+          <button class="btn btn-primary" id="btnWizNext" onclick="wizGoNext()">Next</button>
+          <button class="btn btn-primary" id="btnWizStart" style="display: none;" onclick="startMigration()">Start Migration</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TASK DETAILS MODAL ═══════════════ -->
+<div id="taskDetailModal" class="modal-overlay hidden" style="z-index: 10005;">
+  <div class="modal-card" style="width: 760px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; padding: 1.5rem;">
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.9rem; margin-bottom: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span id="taskDetailIcon" class="task-check-icon">&#10003;</span>
+        <h3 id="taskDetailTitle" style="font-size: 1.15rem; font-weight: 600; margin: 0;">Task Details</h3>
+        <span id="taskDetailStatusBadge" class="badge badge-success" style="font-size: 0.72rem;">Completed</span>
+      </div>
+      <button class="modal-close" onclick="closeTaskDetailModal()" style="font-size: 1.3rem; background:none; border:none; color:var(--text-dim); cursor:pointer;">&times;</button>
+    </div>
+    <div class="modal-body" style="overflow-y: auto; padding: 0.5rem 0;">
+      <!-- Task Summary Key/Values -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; background: var(--bg-medium); padding: 0.9rem 1.1rem; border-radius: 6px; margin-bottom: 1.25rem; font-size: 0.82rem;">
+        <div>
+          <div class="text-dim">Phase</div>
+          <strong id="taskDetailPhase" style="color: var(--text);">Deployment</strong>
+        </div>
+        <div>
+          <div class="text-dim">Target Resource</div>
+          <strong id="taskDetailTargetRes" class="mono" style="color: #0d6efd;">Linux/Boot volume</strong>
+        </div>
+        <div>
+          <div class="text-dim">Duration</div>
+          <strong id="taskDetailDuration">18s</strong>
+        </div>
+        <div>
+          <div class="text-dim">Executed At</div>
+          <strong id="taskDetailTimestamp">August 3, 2026 10:08 AM</strong>
+        </div>
+      </div>
+
+      <!-- Task Explanation / Objectives -->
+      <div style="margin-bottom: 1.25rem;">
+        <h4 style="font-size: 0.82rem; text-transform: uppercase; color: var(--text-dim); margin: 0 0 0.5rem 0; letter-spacing: 0.5px;">Task Objective</h4>
+        <p id="taskDetailDescription" style="font-size: 0.88rem; line-height: 1.5; color: var(--text); background: var(--bg-card); padding: 0.85rem 1.1rem; border: 1px solid var(--border); border-radius: 6px; margin: 0;"></p>
+      </div>
+
+      <!-- Sub-steps completed -->
+      <div style="margin-bottom: 1.25rem;">
+        <h4 style="font-size: 0.82rem; text-transform: uppercase; color: var(--text-dim); margin: 0 0 0.6rem 0; letter-spacing: 0.5px;">Operations Executed</h4>
+        <div id="taskDetailSubSteps" style="display: flex; flex-direction: column; gap: 0.45rem; font-size: 0.85rem;">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Technical Execution Logs -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <h4 style="font-size: 0.82rem; text-transform: uppercase; color: var(--text-dim); margin: 0; letter-spacing: 0.5px;">Execution Logs & Engine Output</h4>
+          <button class="txt-btn" onclick="copyTaskLog()" style="font-size: 0.78rem; display: inline-flex; align-items: center; gap: 0.3rem;"><span class="ri">&#128203;</span> Copy Log</button>
+        </div>
+        <pre id="taskDetailLogs" style="background: #111418; color: #a9b7c6; padding: 0.9rem 1.1rem; border-radius: 6px; font-family: 'SFMono-Regular', Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.5; max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.08); margin: 0; white-space: pre-wrap;"></pre>
+      </div>
+    </div>
+    <div class="modal-footer" style="display: flex; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 0.5rem;">
+      <button class="btn btn-secondary" onclick="closeTaskDetailModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/vhi-common.js"></script>
+<script src="/js/migrations.js"></script>
+</body>
+</html>

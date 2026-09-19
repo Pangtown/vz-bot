@@ -7,7 +7,7 @@ import { handleVolumeTypes, handleVolumes, handleVolumeGet, handleVolumeUpdate, 
 import { handleProjects, handleProjectItem, handleUsers, handleDomains, handleGroups, handleRoles, handleRoleAssignments } from './vhi-api/identity.js';
 import { handleHealthStatus, handleBillingStatus, handleBillingRefresh, handleBillingExport, handleAuditLogs, handleAuditRefresh, handleGetSshSettings, handlePostSshSettings } from './vhi-api/monitoring.js';
 import { handleJobs, handleJobRun } from './vhi-api/jobs.js';
-import { handleCloudTest, handleGetClouds, handleCreateCloud, handleDeleteCloud, handleGetCloudVms, handleGetMigrations, handleCreateMigration, handleGetMigration, handleDeployMigration, handleRetryReplication, handleCancelMigration, handleDeleteMigration } from './vhi-api/clouds.js';
+import { handleCloudTest, handleGetClouds, handleCreateCloud, handleDeleteCloud, handleGetCloudVms, handleGetMigrations, handleCreateMigration, handleGetMigration, handleDeployMigration, handleRetryReplication, handleCancelMigration, handleDeleteMigration, handleCleanupClones } from './vhi-api/clouds.js';
 import { handleCloneBlob, handleCloneProgress } from '../vmware/porter-clone.js';
 import { searchAlerts } from '../monitoring/alert-storage.js';
 import { runAlertPoll } from '../monitoring/alert-poller.js';
@@ -108,6 +108,10 @@ export async function handleVhiApi(req, res) {
   }
   if (m === 'DELETE' && migrationItemMatch) {
     await handleDeleteMigration(req, res, migrationItemMatch[1]);
+    return true;
+  }
+  if (m === 'POST' && p === '/api/vhi/clones/cleanup') {
+    await handleCleanupClones(req, res);
     return true;
   }
 

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { runWithContext } from '../gateway/context.js';
 import { getToken } from '../vhi/identity.js';
 import { listServers } from '../vhi/compute.js';
+import { listVolumes } from '../vhi/block.js';
 import { registerInsecureHost } from '../utils/tls.js';
 
 const HYPERV_WINRM_SCRIPT = join(dirname(fileURLToPath(import.meta.url)), 'hyperv-winrm.ps1');
@@ -267,13 +268,52 @@ export async function listVhiCloudVms(cloud) {
     vhiIdentityPort: cloud.port ? String(cloud.port) : '',
   }, async () => {
     const servers = await listServers();
-    return (servers || []).map((s) => ({
-      id: s.id,
-      name: s.name,
-      guestOs: s.metadata?.os_distro || s.image?.name || '',
-      powerState: s.status || '',
-      vcpus: s.flavor?.vcpus,
-      ramMb: s.flavor?.ram,
-    }));
+    let volumes = [];
+    try {
+      volumes = await listVolumes();
+    } catch (_) {
+      volumes = [];
+    }
+    const volById = new Map((volumes || []).map((v) => [v.id, v]));
+    return (servers || []).map((s) => {
+      const vcpus = Number(s.flavor?.vcpus) || 1;
+      const ramMb = Number(s.flavor?.ram) || 1024;
+      const ramStr = ramMb >= 1024 ? `${Math.round(ramMb / 1024)} GB RAM` : `${ramMb} MB RAM`;
+      const addresses = s.addresses && typeof s.addresses === 'object' ? s.addresses : {};
+      const networks = Object.keys(addresses).map((netName) => {
+        const first = Array.isArray(addresses[netName]) ? addresses[netName][0] : null;
+        return {
+          label: netName,
+          networkName: netName,
+          macAddress: (first && (first['OS-EXT-IPS-MAC:mac_addr'] || first.mac_addr)) || '',
+        };
+      });
+      const attached = Array.isArray(s['os-extended-volumes:volumes_attached'])
+        ? s['os-extended-volumes:volumes_attached']
+        : [];
+      const disks = attached.map((item, idx) => {
+        const vol = volById.get(item.id) || {};
+        return {
+          label: vol.name || `Disk ${idx + 1}`,
+          capacityGb: Number(vol.size) || 0,
+          volumeId: item.id,
+          volumeType: vol.volume_type || '',
+        };
+      });
+      return {
+        id: s.id,
+        name: s.name,
+        guestOs: s.metadata?.os_distro || s.image?.name || '',
+        powerState: s.status || '',
+        vcpus,
+        ramMb,
+        spec: `${vcpus} vCPU${vcpus > 1 ? 's' : ''} / ${ramStr}`,
+        disksCount: disks.length || 1,
+        disks: disks.length ? disks : [{ label: 'Boot disk', capacityGb: 0, volumeId: '', volumeType: '' }],
+        networks,
+        firmware: String(s.image?.hw_firmware_type || s.metadata?.hw_firmware_type || 'bios').toLowerCase().includes('uefi') ? 'uefi' : 'bios',
+        guestId: '',
+      };
+    });
   });
 }

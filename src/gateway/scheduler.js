@@ -11,7 +11,9 @@ import { runAuditPoll } from '../monitoring/audit-poller.js';
 import { runAlertPoll } from '../monitoring/alert-poller.js';
 import { tickDueJobs } from './jobs.js';
 import { tickMigrations } from '../vmware/migration-engine.js';
+import { sweepIdleCloneStore } from '../vmware/windows-replica-fill.js';
 import { getLastValidContext } from './context.js';
+import { prefetchClusterNodeInventory } from './vhi-api/compute.js';
 
 let healthJob = null;
 let lastHealthResult = null;
@@ -118,6 +120,34 @@ export function start(config = {}) {
     tickMigrations().catch((err) => console.error('Migration tick error:', err.message));
   }, 4000);
   console.log('Scheduler: Coriolis-style migration engine tick every 4s');
+
+  setTimeout(() => {
+    sweepIdleCloneStore().catch((err) => console.error('Clone cache sweep error:', err.message));
+  }, 2500);
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      await sweepIdleCloneStore();
+    } catch (e) {
+      console.error('Clone cache sweep error:', e.message);
+    }
+  });
+  console.log('Scheduler: clone cache sweep on start and every 5 min (keeps retryable caches)');
+
+  setTimeout(() => {
+    const ctx = getLastValidContext();
+    if (!ctx) return;
+    prefetchClusterNodeInventory(ctx).catch((err) => console.error('Node inventory prefetch:', err.message));
+  }, 8000);
+  cron.schedule('*/15 * * * *', async () => {
+    const ctx = getLastValidContext();
+    if (!ctx) return;
+    try {
+      await prefetchClusterNodeInventory(ctx);
+    } catch (err) {
+      console.error('Node inventory prefetch:', err.message);
+    }
+  });
+  console.log('Scheduler: node hardware inventory prefetch on start and every 15 min (new nodes only)');
 }
 
 /**

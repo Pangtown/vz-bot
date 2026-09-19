@@ -8,10 +8,11 @@
 
 import { registerInsecureHost } from '../utils/tls.js';
 import { logger } from '../utils/index.js';
-import { createWriteStream } from 'fs';
+import { createWriteStream, unlinkSync } from 'fs';
 import { Client } from 'ssh2';
 import { pipeline } from 'stream/promises';
-import { Readable } from 'stream';
+import { Readable, Transform } from 'stream';
+import { createGunzip } from 'zlib';
 
 /** Escape XML special characters */
 function escapeXml(unsafe) {
@@ -782,7 +783,7 @@ function sshExec(conn, command, timeoutMs = 30 * 60 * 1000) {
   });
 }
 
-function sshStreamFile(conn, command, destPath, { onProgress, shouldAbort, onAbortStream } = {}) {
+function sshStreamFile(conn, command, destPath, { onProgress, shouldAbort, onAbortStream, gunzip } = {}) {
   return new Promise((resolve, reject) => {
     conn.exec(command, (err, stream) => {
       if (err) return reject(err);
@@ -793,11 +794,17 @@ function sshStreamFile(conn, command, destPath, { onProgress, shouldAbort, onAbo
         if (shouldAbort && shouldAbort()) stream.destroy(new Error('Migration cancelled'));
       }, 500);
       stream.stderr.on('data', () => {});
-      stream.on('data', (chunk) => {
-        bytes += chunk.length;
-        if (onProgress) onProgress(bytes);
+      const counter = new Transform({
+        transform(chunk, enc, cb) {
+          bytes += chunk.length;
+          if (onProgress) onProgress(bytes);
+          cb(null, chunk);
+        },
       });
-      pipeline(stream, out).then(() => {
+      const stages = gunzip
+        ? [stream, createGunzip(), counter, out]
+        : [stream, counter, out];
+      pipeline(...stages).then(() => {
         clearInterval(abortTimer);
         resolve({ bytes });
       }).catch((pipeErr) => {
@@ -806,6 +813,15 @@ function sshStreamFile(conn, command, destPath, { onProgress, shouldAbort, onAbo
       });
     });
   });
+}
+
+async function esxiSupportsGzip(conn) {
+  try {
+    const probe = await sshExec(conn, 'gzip -c /dev/null >/dev/null 2>&1 && echo GZIP_OK || echo GZIP_NO', 20000);
+    return /GZIP_OK/.test(String(probe.stdout || ''));
+  } catch (_) {
+    return false;
+  }
 }
 
 function sshConnRefusedMessage(host, port, err) {
@@ -886,15 +902,22 @@ export async function copyLiveDiskOverSsh({
     const flat = exportVmfs.replace(/\.vmdk$/i, '-flat.vmdk');
     const listed = await sshExec(conn, 'ls -1 ' + shQuote(flat) + ' ' + shQuote(exportVmfs) + ' 2>/dev/null || true');
     const streamPath = /\-flat\.vmdk/i.test(listed.stdout) ? flat : exportVmfs;
-    logger.info('Live SSH: streaming ' + streamPath + ' to ' + destPath);
-    const copied = await sshStreamFile(
-      conn,
-      'dd if=' + shQuote(streamPath) + ' bs=4194304',
-      destPath,
-      { onProgress, shouldAbort, onAbortStream }
-    );
+    const dd = 'dd if=' + shQuote(streamPath) + ' bs=4194304';
+    let gzipOk = await esxiSupportsGzip(conn);
+    const streamOpts = { onProgress, shouldAbort, onAbortStream };
+    logger.info('Live SSH: streaming ' + streamPath + ' to ' + destPath + (gzipOk ? ' (gzip -1)' : ''));
+    let copied;
+    try {
+      copied = await sshStreamFile(conn, gzipOk ? dd + ' | gzip -1c' : dd, destPath, { ...streamOpts, gunzip: gzipOk });
+    } catch (err) {
+      if (!gzipOk) throw err;
+      logger.warn('Live SSH gzip stream failed (' + err.message + '); retrying without gzip');
+      gzipOk = false;
+      try { unlinkSync(destPath); } catch (_) {}
+      copied = await sshStreamFile(conn, dd, destPath, { ...streamOpts, gunzip: false });
+    }
     if (!copied.bytes) throw new Error('ESXi SSH dd copied 0 bytes from ' + streamPath);
-    return { bytes: copied.bytes, source: src.vmfs, snapshotId };
+    return { bytes: copied.bytes, gzip: gzipOk, source: src.vmfs, snapshotId };
   } finally {
     if (conn && exportVmfs) {
       try { await sshExec(conn, 'vmkfstools -U ' + shQuote(exportVmfs), 120000); } catch (_) {}

@@ -47,6 +47,16 @@ async function getMarketplacePage() {
   return readFile(join(__dirname, '..', 'public', 'marketplace.html'), 'utf8');
 }
 
+async function getMigrationsPage() {
+  return readFile(join(__dirname, '..', 'public', 'migrations.html'), 'utf8');
+}
+
+const PUBLIC_ASSETS = {
+  '/vhi.css': { file: 'vhi.css', type: 'text/css; charset=utf-8' },
+  '/js/vhi-common.js': { file: 'js/vhi-common.js', type: 'text/javascript; charset=utf-8' },
+  '/js/migrations.js': { file: 'js/migrations.js', type: 'text/javascript; charset=utf-8' },
+};
+
 async function getSpicePage() {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>No console</title>
@@ -140,6 +150,17 @@ const app = async (req, res) => {
     }
     return;
   }
+  if (method === 'GET' && (url === '/migrations' || url === '/migrations/' || url === '/migrations.html')) {
+    try {
+      const html = await getMigrationsPage();
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error loading migrations page.');
+    }
+    return;
+  }
   if (method === 'GET' && (url === '/spice' || url === '/spice/' || url === '/spice.html' || url === '/console' || url === '/console.html')) {
     try {
       const html = await getSpicePage();
@@ -148,6 +169,18 @@ const app = async (req, res) => {
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Error loading console page: ' + e.message);
+    }
+    return;
+  }
+  const asset = PUBLIC_ASSETS[url];
+  if (method === 'GET' && asset) {
+    try {
+      const body = await readFile(join(__dirname, '..', 'public', asset.file));
+      res.writeHead(200, { 'Content-Type': asset.type, 'Cache-Control': 'no-cache' });
+      res.end(body);
+    } catch (e) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not found');
     }
     return;
   }

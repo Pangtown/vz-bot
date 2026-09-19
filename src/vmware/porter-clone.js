@@ -2,9 +2,10 @@
  * Clone a VMware disk onto a Cinder replica.
  *
  * vporter-minion-linux does not ship qemu-img, and Glance PUT of multi-GB
- * VMDKs fails on this cluster. Convert with the local Windows qemu-img,
- * then have the guest-matching porter write the raw image onto the replica volume.
- * Linux guests use vporter-minion-linux. Windows guests use vporter-minion-windows only.
+ * VMDKs fails on this cluster. Convert locally with qemu-img, then fill via
+ * Glance/Cinder (Windows, and Linux when CLONE_PUBLIC_URL is unset). Linux
+ * guests with CLONE_PUBLIC_URL still use vporter-minion-linux to pull raw onto
+ * a pre-created replica volume.
  */
 
 import { createReadStream, existsSync, statSync, unlinkSync } from 'fs';
@@ -14,7 +15,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { throwIfCancelled, isCancelled } from './migration-cancel.js';
 import { copyLiveDiskOverSsh } from './esxi-client.js';
-import { PorterScriptNotStartedError, convertedRawPath, findExistingRaw, fillReplicaFromConvertedRaw, markRawComplete } from './windows-replica-fill.js';
+import { PorterScriptNotStartedError, convertedRawPath, convertedQcowPath, findExistingClone, fillReplicaFromConvertedRaw, markRawComplete, removeCloneFiles, removeIncompleteCloneFiles } from './windows-replica-fill.js';
 
 const cloneBlobs = new Map();
 const inflight = new Map();
@@ -25,13 +26,20 @@ export function abortInFlightClone(id) {
   if (rec?.nfcStream) try { rec.nfcStream.destroy(new Error('Migration cancelled')); } catch (_) {}
   if (rec?.sshStream) try { rec.sshStream.destroy(new Error('Migration cancelled')); } catch (_) {}
   inflight.delete(id);
-  clearCloneBlob(id);
+  clearCloneBlob(id, { keepRaw: true });
+  removeIncompleteCloneFiles(id);
 }
 
 export function formatBytes(n) {
   const num = Number(n) || 0;
   if (num >= 1024 * 1024 * 1024) return `${(num / 1024 / 1024 / 1024).toFixed(2)} GiB`;
   return `${(num / 1024 / 1024).toFixed(1)} MiB`;
+}
+
+function unlinkQuiet(path) {
+  if (!path) return;
+  try { unlinkSync(path); } catch (_) {}
+  try { unlinkSync(String(path) + '.ok'); } catch (_) {}
 }
 
 export function getCloneBlob(id, token) {
@@ -63,6 +71,17 @@ function clonePublicBases() {
     .split(/[\s,]+/)
     .map((base) => base.replace(/\/$/, ''))
     .filter(Boolean);
+}
+
+export function clonePublicUrlConfigured() {
+  return clonePublicBases().length > 0;
+}
+
+export function usesPorterForClone(mig, isWindowsGuest) {
+  const windows = typeof isWindowsGuest === 'function'
+    ? !!isWindowsGuest(mig)
+    : String(mig?.sourceOptions?.os || '').toLowerCase() === 'windows';
+  return clonePublicUrlConfigured() && !windows;
 }
 
 function clonePublicFetchUrls(migrationId, token, kind = 'clone-blob') {
@@ -99,9 +118,14 @@ async function resolveQemuImg() {
   return null;
 }
 
-function runQemuConvert(qemu, src, dest, onProgress, migId) {
+function runQemuConvert(qemu, src, dest, onProgress, migId, opts = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(qemu, ['convert', '-p', '-f', 'vmdk', '-O', 'raw', src, dest], {
+    const formatIn = opts.formatIn || 'vmdk';
+    const formatOut = opts.formatOut || 'raw';
+    const args = ['convert', '-p'];
+    if (opts.compress && formatOut === 'qcow2') args.push('-c');
+    args.push('-f', formatIn, '-O', formatOut, src, dest);
+    const child = spawn(qemu, args, {
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -388,7 +412,6 @@ export async function waitForPorterClone(mig, serverId, ctx) {
 export async function cloneGuestDisk(mig, ctx) {
   const {
     LINUX_PORTER_IMAGE,
-    WINDOWS_PORTER_IMAGE,
     isWindowsGuest,
     getCloudById,
     findImageByName,
@@ -419,52 +442,46 @@ export async function cloneGuestDisk(mig, ctx) {
   if (!mig.srcCloudId || !mig.sourceVmId) {
     throw new Error('Source cloud and VM id are required to copy the guest disk. The replica is otherwise empty and will not boot.');
   }
-  if (!mig.replicaVolumeId) {
-    throw new Error('Replica volume is missing; cannot clone onto an empty disk');
-  }
   const cloud = await getCloudById(mig.srcCloudId, true);
   if (!cloud) throw new Error('Source cloud connection not found');
 
   const windows = typeof isWindowsGuest === 'function' ? !!isWindowsGuest(mig) : String(mig?.sourceOptions?.os || '').toLowerCase() === 'windows';
-  const porterImageName = windows ? WINDOWS_PORTER_IMAGE : LINUX_PORTER_IMAGE;
-  if (windows && !WINDOWS_PORTER_IMAGE) throw new Error('Windows porter image name is not configured');
-  const porterImage = await findImageByName(porterImageName);
-  if (!porterImage) {
-    throw new Error(windows
-      ? `Glance image "${WINDOWS_PORTER_IMAGE}" is required for Windows disk replication. Linux porter is never used for Windows guests.`
-      : `Glance image "${LINUX_PORTER_IMAGE}" is required for disk replication`);
+  const usePorter = usesPorterForClone(mig, isWindowsGuest);
+  const porterImageName = LINUX_PORTER_IMAGE;
+  let porterImage = null;
+  let flavor = null;
+  if (usePorter) {
+    if (!mig.replicaVolumeId) {
+      throw new Error('Replica volume is missing; cannot clone onto an empty disk');
+    }
+    porterImage = await findImageByName(porterImageName);
+    if (!porterImage) {
+      throw new Error(`Glance image "${LINUX_PORTER_IMAGE}" is required for Linux porter disk replication`);
+    }
+    const flavors = await listFlavors();
+    flavor = pickFlavor(flavors, { minRamMb: 2048, minVcpus: 1 });
+    if (!flavor) throw new Error('No compute flavor available for the Linux clone porter');
   }
-  const flavors = await listFlavors();
-  const flavor = pickFlavor(flavors, { minRamMb: windows ? 4096 : 2048, minVcpus: windows ? 2 : 1 });
-  if (!flavor) throw new Error(`No compute flavor available for the ${windows ? 'Windows' : 'Linux'} clone porter`);
 
-  const leftoverIds = windows
-    ? [mig.windowsWorkerId, mig.linuxWorkerId]
-    : [mig.linuxWorkerId];
-  for (const leftover of leftoverIds.filter(Boolean)) {
+  const leftoverIds = [mig.windowsWorkerId, mig.linuxWorkerId].filter(Boolean);
+  for (const leftover of leftoverIds) {
     appendLog(mig, `Cleaning leftover porter ${leftover} before clone`);
-    await detachNamedVolume(leftover, mig.replicaVolumeId);
+    if (mig.replicaVolumeId) await detachNamedVolume(leftover, mig.replicaVolumeId);
     await safeDeleteServer(leftover);
   }
   mig.linuxWorkerId = null;
-  mig.windowsWorkerId = windows ? null : mig.windowsWorkerId;
-  if (windows && mig.linuxWorkerPortId) {
+  mig.windowsWorkerId = null;
+  if (mig.linuxWorkerPortId) {
     await safeDeletePort(mig.linuxWorkerPortId);
     mig.linuxWorkerPortId = null;
     mig.linuxWorkerIp = '';
   }
-  const workerPortId = windows ? mig.windowsWorkerPortId : mig.linuxWorkerPortId;
-  if (workerPortId) {
-    await safeDeletePort(workerPortId);
-  }
-  if (windows) {
+  if (mig.windowsWorkerPortId) {
+    await safeDeletePort(mig.windowsWorkerPortId);
     mig.windowsWorkerPortId = null;
     mig.windowsWorkerIp = '';
-  } else {
-    mig.linuxWorkerPortId = null;
-    mig.linuxWorkerIp = '';
   }
-  await waitVolume(mig.replicaVolumeId, ['available']).catch(() => {});
+  if (mig.replicaVolumeId) await waitVolume(mig.replicaVolumeId, ['available']).catch(() => {});
 
   const firmware = guestFirmware(mig);
   const diskBus = guestDiskBus(mig);
@@ -472,18 +489,16 @@ export async function cloneGuestDisk(mig, ctx) {
   mig.diskBus = diskBus;
   mig.targetOptions = { ...mig.targetOptions, diskBus: diskBus === 'sata' ? 'SATA (AHCI)' : 'VirtIO' };
 
-  const existingRaw = findExistingRaw(mig.id);
+  const existing = findExistingClone(mig.id, usePorter ? 'raw' : 'qcow2');
   const vmdk = join(tmpdir(), `vzbot-nfc-${mig.id}.vmdk`);
-  const raw = existingRaw || convertedRawPath(mig.id);
+  const raw = convertedRawPath(mig.id);
+  const qcow = convertedQcowPath(mig.id);
   let lease = null;
-  let reusedRaw = !!existingRaw;
-  let rawSt = existingRaw ? statSync(raw) : null;
+  let clonePath = existing ? existing.path : (usePorter ? raw : qcow);
+  let cloneFormat = existing ? existing.format : (usePorter ? 'raw' : 'qcow2');
+  let reused = !!existing;
+  let cloneSt = existing ? statSync(clonePath) : null;
   try {
-    if (reusedRaw) {
-      appendLog(mig, `Reusing converted raw disk ${formatBytes(rawSt.size)} at ${raw} (skipping NFC + qemu-img)`);
-      mig.convertedRawPath = raw;
-      await persist(mig);
-    } else {
     const live = String(mig.migType || 'live').toLowerCase() !== 'cold';
     let lastLog = 0;
     let lastPersist = 0;
@@ -491,186 +506,232 @@ export async function cloneGuestDisk(mig, ctx) {
       256 * 1024 * 1024,
       (Number(mig.replicaSizeGb) || parseInt(String(mig.sourceOptions?.diskSize || '10'), 10) || 10) * 1024 * 1024 * 1024
     );
-    if (live) {
-      appendLog(mig, `Live SSH disk copy from ${cloud.host} VM ${mig.sourceVmId} (snapshot + vmkfstools, not NFC)`);
-      await persist(mig);
-      await copyLiveDiskOverSsh({
-        host: cloud.host,
-        port: cloud.port,
-        sshPort: cloud.sshPort || 22,
-        username: cloud.user,
-        password: cloud.pass,
-        insecure: cloud.insecure,
-        vmId: mig.sourceVmId,
-        destPath: raw,
-        shouldAbort: () => isCancelled(mig.id) || mig.cancelRequested,
-        onAbortStream: (stream) => {
-          const prev = inflight.get(mig.id) || {};
-          inflight.set(mig.id, { ...prev, sshStream: stream });
-        },
-        onProgress: (bytes) => {
-          throwIfCancelled(mig);
-          const now = Date.now();
-          mig.replicatedBytes = formatBytes(bytes);
-          mig.progress = Math.min(48, 36 + Math.floor((bytes / expected) * 12));
-          if (now - lastPersist >= 3000) {
-            lastPersist = now;
-            void persist(mig);
-          }
-          if (now - lastLog < 15000) return;
-          lastLog = now;
-          appendLog(mig, `SSH disk copy ${formatBytes(bytes)}`);
-        },
-      });
-      rawSt = statSync(raw);
-      if (!rawSt.size || rawSt.size < 1024) throw new Error('SSH disk copy produced an empty raw disk');
-      appendLog(mig, `SSH disk copy complete: ${formatBytes(rawSt.size)}`);
-      await persist(mig);
-    } else {
-    const qemu = await resolveQemuImg();
-    if (!qemu) {
-      throw new Error('qemu-img is missing on the porter image and was not found on this Windows host. Install QEMU (qemu-img.exe) or set QEMU_IMG.');
-    }
-    appendLog(mig, `Cold NFC export from ${cloud.host} VM ${mig.sourceVmId}, then local qemu-img convert (${qemu})`);
-    await persist(mig);
-    lease = await acquireHttpNfcLease({
-      host: cloud.host,
-      port: cloud.port,
-      username: cloud.user,
-      password: cloud.pass,
-      insecure: cloud.insecure,
-      vmId: mig.sourceVmId,
-      live: false,
-    });
-    const disk = lease.disks[0];
-    if (!disk?.url) throw new Error('NFC lease has no disk URL');
-    mig.nfcLeaseId = lease.leaseId || null;
-    appendLog(mig, `NFC lease ready: ${disk.url}`);
-    await persist(mig);
-    await downloadNfcDisk(lease, vmdk, {
-      shouldAbort: () => isCancelled(mig.id) || mig.cancelRequested,
-      onAbortStream: (stream) => {
-        const prev = inflight.get(mig.id) || {};
-        inflight.set(mig.id, { ...prev, nfcStream: stream });
-      },
-      onProgress: (bytes) => {
-        throwIfCancelled(mig);
-        const now = Date.now();
-        mig.replicatedBytes = formatBytes(bytes);
-        mig.progress = Math.min(48, 36 + Math.floor((bytes / expected) * 12));
-        if (now - lastPersist >= 3000) {
-          lastPersist = now;
-          void persist(mig);
-        }
-        if (now - lastLog < 15000) return;
-        lastLog = now;
-        appendLog(mig, `NFC download ${formatBytes(bytes)}`);
-      },
-    });
-    await completeHttpNfcLease(lease);
-    lease = null;
-    const vmdkSt = statSync(vmdk);
-    if (!vmdkSt.size || vmdkSt.size < 1024) throw new Error('NFC download produced an empty VMDK');
-    appendLog(mig, `NFC download complete: ${formatBytes(vmdkSt.size)}. Converting VMDK to raw...`);
-    await persist(mig);
-
-    throwIfCancelled(mig);
-    await runQemuConvert(qemu, vmdk, raw, (pct) => {
+    const reportQemu = (pct) => {
       throwIfCancelled(mig);
       if (Date.now() - lastLog < 8000) return;
       lastLog = Date.now();
       mig.progress = Math.min(49, 46 + Math.floor(Number(pct) / 50));
       appendLog(mig, `qemu-img convert ${pct.toFixed(0)}%`);
       void persist(mig);
-    }, mig.id);
-    rawSt = statSync(raw);
-    if (!rawSt.size || rawSt.size < 1024) throw new Error('qemu-img produced an empty raw disk');
-    try { unlinkSync(vmdk); } catch (_) {}
-    } // cold NFC+qemu
-    } // not reusedRaw
+    };
 
-    mig.convertedRawPath = raw;
-    mig.convertedRawBytes = rawSt.size;
-    markRawComplete(raw, rawSt.size);
+    if (reused && cloneFormat === 'raw' && !usePorter) {
+      const qemu = await resolveQemuImg();
+      if (qemu) {
+        appendLog(mig, `Converting reused raw ${formatBytes(cloneSt.size)} to compressed qcow2`);
+        await persist(mig);
+        await runQemuConvert(qemu, clonePath, qcow, reportQemu, mig.id, { formatIn: 'raw', formatOut: 'qcow2', compress: true });
+        cloneSt = statSync(qcow);
+        if (!cloneSt.size) throw new Error('qemu-img produced an empty qcow2 disk');
+        unlinkQuiet(clonePath);
+        clonePath = qcow;
+        cloneFormat = 'qcow2';
+        markRawComplete(qcow, cloneSt.size);
+      }
+    }
 
-    const token = randomBytes(16).toString('hex');
-    cloneBlobs.set(mig.id, { token, path: raw, size: rawSt.size, bytesSent: 0, reportedBytes: 0, scriptStarted: false, scriptOk: false, scriptFail: '' });
-    const urls = clonePublicFetchUrls(mig.id, token, 'clone-blob');
-    const progressUrls = clonePublicFetchUrls(mig.id, token, 'clone-progress');
-
-    if (!urls.length) {
-      appendLog(mig, `Converted raw disk ${formatBytes(rawSt.size)}. Filling replica via Glance/Cinder from vz-bot (set CLONE_PUBLIC_URL if a porter on VHI should HTTP-download the disk).`);
+    if (reused) {
+      appendLog(mig, `Reusing converted ${cloneFormat} disk ${formatBytes(cloneSt.size)} at ${clonePath}`);
+      mig.convertedRawPath = clonePath;
       await persist(mig);
-      await fillReplicaFromConvertedRaw(mig, raw, {
+    } else {
+      if (live) {
+        appendLog(mig, `Live SSH disk copy from ${cloud.host} VM ${mig.sourceVmId} (snapshot + vmkfstools; gzip when ESXi supports it)`);
+        await persist(mig);
+        const copied = await copyLiveDiskOverSsh({
+          host: cloud.host,
+          port: cloud.port,
+          sshPort: cloud.sshPort || 22,
+          username: cloud.user,
+          password: cloud.pass,
+          insecure: cloud.insecure,
+          vmId: mig.sourceVmId,
+          destPath: raw,
+          shouldAbort: () => isCancelled(mig.id) || mig.cancelRequested,
+          onAbortStream: (stream) => {
+            const prev = inflight.get(mig.id) || {};
+            inflight.set(mig.id, { ...prev, sshStream: stream });
+          },
+          onProgress: (bytes) => {
+            throwIfCancelled(mig);
+            const now = Date.now();
+            mig.replicatedBytes = formatBytes(bytes);
+            mig.progress = Math.min(48, 36 + Math.floor((bytes / expected) * 12));
+            if (now - lastPersist >= 3000) {
+              lastPersist = now;
+              void persist(mig);
+            }
+            if (now - lastLog < 15000) return;
+            lastLog = now;
+            appendLog(mig, `SSH disk copy ${formatBytes(bytes)}`);
+          },
+        });
+        const rawSt = statSync(raw);
+        if (!rawSt.size || rawSt.size < 1024) throw new Error('SSH disk copy produced an empty raw disk');
+        markRawComplete(raw, rawSt.size);
+        appendLog(mig, `SSH disk copy complete: ${formatBytes(rawSt.size)}${copied && copied.gzip ? ' (gzip stream)' : ''}`);
+        await persist(mig);
+        if (usePorter) {
+          clonePath = raw;
+          cloneFormat = 'raw';
+          cloneSt = rawSt;
+        } else {
+          const qemu = await resolveQemuImg();
+          if (qemu) {
+            appendLog(mig, `Converting raw to compressed qcow2 (${qemu})`);
+            await persist(mig);
+            await runQemuConvert(qemu, raw, qcow, reportQemu, mig.id, { formatIn: 'raw', formatOut: 'qcow2', compress: true });
+            cloneSt = statSync(qcow);
+            if (!cloneSt.size) throw new Error('qemu-img produced an empty qcow2 disk');
+            unlinkQuiet(raw);
+            clonePath = qcow;
+            cloneFormat = 'qcow2';
+          } else {
+            clonePath = raw;
+            cloneFormat = 'raw';
+            cloneSt = rawSt;
+          }
+        }
+      } else {
+        const qemu = await resolveQemuImg();
+        if (!qemu) {
+          throw new Error('qemu-img was not found on this Windows host. Install QEMU (qemu-img.exe) or set QEMU_IMG.');
+        }
+        const outFmt = usePorter ? 'raw' : 'qcow2';
+        const dest = usePorter ? raw : qcow;
+        appendLog(mig, `Cold NFC export from ${cloud.host} VM ${mig.sourceVmId}, then local qemu-img convert to ${outFmt} (${qemu})`);
+        await persist(mig);
+        lease = await acquireHttpNfcLease({
+          host: cloud.host,
+          port: cloud.port,
+          username: cloud.user,
+          password: cloud.pass,
+          insecure: cloud.insecure,
+          vmId: mig.sourceVmId,
+          live: false,
+        });
+        const disk = lease.disks[0];
+        if (!disk?.url) throw new Error('NFC lease has no disk URL');
+        mig.nfcLeaseId = lease.leaseId || null;
+        appendLog(mig, `NFC lease ready: ${disk.url}`);
+        await persist(mig);
+        await downloadNfcDisk(lease, vmdk, {
+          shouldAbort: () => isCancelled(mig.id) || mig.cancelRequested,
+          onAbortStream: (stream) => {
+            const prev = inflight.get(mig.id) || {};
+            inflight.set(mig.id, { ...prev, nfcStream: stream });
+          },
+          onProgress: (bytes) => {
+            throwIfCancelled(mig);
+            const now = Date.now();
+            mig.replicatedBytes = formatBytes(bytes);
+            mig.progress = Math.min(48, 36 + Math.floor((bytes / expected) * 12));
+            if (now - lastPersist >= 3000) {
+              lastPersist = now;
+              void persist(mig);
+            }
+            if (now - lastLog < 15000) return;
+            lastLog = now;
+            appendLog(mig, `NFC download ${formatBytes(bytes)}`);
+          },
+        });
+        await completeHttpNfcLease(lease);
+        lease = null;
+        const vmdkSt = statSync(vmdk);
+        if (!vmdkSt.size || vmdkSt.size < 1024) throw new Error('NFC download produced an empty VMDK');
+        appendLog(mig, `NFC download complete: ${formatBytes(vmdkSt.size)}. Converting VMDK to ${outFmt}...`);
+        await persist(mig);
+        throwIfCancelled(mig);
+        await runQemuConvert(qemu, vmdk, dest, reportQemu, mig.id, {
+          formatIn: 'vmdk',
+          formatOut: outFmt,
+          compress: outFmt === 'qcow2',
+        });
+        unlinkQuiet(vmdk);
+        cloneSt = statSync(dest);
+        if (!cloneSt.size || cloneSt.size < 1024) throw new Error('qemu-img produced an empty ' + outFmt + ' disk');
+        clonePath = dest;
+        cloneFormat = outFmt;
+      }
+    }
+
+    mig.convertedRawPath = clonePath;
+    mig.convertedRawBytes = cloneSt.size;
+    markRawComplete(clonePath, cloneSt.size);
+
+    if (!usePorter) {
+      appendLog(mig, `Converted ${cloneFormat} disk ${formatBytes(cloneSt.size)}. Filling ${windows ? 'Windows' : 'Linux'} replica via Glance/Cinder (no porter VM).`);
+      await persist(mig);
+      await fillReplicaFromConvertedRaw(mig, clonePath, {
         ...ctx,
-        clonePublicUrls: urls,
+        clonePublicUrls: [],
       });
-      appendLog(mig, `Replica volume ${mig.replicaVolumeId} filled (${formatBytes(rawSt.size)}, firmware=${firmware}, bus=${diskBus})`);
+      appendLog(mig, `Replica volume ${mig.replicaVolumeId} filled (${formatBytes(cloneSt.size)}, firmware=${firmware}, bus=${diskBus})`);
       await persist(mig);
       return;
     }
 
-    appendLog(mig, `Converted raw disk ${formatBytes(rawSt.size)}. Porter will download from CLONE_PUBLIC_URL`);
+    if (cloneFormat !== 'raw') {
+      const qemu = await resolveQemuImg();
+      if (!qemu) throw new Error('qemu-img is required to convert qcow2 to raw for the Linux porter');
+      appendLog(mig, `Converting ${cloneFormat} to raw for Linux porter download`);
+      await persist(mig);
+      await runQemuConvert(qemu, clonePath, raw, reportQemu, mig.id, { formatIn: cloneFormat, formatOut: 'raw' });
+      cloneSt = statSync(raw);
+      clonePath = raw;
+      cloneFormat = 'raw';
+      markRawComplete(raw, cloneSt.size);
+    }
+
+    const token = randomBytes(16).toString('hex');
+    cloneBlobs.set(mig.id, { token, path: clonePath, size: cloneSt.size, bytesSent: 0, reportedBytes: 0, scriptStarted: false, scriptOk: false, scriptFail: '' });
+    const urls = clonePublicFetchUrls(mig.id, token, 'clone-blob');
+    const progressUrls = clonePublicFetchUrls(mig.id, token, 'clone-progress');
+
+    appendLog(mig, `Converted raw disk ${formatBytes(cloneSt.size)}. Linux porter will download from CLONE_PUBLIC_URL`);
     await persist(mig);
 
     const porterPort = await allocatePort(
       mig.networkId,
-      `vzbot-${windows ? 'windows' : 'linux'}-clone-${shortId(mig.id)}`,
-      `${windows ? 'Windows' : 'Linux'} porter clone IP - independent of guest`
+      `vzbot-linux-clone-${shortId(mig.id)}`,
+      'Linux porter clone IP - independent of guest'
     );
-    if (windows) {
-      mig.windowsWorkerPortId = porterPort.id;
-      mig.windowsWorkerIp = portIp(porterPort);
-    } else {
-      mig.linuxWorkerPortId = porterPort.id;
-      mig.linuxWorkerIp = portIp(porterPort);
-    }
-    const userData = windows ? buildWindowsPorterCloneUserData({ urls, progressUrls }) : buildPorterDdUserData({ urls });
-    const workerIp = windows ? mig.windowsWorkerIp : mig.linuxWorkerIp;
-    appendLog(mig, `Spawning ${porterImageName} at ${workerIp || 'dhcp'} with replica ${mig.replicaVolumeId} attached${windows ? ' (Cloudbase-Init #ps1_sysnative, HTTP heartbeat, COM1 log)' : ''}`);
+    mig.linuxWorkerPortId = porterPort.id;
+    mig.linuxWorkerIp = portIp(porterPort);
+    const userData = buildPorterDdUserData({ urls });
+    const workerIp = mig.linuxWorkerIp;
+    appendLog(mig, `Spawning ${porterImageName} at ${workerIp || 'dhcp'} with replica ${mig.replicaVolumeId} attached`);
     await persist(mig);
 
     const porter = await spawnPorter({
       image: porterImage,
       flavor,
       portId: porterPort.id,
-      name: `vzbot-${windows ? 'windows' : 'linux'}-clone-${shortId(mig.id)}`,
+      name: `vzbot-linux-clone-${shortId(mig.id)}`,
       volumeType: mig.volumeType,
-      minDisk: windows ? 40 : 10,
+      minDisk: 10,
       replicaVolumeId: mig.replicaVolumeId,
       userData,
     });
-    if (windows) mig.windowsWorkerId = porter.id;
-    else mig.linuxWorkerId = porter.id;
+    mig.linuxWorkerId = porter.id;
     const refreshed = await getPort(porterPort.id).catch(() => porterPort);
-    if (windows) mig.windowsWorkerIp = portIp(refreshed) || mig.windowsWorkerIp;
-    else mig.linuxWorkerIp = portIp(refreshed) || mig.linuxWorkerIp;
-    appendLog(mig, `${windows ? 'Windows' : 'Linux'} porter ${porter.id} ACTIVE at ${(windows ? mig.windowsWorkerIp : mig.linuxWorkerIp) || 'dhcp'}; writing raw disk onto replica`);
+    mig.linuxWorkerIp = portIp(refreshed) || mig.linuxWorkerIp;
+    appendLog(mig, `Linux porter ${porter.id} ACTIVE at ${mig.linuxWorkerIp || 'dhcp'}; writing raw disk onto replica`);
     await persist(mig);
 
-    try {
-      await waitForPorterClone(mig, porter.id, { getConsoleOutput, appendLog, persist, sleep, windows });
-    } catch (err) {
-      if (windows && err instanceof PorterScriptNotStartedError) {
-        appendLog(mig, err.message);
-        await fillReplicaFromConvertedRaw(mig, raw, {
-          ...ctx,
-          clonePublicUrls: urls,
-        });
-        appendLog(mig, `Replica volume ${mig.replicaVolumeId} filled (${formatBytes(rawSt.size)}, firmware=${firmware}, bus=${diskBus})`);
-        await persist(mig);
-        return;
-      }
-      throw err;
-    }
+    await waitForPorterClone(mig, porter.id, { getConsoleOutput, appendLog, persist, sleep, windows: false });
 
     await detachNamedVolume(porter.id, mig.replicaVolumeId);
     await waitVolume(mig.replicaVolumeId, ['available']);
     await ensureVolumeBootable(mig.replicaVolumeId);
-    if (!mig.clonedBytes) mig.clonedBytes = rawSt.size;
-    mig.replicatedBytes = mig.replicatedBytes || formatBytes(rawSt.size);
+    if (!mig.clonedBytes) mig.clonedBytes = cloneSt.size;
+    mig.replicatedBytes = mig.replicatedBytes || formatBytes(cloneSt.size);
     appendLog(mig, `Replica volume ${mig.replicaVolumeId} filled (${mig.replicatedBytes}, firmware=${firmware}, bus=${diskBus})`);
     await persist(mig);
+    const cleaned = removeCloneFiles(mig.id);
+    if (cleaned.files) {
+      appendLog(mig, `Removed local clone cache (${cleaned.files} file(s), ${formatBytes(cleaned.bytes)})`);
+    }
   } catch (err) {
     if (lease) await abortHttpNfcLease(lease);
     throw err;

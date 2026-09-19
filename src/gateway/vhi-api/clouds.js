@@ -3,6 +3,7 @@ import { testEsxiConnection, getEsxiVmInventory } from '../../vmware/esxi-client
 import { testVhiConnection, testHyperVConnection, listVhiCloudVms, listHyperVCloudVms } from '../../vmware/cloud-connectors.js';
 import { loadClouds, getCloudById, saveCloud, deleteCloud, loadMigrations, getMigrationById, deleteMigration } from '../../vmware/cloud-storage.js';
 import { createAndStartMigration, startDeployment, retryReplication, cancelMigration, cleanupMigrationResources } from '../../vmware/migration-engine.js';
+import { sweepIdleCloneStore } from '../../vmware/windows-replica-fill.js';
 import { logger } from '../../utils/index.js';
 
 /**
@@ -279,6 +280,21 @@ export async function handleDeleteMigration(req, res, id) {
     json(res, 200, { ok: true, message: 'Migration deleted successfully' });
   } catch (err) {
     logger.error(`handleDeleteMigration error: ${err.message}`);
+    json(res, 500, { error: err.message });
+  }
+}
+
+/**
+ * POST /api/vhi/clones/cleanup
+ * Delete idle clone cache files (.raw / .qcow2 / .ok) not used by an in-flight migration.
+ * Retryable ERROR/CANCELLED caches are removed here; the scheduled sweep leaves them for retry.
+ */
+export async function handleCleanupClones(req, res) {
+  try {
+    const result = await sweepIdleCloneStore({ keepRetryable: false });
+    json(res, 200, { ok: true, files: result.files, bytes: result.bytes });
+  } catch (err) {
+    logger.error(`handleCleanupClones error: ${err.message}`);
     json(res, 500, { error: err.message });
   }
 }

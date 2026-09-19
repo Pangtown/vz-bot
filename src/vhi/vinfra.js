@@ -2,7 +2,13 @@ import { Client } from 'ssh2';
 import { getContextValue } from '../gateway/context.js';
 import { loadGlobalSshConfig } from '../monitoring/ssh-storage.js';
 
-const ALLOWED_RAW_COMMANDS = new Set(['/sbin/ip', '/sbin/reboot', 'reboot']);
+const ALLOWED_RAW_COMMANDS = new Set([
+  '/sbin/ip',
+  '/sbin/reboot',
+  'reboot',
+  '/usr/sbin/dmidecode',
+  '/usr/bin/lsblk',
+]);
 
 export function validateVinfraArgs(args) {
     if (!Array.isArray(args) || args.length === 0) {

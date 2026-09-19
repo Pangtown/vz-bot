@@ -27,7 +27,8 @@ import {
 import { getCloudById, loadMigrations, getMigrationById, saveMigration } from './cloud-storage.js';
 import { acquireHttpNfcLease, downloadNfcDisk, completeHttpNfcLease, abortHttpNfcLease, pingHttpNfcLease } from './esxi-client.js';
 import { getEsxiVmInventory } from './esxi-client.js';
-import { cloneGuestDisk as porterCloneGuestDisk, abortInFlightClone } from './porter-clone.js';
+import { cloneGuestDisk as porterCloneGuestDisk, abortInFlightClone, usesPorterForClone } from './porter-clone.js';
+import { removeCloneFiles } from './windows-replica-fill.js';
 import { markCancelled, clearCancelled, isCancelled, throwIfCancelled, MigrationCancelledError } from './migration-cancel.js';
 import { runWithContext } from '../gateway/context.js';
 import { logger } from '../utils/index.js';
@@ -661,10 +662,14 @@ export async function retryReplication(id) {
   if (!replicaExists) {
     mig.replicaVolumeId = null;
     mig.snapshotId = null;
-    appendLog(mig, 'Replica volume missing after cancel; recreating Cinder replica before NFC clone');
+    appendLog(mig, usesPorterForClone(mig, isWindowsGuest)
+      ? 'Replica volume missing after cancel; recreating Cinder replica before clone'
+      : 'No replica volume; Glance/Cinder will create the boot disk from the converted image');
   }
   mig.migType = 'live';
-  appendLog(mig, `Retrying live disk clone via ${isWindowsGuest(mig) ? WINDOWS_PORTER_IMAGE : LINUX_PORTER_IMAGE} NFC (source VM can stay powered on)`);
+  appendLog(mig, usesPorterForClone(mig, isWindowsGuest)
+    ? `Retrying live disk clone via ${LINUX_PORTER_IMAGE} (source VM can stay powered on)`
+    : 'Retrying live disk clone via SSH + qemu-img + Glance (source VM can stay powered on)');
   await persist(mig);
   setImmediate(() => tickMigrations().catch((err) => logger.error('Migration tick after retry clone failed: ' + err.message)));
   return mig;
@@ -694,7 +699,7 @@ async function runReplicationTask(mig, idx) {
       if (windows) {
         const winImage = await findImageByName(WINDOWS_PORTER_IMAGE);
         if (!winImage) {
-          throw new Error('Glance image "' + WINDOWS_PORTER_IMAGE + '" is required for Windows disk replication. Linux porter is never used for Windows guests.');
+          throw new Error('Glance image "' + WINDOWS_PORTER_IMAGE + '" is required for Windows OS morphing. Linux porter is never used for Windows guests.');
         }
         mig.windowsImageId = winImage.id;
         mig.skipMorph = false;
@@ -702,7 +707,7 @@ async function runReplicationTask(mig, idx) {
       } else {
         const linuxImage = await findImageByName(LINUX_PORTER_IMAGE);
         if (!linuxImage) {
-          throw new Error('Glance image "' + LINUX_PORTER_IMAGE + '" is required for disk replication (Linux porter). This tool does not use VIS MAAS.');
+          throw new Error('Glance image "' + LINUX_PORTER_IMAGE + '" is required for Linux OS morphing. This tool does not use VIS MAAS.');
         }
         mig.linuxImageId = linuxImage.id;
         appendLog(mig, 'Linux porter image ' + LINUX_PORTER_IMAGE + ' ACTIVE (' + linuxImage.id + ')');
@@ -715,16 +720,21 @@ async function runReplicationTask(mig, idx) {
       return persist(mig);
     }
     case 3: {
+      mig.replicaSizeGb = replicaSizeGb(mig);
+      if (!usesPorterForClone(mig, isWindowsGuest)) {
+        appendLog(mig, 'Skipping empty replica volume (' + mig.replicaSizeGb + ' GiB planned). Glance/Cinder will create the boot disk from the converted image.');
+        return persist(mig);
+      }
       const vol = await createVolume({
         name: replicaName,
-        size: replicaSizeGb(mig),
+        size: mig.replicaSizeGb,
         volume_type: mig.volumeType || undefined,
         description: `vz-bot replica for ${name}`,
         metadata: { vzbot_migration: mig.id, role: 'replica' },
       });
       await waitVolume(vol.id, ['available']);
       mig.replicaVolumeId = vol.id;
-      mig.replicaSizeGb = Number(vol.size) || replicaSizeGb(mig);
+      mig.replicaSizeGb = Number(vol.size) || mig.replicaSizeGb;
       appendLog(mig, `Replica volume ${replicaName} (${vol.id}) available, size ${mig.replicaSizeGb} GiB (guest disk ${diskSizeGb(mig)} GiB)`);
       return persist(mig);
     }
@@ -753,7 +763,7 @@ async function runReplicationTask(mig, idx) {
           };
           if (vm.powerState && vm.powerState !== 'poweredOff') {
             mig.migType = 'live';
-            appendLog(mig, `Live migration: source VM "${vm.name}" is ${vm.powerState}; snapshot then NFC-export the snapshot so the guest can stay on`);
+            appendLog(mig, `Live migration: source VM "${vm.name}" is ${vm.powerState}; snapshot then SSH-copy the disk so the guest can stay on`);
           } else {
             appendLog(mig, `Source VM ready for NFC export: ${vm.name} firmware=${mig.firmware} power=${vm.powerState || 'poweredOff'}`);
           }
@@ -766,17 +776,14 @@ async function runReplicationTask(mig, idx) {
       return persist(mig);
     }
           case 5: {
-      if (windows) {
-        const winImage = await findImageByName(WINDOWS_PORTER_IMAGE);
-        if (!winImage) throw new Error('Missing ' + WINDOWS_PORTER_IMAGE);
-        mig.windowsImageId = winImage.id;
-        appendLog(mig, 'Windows porter image ' + WINDOWS_PORTER_IMAGE + ' ready (' + winImage.id + '). Disk clone uses Windows porter NFC, qemu-img, then porter write onto the replica volume.');
-      } else {
-        const linuxImage = await findImageByName(LINUX_PORTER_IMAGE);
-        if (!linuxImage) throw new Error('Missing ' + LINUX_PORTER_IMAGE);
-        mig.linuxImageId = linuxImage.id;
-        appendLog(mig, 'Linux porter image ' + LINUX_PORTER_IMAGE + ' ready (' + linuxImage.id + '). Disk clone uses Linux porter NFC, qemu-img onto the replica volume (no Glance PUT).');
+      if (!usesPorterForClone(mig, isWindowsGuest)) {
+        appendLog(mig, (windows ? 'Windows' : 'Linux') + ' disk clone converts locally with qemu-img and fills via Glance/Cinder (no porter VM).');
+        return persist(mig);
       }
+      const linuxImage = await findImageByName(LINUX_PORTER_IMAGE);
+      if (!linuxImage) throw new Error('Missing ' + LINUX_PORTER_IMAGE);
+      mig.linuxImageId = linuxImage.id;
+      appendLog(mig, 'Linux porter image ' + LINUX_PORTER_IMAGE + ' ready (' + linuxImage.id + '). Disk clone uses SSH/NFC, qemu-img, then Linux porter write onto the replica volume.');
       return persist(mig);
     }
     case 6: {
@@ -1181,8 +1188,12 @@ export async function cancelMigration(id) {
 
 export async function cleanupMigrationResources(id, { keepTarget = true } = {}) {
   const mig = await getMigrationById(id);
-  if (!mig) return;
+  if (!mig) {
+    removeCloneFiles(id);
+    return;
+  }
   const deployed = mig.status === 'DEPLOYED' || mig.status === 'ACTIVE';
+  removeCloneFiles(id);
 
   const run = async () => {
     await safeDeleteServer(mig.linuxWorkerId);
