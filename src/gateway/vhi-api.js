@@ -1,12 +1,13 @@
 import { extractContext, json, verifyWebPassword } from './vhi-api/helpers.js';
 import { handleAuth } from './vhi-api/auth.js';
 import { handleMarketplaceScripts } from './vhi-api/marketplace.js';
-import { handleServers, handleServerGet, handleServerDelete, handleServerAction, handleCreateServer, handleFlavors, handleFlavorDelete, handleKeypairs, handleNodes, handleNodeGet, handleNodeAction, handleImages, handleCreateImage, handleUploadImage, handleUpdateImage, handleDeleteImage, handleServerInterfaces, handleServerVolumes } from './vhi-api/compute.js';
+import { handleServers, handleServerGet, handleServerDelete, handleServerAction, handleCreateServer, handleFlavors, handleFlavorDelete, handleKeypairs, handleNodes, handleNodeGet, handleNodeAction, handleImages, handleCreateImage, handleUploadImage, handleUpdateImage, handleDeleteImage, handleServerInterfaces, handleServerVolumes, handleQuotas, handleCreateVmCatalog } from './vhi-api/compute.js';
 import { handleNetworks, handleNetworkDelete, handleSubnetCreate, handleSubnetDelete, handleSecurityGroups, handleSecurityGroupDelete, handleSecurityGroupRule, handleSecurityGroupRuleDelete, handleFloatingIPs, handleRouters, handleRouterInterface, handlePorts, handlePortGet, handlePortUpdate } from './vhi-api/network.js';
 import { handleVolumeTypes, handleVolumes, handleVolumeGet, handleVolumeUpdate, handleVolumeDelete, handleVolumeExtend, handleVolumeRetype, handleSnapshots, handleSnapshotAction } from './vhi-api/block.js';
-import { handleProjects, handleProjectItem, handleUsers, handleDomains, handleGroups, handleRoles, handleRoleAssignments } from './vhi-api/identity.js';
+import { handleProjects, handleProjectItem, handleUsers, handleDomains, handleGroups, handleRoles, handleRoleAssignments, handleProjectAccess } from './vhi-api/identity.js';
 import { handleHealthStatus, handleBillingStatus, handleBillingRefresh, handleBillingExport, handleAuditLogs, handleAuditRefresh, handleGetSshSettings, handlePostSshSettings } from './vhi-api/monitoring.js';
 import { handleJobs, handleJobRun } from './vhi-api/jobs.js';
+import { handleDr } from './vhi-api/dr.js';
 import { handleCloudTest, handleGetClouds, handleCreateCloud, handleDeleteCloud, handleGetCloudVms, handleGetMigrations, handleCreateMigration, handleGetMigration, handleDeployMigration, handleRetryReplication, handleCancelMigration, handleDeleteMigration, handleCleanupClones } from './vhi-api/clouds.js';
 import { handleCloneBlob, handleCloneProgress } from '../vmware/porter-clone.js';
 import { searchAlerts } from '../monitoring/alert-storage.js';
@@ -197,6 +198,8 @@ export async function handleVhiApi(req, res) {
       if (m === 'GET' && portMatch) { await handlePortGet(req, res, ctx, portMatch[1]); return true; }
       if (m === 'PATCH' && portMatch) { await handlePortUpdate(req, res, ctx, portMatch[1]); return true; }
 
+      if (m === 'GET' && p === '/api/vhi/quotas') { await handleQuotas(req, res, ctx); return true; }
+      if (m === 'GET' && p === '/api/vhi/create-vm-catalog') { await handleCreateVmCatalog(req, res, ctx); return true; }
       if (p === '/api/vhi/flavors') { await handleFlavors(req, res, ctx); return true; }
       const flvDel = p.match(/^\/api\/vhi\/flavors\/([^/]+)$/);
       if (m === 'DELETE' && flvDel) { await handleFlavorDelete(req, res, ctx, flvDel[1]); return true; }
@@ -204,6 +207,11 @@ export async function handleVhiApi(req, res) {
       if (p === '/api/vhi/keypairs') { await handleKeypairs(req, res, ctx); return true; }
       const kpDel = p.match(/^\/api\/vhi\/keypairs\/([^/]+)$/);
       if (m === 'DELETE' && kpDel) { await handleKeypairs(req, res, ctx, kpDel[1]); return true; }
+
+      if (p === '/api/vhi/dr' || p.startsWith('/api/vhi/dr/')) {
+        await handleDr(req, res, ctx, p.replace(/^\/api\/vhi\/dr\/?/, ''));
+        return true;
+      }
 
       if (p === '/api/vhi/jobs') { await handleJobs(req, res, ctx); return true; }
       const jobRun = p.match(/^\/api\/vhi\/jobs\/([^/]+)\/run$/);
@@ -249,6 +257,7 @@ export async function handleVhiApi(req, res) {
       if (p === '/api/vhi/groups') { await handleGroups(req, res, ctx); return true; }
       if (m === 'GET' && p === '/api/vhi/roles') { await handleRoles(req, res, ctx); return true; }
       if (m === 'GET' && p === '/api/vhi/role-assignments') { await handleRoleAssignments(req, res, ctx); return true; }
+      if (m === 'POST' && p === '/api/vhi/project-access') { await handleProjectAccess(req, res, ctx); return true; }
       if (p === '/api/vhi/domains') { await handleDomains(req, res, ctx); return true; }
       const domainMatch = p.match(/^\/api\/vhi\/domains\/([^/]+)$/);
       if (domainMatch) { await handleDomains(req, res, ctx, decodeURIComponent(domainMatch[1])); return true; }

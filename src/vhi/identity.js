@@ -16,21 +16,14 @@ const getBaseUrl = () => {
   return base.replace(/\/$/, '');
 };
 
-export async function getToken() {
-  const base = getBaseUrl();
-  const port = getContextValue('vhiIdentityPort') || process.env.VHI_IDENTITY_PORT || 5000;
-  const url = `${base}:${port}/v3/auth/tokens`;
-  const user = getContextValue('vhiUser', 'VHI_USER');
-  const password = getContextValue('vhiPassword', 'VHI_PASSWORD');
-  const projectName = getContextValue('vhiProject', 'VHI_PROJECT_NAME') || 'admin';
-  const domainName = getContextValue('vhiDomain', 'VHI_DOMAIN_NAME') || 'Default';
-  const projectDomain = getContextValue('vhiProjectDomain') || domainName;
+function isProjectUuid(id) {
+  const value = String(id || '').trim();
+  return /^[0-9a-f]{32}$/i.test(value)
+    || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
 
-  if (!user || !password) {
-    throw new Error('VHI_USER and VHI_PASSWORD must be set in environment');
-  }
-
-  const body = {
+function authBody(user, password, domainName, projectScope) {
+  return {
     auth: {
       identity: {
         methods: ['password'],
@@ -43,27 +36,60 @@ export async function getToken() {
         },
       },
       scope: {
-        project: {
-          name: projectName,
-          domain: { name: projectDomain },
-        },
+        project: projectScope,
       },
     },
   };
+}
+
+export async function getToken() {
+  const base = getBaseUrl();
+  const port = getContextValue('vhiIdentityPort') || process.env.VHI_IDENTITY_PORT || 5000;
+  const url = `${base}:${port}/v3/auth/tokens`;
+  const user = getContextValue('vhiUser', 'VHI_USER');
+  const password = getContextValue('vhiPassword', 'VHI_PASSWORD');
+  const projectName = getContextValue('vhiProject', 'VHI_PROJECT_NAME') || 'admin';
+  const domainName = getContextValue('vhiDomain', 'VHI_DOMAIN_NAME') || 'Default';
+  const projectDomain = getContextValue('vhiProjectDomain') || domainName;
+  const requestedProjectId = isProjectUuid(getContextValue('vhiProjectId'))
+    ? String(getContextValue('vhiProjectId')).trim()
+    : '';
+
+  if (!user || !password) {
+    throw new Error('VHI_USER and VHI_PASSWORD must be set in environment');
+  }
+
+  const projectNameScope = { name: projectName, domain: { name: projectDomain } };
+  const projectScope = requestedProjectId
+    ? { id: requestedProjectId }
+    : projectNameScope;
 
   console.log('Fetching', url, 'for user', user);
-  const res = await fetch(url, {
+  const headers = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  let res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(body),
+    headers,
+    body: JSON.stringify(authBody(user, password, domainName, projectScope)),
   });
+
+  if (!res.ok && res.status === 401 && projectScope.id) {
+    await res.text().catch(() => '');
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(authBody(user, password, domainName, projectNameScope)),
+    });
+  }
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`VHI Identity auth failed (${res.status}): ${text.slice(0, 500)}`);
+    const hint = res.status === 401
+      ? `Keystone rejected ${user} on project ${projectName} at ${base}. Re-enter that cluster's password, or grant this user a role on the project.`
+      : text.slice(0, 300);
+    throw new Error(`VHI Identity auth failed (${res.status}): ${hint}`);
   }
 
   const token = res.headers.get('x-subject-token');
@@ -134,7 +160,7 @@ export async function listProjects(options = {}) {
 }
 
 export async function listUsers(options = {}) {
-  const data = await identityFetch(withQuery('/users', { domain_id: options.domain_id }));
+  const data = await identityFetch(withQuery('/users', { domain_id: options.domain_id, name: options.name }));
   return data.users || [];
 }
 

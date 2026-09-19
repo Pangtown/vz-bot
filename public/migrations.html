@@ -11,12 +11,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/vhi.css">
 </head>
-<body>
+<body data-nav="migrations">
 <!-- ═══════════════ LOGIN OVERLAY ═══════════════ -->
 <div id="loginOverlay">
   <div class="login-card">
     <div class="login-logo">
-      <span class="vz-brand">Virtuozzo<span> Infrastructure</span></span>
+      <span class="vz-brand">Infrastructure System (V/IS)</span>
       <h1>VI Manager</h1>
       <p>Connect to your infrastructure cluster</p>
     </div>
@@ -65,104 +65,15 @@
 
 <div id="appShell">
 <header class="app-header">
-    <span class="logo">Virtuozzo<span> Infrastructure</span></span>
+    <span class="logo">Infrastructure System (V/IS)</span>
     <span class="spacer"></span>
-    <a href="/marketplace" class="btn-chat-toggle" id="marketplaceLink" style="text-decoration:none; margin-right:0.5rem;" title="Deploy VMs from templates">🛒 Marketplace</a>
     <a href="/clusters" class="btn-chat-toggle" style="text-decoration:none; margin-right:0.5rem;" title="Multi-Cluster Dashboard">🌐 Clusters</a>
     <button class="btn-chat-toggle" id="themeToggle" title="Toggle Theme" style="margin-right:0.5rem">🌓 Theme</button>
     <button class="btn-logout" id="logoutBtn">Disconnect</button>
   </header>
 
   <div class="app-body">
-    <nav class="sidebar">
-      <!-- Brand -->
-      <div class="sidebar-brand">Virtuozzo<span> Infrastructure</span></div>
-
-      <!-- Monitoring -->
-      <div class="sidebar-section">Monitoring</div>
-      <a class="nav-item" href="/?panel=overview">
-        <span class="nav-icon">📊</span>
-        <span class="nav-label">Dashboard</span>
-      </a>
-      <a class="nav-item" href="/?panel=alerts">
-        <span class="nav-icon">🔔</span>
-        <span class="nav-label">Alerts</span>
-      </a>
-      <a class="nav-item" href="/?panel=audit">
-        <span class="nav-icon">📜</span>
-        <span class="nav-label">Audit Log</span>
-      </a>
-      <a class="nav-item" href="/?panel=chat">
-        <span class="nav-icon">🤖</span>
-        <span class="nav-label">AI Assistant</span>
-      </a>
-      <a class="nav-item" href="/?panel=scheduler">
-        <span class="nav-icon">⏱</span>
-        <span class="nav-label">Scheduler</span>
-      </a>
-
-      <!-- Compute -->
-      <div class="sidebar-section">Compute</div>
-      <a class="nav-item" href="/?panel=vms">
-        <span class="nav-icon">🖥</span>
-        <span class="nav-label">Virtual Machines</span>
-        <span class="nav-badge" id="vmBadge">–</span>
-      </a>
-      <a class="nav-item" href="/?panel=flavors">
-        <span class="nav-icon">📐</span>
-        <span class="nav-label">Flavors</span>
-      </a>
-      <a class="nav-item" href="/?panel=sshkeys">
-        <span class="nav-icon">🔑</span>
-        <span class="nav-label">SSH Keys</span>
-      </a>
-      <a class="nav-item" href="/?panel=nodes">
-        <span class="nav-icon">📦</span>
-        <span class="nav-label">Nodes</span>
-        <span class="nav-badge" id="nodeBadge">–</span>
-      </a>
-      <a class="nav-item active" href="/migrations" id="migrationsNavLink">
-        <span class="nav-icon">🔄</span>
-        <span class="nav-label">Migrations</span>
-        <span class="nav-badge" id="migrationBadge" style="display: none;">–</span>
-      </a>
-
-      <!-- Storage Services -->
-      <div class="sidebar-section">Storage Services</div>
-      <a class="nav-item" href="/?panel=storage">
-        <span class="nav-icon">💾</span>
-        <span class="nav-label">Volumes</span>
-        <span class="nav-badge" id="volBadge">–</span>
-      </a>
-
-      <!-- Infrastructure -->
-      <div class="sidebar-section">Infrastructure</div>
-      <a class="nav-item" href="/?panel=networks">
-        <span class="nav-icon">🌐</span>
-        <span class="nav-label">Networks</span>
-        <span class="nav-badge" id="netBadge">–</span>
-      </a>
-      <a class="nav-item" href="/?panel=images">
-        <span class="nav-icon">🗂</span>
-        <span class="nav-label">Images</span>
-        <span class="nav-badge" id="imgBadge">–</span>
-      </a>
-
-      <!-- Settings -->
-      <div class="sidebar-section">Settings</div>
-      <a class="nav-item" href="/?panel=domains">
-        <span class="nav-icon">🏛</span>
-        <span class="nav-label">Projects and users</span>
-        <span class="nav-badge" id="domainBadge">–</span>
-      </a>
-      <!-- Cluster footer -->
-      <div class="sidebar-footer">
-        <div class="cluster-dot" id="clusterDot"></div>
-        <select class="cluster-switcher" id="clusterSwitcher" title="Switch cluster">
-          <option value="">Not connected</option>
-        </select>
-      </div>
-    </nav>
+    <nav class="sidebar" id="appSidebar"></nav>
 
     <main class="content">
       <!-- ── MIGRATIONS & CLOUDS PANEL ── -->

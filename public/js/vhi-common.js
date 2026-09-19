@@ -18,11 +18,11 @@ function toast(msg, type = 'ok') {
 function statusBadge(status = '') {
   const s = status.toLowerCase();
   let cls = 'badge-default';
-  if (['active','up','running','available','in-use'].includes(s)) cls = 'badge-active';
+  if (['active','up','running','available','in-use','ready','failed_over'].includes(s)) cls = 'badge-active';
   else if (['error','failed','down','cancelled'].includes(s)) cls = 'badge-error';
-  else if (['cancelling'].includes(s)) cls = 'badge-build';
+  else if (['cancelling','syncing','staging','failing_over','cleaning_up'].includes(s)) cls = 'badge-build';
   else if (['build','migrating','resize'].includes(s)) cls = 'badge-build';
-  else if (['shutoff','stopped'].includes(s)) cls = 'badge-shutoff';
+  else if (['shutoff','stopped','idle'].includes(s)) cls = 'badge-shutoff';
   return `<span class="badge ${cls}">${status || '–'}</span>`;
 }
 
@@ -96,6 +96,38 @@ function authHeaders() {
 }
 
 // ── API calls ─────────────────────────────────────────────────────────────
+
+function authHeadersForTarget(target) {
+  const headers = authHeaders();
+  if (!target) return headers;
+  if (target.project) headers['X-VHI-Project'] = target.project;
+  if (target.projectId) headers['X-VHI-Project-ID'] = target.projectId;
+  if (target.projectDomain) headers['X-VHI-Project-Domain'] = target.projectDomain;
+  if (target.userDomain) headers['X-VHI-Domain'] = target.userDomain;
+  return headers;
+}
+
+async function apiGetAs(path, target) {
+  const r = await fetch(path, { headers: authHeadersForTarget(target) });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+async function apiPostAs(path, body, target) {
+  const r = await fetch(path, {
+    method: 'POST',
+    headers: { ...authHeadersForTarget(target), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
 
 async function apiGet(path) {
   const r = await fetch(path, { headers: authHeaders() });
@@ -296,12 +328,30 @@ function clusterIdFromSession(s) {
   const host = String(s.baseUrl || '').replace(/https?:\/\//, '').split('/')[0];
   return host + '_' + (s.project || 'admin');
 }
+function upsertSavedCluster(rec) {
+  const clusters = readSavedClusters();
+  const host = String(rec.baseUrl || '').replace(/https?:\/\//, '').split('/')[0];
+  const id = rec.id || (host + '_' + (rec.project || 'admin'));
+  const next = {
+    id,
+    baseUrl: rec.baseUrl,
+    username: rec.username,
+    password: rec.password,
+    project: rec.project || 'admin',
+    userDomain: rec.userDomain || 'Default',
+    projectDomain: rec.projectDomain || rec.userDomain || 'Default',
+    projectId: rec.projectId || '',
+  };
+  const idx = clusters.findIndex(c => c.id === id);
+  if (idx >= 0) clusters[idx] = Object.assign({}, clusters[idx], next);
+  else clusters.push(next);
+  localStorage.setItem(CLUSTER_STORE_KEY, JSON.stringify(clusters));
+  return next;
+}
 function rememberClusterInSwitcher() {
   if (!session) return;
-  const clusters = readSavedClusters();
-  const id = clusterIdFromSession(session);
-  const rec = {
-    id,
+  upsertSavedCluster({
+    id: clusterIdFromSession(session),
     baseUrl: session.baseUrl,
     username: session.username,
     password: session.password,
@@ -309,11 +359,7 @@ function rememberClusterInSwitcher() {
     userDomain: session.userDomain,
     projectDomain: session.projectDomain,
     projectId: session.projectId || '',
-  };
-  const idx = clusters.findIndex(c => c.id === id);
-  if (idx >= 0) clusters[idx] = Object.assign({}, clusters[idx], rec);
-  else clusters.push(rec);
-  localStorage.setItem(CLUSTER_STORE_KEY, JSON.stringify(clusters));
+  });
 }
 function refreshClusterSwitcher() {
   const sel = document.getElementById('clusterSwitcher');
@@ -368,6 +414,7 @@ function stashVhiSession() {
 }
 document.getElementById('marketplaceLink')?.addEventListener('click', stashVhiSession);
 document.getElementById('migrationsNavLink')?.addEventListener('click', stashVhiSession);
+document.getElementById('chatToggle')?.addEventListener('click', stashVhiSession);
 
 document.getElementById('logoutBtn')?.addEventListener('click', () => {
   session = null;
@@ -427,3 +474,137 @@ window.bootVhiSession = function bootVhiSession(onReady) {
     doLogin();
   }
 };
+
+function openModal(id) {
+  document.getElementById(id)?.classList.remove('hidden');
+}
+function closeModal(id) {
+  document.getElementById(id)?.classList.add('hidden');
+}
+
+const SIDEBAR_COLLAPSE_KEY = 'vhiSidebarCollapsed';
+const SIDEBAR_SECTION_FOR = {
+  overview: 'monitoring', alerts: 'monitoring', audit: 'monitoring',
+  marketplace: 'tools', migrations: 'tools', dr: 'tools', assistant: 'tools', scheduler: 'tools',
+  vms: 'compute', flavors: 'compute', sshkeys: 'compute', nodes: 'compute',
+  storage: 'storage',
+  networks: 'infrastructure', images: 'infrastructure',
+  domains: 'settings',
+};
+
+function loadSidebarCollapsed() {
+  try { return JSON.parse(localStorage.getItem(SIDEBAR_COLLAPSE_KEY) || '{}'); } catch (_) { return {}; }
+}
+
+function saveSidebarCollapsed(map) {
+  localStorage.setItem(SIDEBAR_COLLAPSE_KEY, JSON.stringify(map));
+}
+
+function currentSidebarSection() {
+  const fromItem = document.querySelector('#appSidebar .nav-item.active')?.getAttribute('data-panel');
+  const fromBody = document.body.getAttribute('data-nav') || 'overview';
+  return SIDEBAR_SECTION_FOR[fromItem] || SIDEBAR_SECTION_FOR[fromBody] || 'monitoring';
+}
+
+function applySidebarCollapse() {
+  const collapsed = loadSidebarCollapsed();
+  const openSection = currentSidebarSection();
+  document.querySelectorAll('#appSidebar .nav-group').forEach((group) => {
+    const id = group.getAttribute('data-section');
+    const isCollapsed = !!collapsed[id] && id !== openSection;
+    group.classList.toggle('collapsed', isCollapsed);
+    const btn = group.querySelector('.sidebar-section');
+    if (btn) btn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+  });
+}
+
+function bindSidebarCollapse() {
+  document.querySelectorAll('#appSidebar .nav-group .sidebar-section').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const group = btn.closest('.nav-group');
+      if (!group) return;
+      const id = group.getAttribute('data-section');
+      const nowCollapsed = !group.classList.contains('collapsed');
+      group.classList.toggle('collapsed', nowCollapsed);
+      btn.setAttribute('aria-expanded', nowCollapsed ? 'false' : 'true');
+      const map = loadSidebarCollapsed();
+      if (nowCollapsed) map[id] = true;
+      else delete map[id];
+      saveSidebarCollapsed(map);
+    });
+  });
+}
+
+function renderAppSidebar() {
+  const nav = document.getElementById('appSidebar');
+  if (!nav) return;
+  const active = document.body.getAttribute('data-nav') || 'overview';
+  const onDash = !{ marketplace: 1, migrations: 1, dr: 1, assistant: 1, scheduler: 1 }[active];
+
+  function badge(id) {
+    return id ? `<span class="nav-badge" id="${id}">–</span>` : '';
+  }
+  function panelItem(id, icon, label, badgeId) {
+    if (onDash) {
+      return `<div class="nav-item${active === id ? ' active' : ''}" data-panel="${id}"><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${badge(badgeId)}</div>`;
+    }
+    return `<a class="nav-item" href="/?panel=${encodeURIComponent(id)}" data-panel="${id}"><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${badge(badgeId)}</a>`;
+  }
+  function pageItem(id, href, icon, label, badgeId, linkId) {
+    return `<a class="nav-item${active === id ? ' active' : ''}" href="${href}" data-panel="${id}"${linkId ? ` id="${linkId}"` : ''}><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${badge(badgeId)}</a>`;
+  }
+  function sectionBlock(id, title, itemsHtml) {
+    return `<div class="nav-group" data-section="${id}">` +
+      `<button type="button" class="sidebar-section" aria-expanded="true"><span>${title}</span></button>` +
+      `<div class="nav-group-items">${itemsHtml}</div>` +
+      `</div>`;
+  }
+
+  nav.innerHTML =
+    `<div class="sidebar-brand">Infrastructure System (V/IS)</div>` +
+    sectionBlock('monitoring', 'Monitoring',
+      panelItem('overview', '📊', 'Dashboard') +
+      panelItem('alerts', '🔔', 'Alerts') +
+      panelItem('audit', '📜', 'Audit Log')) +
+    sectionBlock('tools', 'Tools',
+      pageItem('marketplace', '/marketplace', '🛒', 'Marketplace', '', 'marketplaceNavLink') +
+      pageItem('migrations', '/migrations', '🔄', 'Migrations', 'migrationBadge', 'migrationsNavLink') +
+      pageItem('dr', '/dr', '🛟', 'Disaster Recovery', 'drBadge', 'drNavLink') +
+      pageItem('assistant', '/assistant', '🤖', 'AI Assistant', '', 'assistantNavLink') +
+      pageItem('scheduler', '/scheduler', '⏱', 'Scheduler', '', 'schedulerNavLink')) +
+    sectionBlock('compute', 'Compute',
+      panelItem('vms', '🖥', 'Virtual Machines', 'vmBadge') +
+      panelItem('flavors', '📐', 'Flavors') +
+      panelItem('sshkeys', '🔑', 'SSH Keys') +
+      panelItem('nodes', '📦', 'Nodes', 'nodeBadge')) +
+    sectionBlock('storage', 'Storage Services',
+      panelItem('storage', '💾', 'Volumes', 'volBadge')) +
+    sectionBlock('infrastructure', 'Infrastructure',
+      panelItem('networks', '🌐', 'Networks', 'netBadge') +
+      panelItem('images', '🗂', 'Images', 'imgBadge')) +
+    sectionBlock('settings', 'Settings',
+      panelItem('domains', '🏛', 'Projects and users', 'domainBadge')) +
+    `<div class="sidebar-footer">` +
+    `<div class="cluster-dot" id="clusterDot"></div>` +
+    `<select class="cluster-switcher" id="clusterSwitcher" title="Switch cluster"><option value="">Not connected</option></select>` +
+    `</div>`;
+
+  ['marketplaceNavLink', 'migrationsNavLink', 'drNavLink', 'assistantNavLink', 'schedulerNavLink'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('click', stashVhiSession);
+  });
+  document.querySelectorAll('#appSidebar .nav-item[data-panel]').forEach((item) => {
+    item.addEventListener('click', () => {
+      const section = SIDEBAR_SECTION_FOR[item.getAttribute('data-panel')];
+      const group = section && document.querySelector('#appSidebar .nav-group[data-section="' + section + '"]');
+      if (!group || !group.classList.contains('collapsed')) return;
+      group.classList.remove('collapsed');
+      group.querySelector('.sidebar-section')?.setAttribute('aria-expanded', 'true');
+    });
+  });
+  applySidebarCollapse();
+  bindSidebarCollapse();
+}
+
+renderAppSidebar();

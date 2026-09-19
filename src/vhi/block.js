@@ -64,8 +64,31 @@ async function listBlockCollection(resourceType, extraParams = {}) {
   return collected;
 }
 
-export async function listVolumes() {
-  return listBlockCollection('volumes');
+export async function listVolumes(options = {}) {
+  const extra = {};
+  if (options.allTenants) extra.all_tenants = 1;
+  return listBlockCollection('volumes', extra);
+}
+
+export async function getVolumeQuota(projectId) {
+  const client = await getClient();
+  const tokenPid = client.projectId;
+  const pid = projectId || tokenPid;
+  if (!tokenPid || !pid) return null;
+  const base = getBaseUrl();
+  const port = process.env.VHI_BLOCK_PORT || 8776;
+  const urls = [
+    `${base}:${port}/v3/${tokenPid}/os-quota-sets/${pid}?usage=True`,
+    `${base}:${port}/v3/${tokenPid}/os-quota-sets/${pid}`,
+  ];
+  for (const url of urls) {
+    const res = await client.fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      return data.quota_set || null;
+    }
+  }
+  return null;
 }
 
 export async function listVolumeTypes() {
@@ -183,7 +206,12 @@ export async function uploadVolumeToImage(volumeId, options = {}) {
     throw new Error(`VHI Block uploadVolumeToImage failed (${res.status}): ${text.slice(0, 300)}`);
   }
   const data = await res.json();
-  return data.os_volume_upload_image || null;
+  const wrap = data['os-volume_upload_image'] || data.os_volume_upload_image || data || {};
+  return {
+    ...wrap,
+    image_id: wrap.image_id || wrap.glance_image_id || '',
+    volume_id: wrap.id || volumeId,
+  };
 }
 
 export async function updateVolume(volumeId, options = {}) {
@@ -335,6 +363,30 @@ export async function createSnapshot(name, volumeId, description = '') {
   }
   const data = await res.json();
   return data.snapshot || null;
+}
+
+async function waitStatus(loadFn, id, statuses, label, timeoutMs = 30 * 60 * 1000) {
+  const want = new Set((statuses || ['available']).map((s) => String(s).toLowerCase()));
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const item = await loadFn(id);
+    if (!item) throw new Error(`${label} ${id} disappeared`);
+    const st = String(item.status || '').toLowerCase();
+    if (want.has(st)) return item;
+    if (st === 'error' || st === 'error_deleting') {
+      throw new Error(`${label} ${id} ended in ${item.status}`);
+    }
+    await new Promise((r) => setTimeout(r, 4000));
+  }
+  throw new Error(`${label} ${id} did not reach ${[...want].join('/')} within ${timeoutMs}ms`);
+}
+
+export async function waitVolume(volumeId, statuses, timeoutMs) {
+  return waitStatus(getVolume, volumeId, statuses, 'Volume', timeoutMs);
+}
+
+export async function waitSnapshot(snapshotId, statuses, timeoutMs) {
+  return waitStatus(getSnapshot, snapshotId, statuses, 'Snapshot', timeoutMs);
 }
 
 export async function deleteSnapshot(snapshotId) {

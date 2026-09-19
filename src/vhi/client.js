@@ -13,7 +13,8 @@ function getCacheKey() {
   const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL') || 'default';
   const user = getContextValue('vhiUser', 'VHI_USER') || 'default';
   const project = getContextValue('vhiProject', 'VHI_PROJECT_NAME') || 'default';
-  return `${base}:${user}:${project}`;
+  const projectId = getContextValue('vhiProjectId', 'VHI_PROJECT_ID') || '';
+  return `${base}:${user}:${projectId || project}`;
 }
 
 function isExpiringSoon(expiresAt) {

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VI Manager - AI Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/vhi.css">
+  <style>
+    #panel-assistant { height: 100%; display: flex; flex-direction: column; padding: 0; }
+    #panel-assistant .panel-header { padding: 1rem 1.5rem; margin-bottom: 0; border-bottom: 1px solid var(--border); }
+    #panelChatMessages { flex: 1; padding: 1.5rem; overflow-y: auto; }
+    #panel-assistant .chat-input-wrap { padding: 1.5rem; background: var(--bg-card); display: flex; gap: .75rem; }
+    #panelChatInput { flex: 1; padding: .8rem 1rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; font-size: .95rem; outline: none; resize: none; height: 48px; max-height: 150px; }
+    #panelChatSend { padding: 0 1.5rem; border: none; border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer; font: inherit; font-weight: 600; }
+  </style>
+</head>
+<body data-nav="assistant">
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="vz-brand">Infrastructure System (V/IS)</span>
+      <h1>VI Manager</h1>
+      <p>Connect to your infrastructure cluster</p>
+    </div>
+    <div class="form-group"><label>Cluster Address</label><input type="text" id="loginHost" value="172.16.218.7" autocomplete="off"></div>
+    <div class="form-group"><label>Username</label><input type="text" id="loginUser" value="admin" autocomplete="username"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="loginPass" value="Nexpass8188!" autocomplete="current-password"></div>
+    <button class="advanced-toggle" id="advToggle" type="button"><span id="advArrow">&#9654;</span> <span>Advanced Options</span></button>
+    <div class="advanced-fields" id="advFields">
+      <div class="advanced-grid">
+        <div class="form-group"><label>User Domain</label><input type="text" id="loginUserDomain" value="Default"></div>
+        <div class="form-group"><label>Project Domain</label><input type="text" id="loginProjDomain" value="Default"></div>
+      </div>
+      <div class="form-group"><label>Project Name</label><input type="text" id="loginProject" value="admin"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" id="discoverBtn" type="button">Discover</button>
+      <button class="btn btn-primary" id="connectBtn" type="button">Connect</button>
+    </div>
+    <div class="login-status" id="loginStatus"></div>
+  </div>
+</div>
+
+<div id="appShell">
+  <header class="app-header">
+    <span class="logo">Infrastructure System (V/IS)</span>
+    <span class="spacer"></span>
+    <a href="/clusters" class="btn-chat-toggle" style="text-decoration:none; margin-right:0.5rem;">Clusters</a>
+    <button class="btn-chat-toggle" id="themeToggle" style="margin-right:0.5rem">Theme</button>
+    <button class="btn-chat-toggle" id="settingsToggle" title="Settings" style="margin-right:0.5rem">Settings</button>
+    <button class="btn-logout" id="logoutBtn">Disconnect</button>
+  </header>
+  <div class="app-body">
+    <nav class="sidebar" id="appSidebar"></nav>
+    <main class="content">
+      <div class="panel active" id="panel-assistant">
+        <div class="panel-header">
+          <h2>AI Assistant</h2>
+          <span class="panel-badge">Powered by VZ Bot</span>
+        </div>
+        <div id="panelChatMessages" class="chat-messages">
+          <div class="msg msg-ai">Hello. Ask about this cluster -- VMs, nodes, storage, networks, or scheduled jobs.</div>
+        </div>
+        <div class="chat-input-wrap">
+          <textarea id="panelChatInput" placeholder="Ask anything about your VHI infrastructure..." rows="1"></textarea>
+          <button id="panelChatSend">Send</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="settingsModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 400px;">
+    <div class="modal-header">
+      <h3>Global Settings</h3>
+      <button class="modal-close" id="closeSettingsModal">X</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>LLM Provider</label>
+        <select id="llmProvider">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>API Key</label>
+        <input type="password" id="llmApiKey" placeholder="sk-...">
+      </div>
+      <div class="form-group">
+        <label>Base URL (Optional)</label>
+        <input type="text" id="llmBaseUrl" placeholder="https://api.openai.com/v1">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="cancelSettingsBtn" style="flex:0; padding: .6rem 1rem;">Cancel</button>
+      <button class="btn btn-primary" id="saveSettingsBtn" style="flex:0; padding: .6rem 1.2rem;">Save Settings</button>
+    </div>
+  </div>
+</div>
+<script src="/js/vhi-common.js"></script>
+<script src="/js/assistant.js"></script>
+</body>
+</html>

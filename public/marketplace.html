@@ -1,148 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VZ Marketplace</title>
-<style>
-  :root {
-    --bg: #141518; --panel: #1e2025; --panel-2: #26282d; --border: #33363c;
-    --text: #e8e9eb; --muted: #9a9ea6; --accent: #e11d2e; --accent-hover: #c01625;
-    --success: #2ecc71; --warn: #f1c40f; --danger: #e74c3c; --radius: 10px;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: var(--bg); color: var(--text); font: 14px/1.5 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
-  a { color: inherit; }
-
-  header {
-    display: flex; align-items: center; gap: 16px; padding: 14px 24px;
-    background: var(--panel); border-bottom: 1px solid var(--border);
-    position: sticky; top: 0; z-index: 50;
-  }
-  header h1 { font-size: 19px; font-weight: 700; }
-  header h1 .vz { color: var(--accent); }
-  .cluster-chip { display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 14px; font-size: 12.5px; color: var(--muted); }
-  .cluster-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
-  header nav { margin-left: auto; display: flex; gap: 6px; }
-  header nav a { color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; }
-  header nav a:hover { background: var(--panel-2); color: var(--text); }
-
-  .tabs { display: flex; gap: 4px; padding: 16px 24px 0; }
-  .tab { padding: 9px 18px; border-radius: 8px 8px 0 0; cursor: pointer; color: var(--muted); border: 1px solid transparent; border-bottom: none; font-weight: 600; font-size: 13.5px; }
-  .tab.active { background: var(--panel); color: var(--text); border-color: var(--border); }
-  main { padding: 20px 24px 60px; }
-
-  .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-  .toolbar input[type=text] { flex: 0 0 320px; }
-  .toolbar .spacer { flex: 1; }
-
-  input[type=text], input[type=number], input[type=password], select, textarea {
-    width: 100%; background: #17181c; color: var(--text); border: 1px solid var(--border);
-    border-radius: 7px; padding: 9px 12px; font-size: 13.5px; outline: none;
-  }
-  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-  textarea { font-family: Consolas, 'Courier New', monospace; font-size: 12.5px; resize: vertical; }
-  label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 14px 0 5px; }
-
-  .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); border-radius: 7px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
-  .btn:hover { background: #2e3138; }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .btn.primary:hover { background: var(--accent-hover); }
-  .btn.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
-  .btn:disabled { opacity: .5; cursor: not-allowed; }
-  .btn.sm { padding: 5px 10px; font-size: 12px; }
-
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-  .card {
-    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 18px; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s;
-  }
-  .card:hover { border-color: #4a4e56; }
-  .card .os-icon { font-size: 26px; }
-  .card h3 { font-size: 15px; font-weight: 700; word-break: break-word; }
-  .card .meta { color: var(--muted); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
-  .card .deploy-row { margin-top: auto; padding-top: 12px; }
-  .badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 700; background: var(--panel-2); color: var(--muted); }
-  .badge.active { color: var(--success); }
-  .badge.warn { color: var(--warn); }
-  .badge.off { color: var(--danger); }
-  .ci-warn { display: none; margin-top: 8px; padding: 9px 12px; border: 1px solid var(--warn); border-radius: 7px; font-size: 12.5px; color: var(--warn); background: rgba(241,196,15,.07); }
-
-  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
-  th { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; }
-  tr:last-child td { border-bottom: none; }
-  td .desc { color: var(--muted); font-size: 12px; }
-
-  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: flex-start; justify-content: center; z-index: 100; overflow-y: auto; padding: 40px 16px; }
-  .overlay.open { display: flex; }
-  .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 560px; padding: 26px 28px 24px; }
-  .modal h2 { font-size: 17px; margin-bottom: 4px; }
-  .modal .sub { color: var(--muted); font-size: 12.5px; }
-  .modal .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
-
-  .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
-  .status-msg { margin-top: 14px; font-size: 13px; display: none; }
-  .status-msg.error { color: var(--danger); display: block; }
-  .status-msg.ok { color: var(--success); display: block; }
-
-  .empty { color: var(--muted); text-align: center; padding: 60px 0; }
-  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid var(--success); border-radius: 8px; padding: 12px 18px; font-size: 13px; display: none; z-index: 200; max-width: 420px; }
-  #toast.error { border-left-color: var(--danger); }
-
-  /* login overlay */
-  #loginOverlay .modal { max-width: 400px; }
-  #loginOverlay h2 { text-align: center; font-size: 21px; }
-  #loginOverlay h2 .vz { color: var(--accent); }
-  #loginOverlay .sub { text-align: center; margin-bottom: 8px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VI Manager – Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/vhi.css">
+  <style>
+    .mp-tabs { display: flex; gap: 4px; margin: 0 0 1rem; }
+    .mp-tab { padding: 9px 18px; border-radius: 8px 8px 0 0; cursor: pointer; color: var(--text-dim); border: 1px solid transparent; border-bottom: none; font-weight: 600; font-size: 13.5px; }
+    .mp-tab.active { background: var(--bg-card); color: var(--text); border-color: var(--border); }
+    .mp-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .mp-toolbar input[type=text] { flex: 0 0 320px; }
+    .mp-toolbar .spacer { flex: 1; }
+    .mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .mp-grid .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+    .mp-grid .os-icon { font-size: 26px; }
+    .mp-grid h3 { font-size: 15px; font-weight: 700; word-break: break-word; }
+    .mp-grid .meta { color: var(--text-dim); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+    .mp-grid .deploy-row { margin-top: auto; padding-top: 12px; }
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 700; background: var(--bg-dark); color: var(--text-dim); }
+    .badge.active { color: #2ecc71; }
+    .badge.warn { color: #f1c40f; }
+    .badge.off { color: #e74c3c; }
+    .ci-warn { display: none; margin-top: 8px; padding: 9px 12px; border: 1px solid #f1c40f; border-radius: 7px; font-size: 12.5px; color: #f1c40f; }
+    .empty { color: var(--text-dim); text-align: center; padding: 60px 0; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: flex-start; justify-content: center; z-index: 100; overflow-y: auto; padding: 40px 16px; }
+    .overlay.open { display: flex; }
+    .overlay .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 560px; padding: 26px 28px 24px; }
+    .overlay .modal h2 { font-size: 17px; margin-bottom: 4px; }
+    .overlay .modal .sub { color: var(--text-dim); font-size: 12.5px; }
+    .overlay .modal .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+    .hint { font-size: 12px; color: var(--text-dim); margin-top: 5px; }
+    .status-msg { margin-top: 14px; font-size: 13px; display: none; }
+    .status-msg.error { color: #e74c3c; display: block; }
+    .status-msg.ok { color: #2ecc71; display: block; }
+    .desc { color: var(--text-dim); font-size: 12px; }
+    #tab-scripts table { width: 100%; border-collapse: collapse; }
+    #tab-scripts th, #tab-scripts td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--border); }
+  </style>
 </head>
-<body>
-
-<header>
-  <h1>Virtuozzo <span class="vz">Marketplace</span></h1>
-  <div class="cluster-chip" id="clusterChip" style="display:none">
-    <span class="dot"></span><span id="clusterName"></span>&nbsp;·&nbsp;<span id="projectName"></span>
+<body data-nav="marketplace">
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="vz-brand">Infrastructure System (V/IS)</span>
+      <h1>VI Manager</h1>
+      <p>Connect to your infrastructure cluster</p>
+    </div>
+    <div class="form-group">
+      <label>Cluster Address</label>
+      <input type="text" id="loginHost" value="172.16.218.7" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="loginUser" value="admin" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="loginPass" value="Nexpass8188!" autocomplete="current-password">
+    </div>
+    <button class="advanced-toggle" id="advToggle" type="button">
+      <span id="advArrow">▶</span> <span>Advanced Options</span>
+    </button>
+    <div class="advanced-fields" id="advFields">
+      <div class="advanced-grid">
+        <div class="form-group">
+          <label>User Domain</label>
+          <input type="text" id="loginUserDomain" value="Default">
+        </div>
+        <div class="form-group">
+          <label>Project Domain</label>
+          <input type="text" id="loginProjDomain" value="Default">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Project Name</label>
+        <input type="text" id="loginProject" value="admin">
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" id="discoverBtn" type="button">Discover</button>
+      <button class="btn btn-primary" id="connectBtn" type="button">Connect</button>
+    </div>
+    <div class="login-status" id="loginStatus"></div>
   </div>
-  <nav>
-    <a href="/">Dashboard</a>
-    <a href="/clusters">Clusters</a>
-    <a href="/chat">Chat</a>
-  </nav>
-</header>
-
-<div class="tabs">
-  <div class="tab active" data-tab="templates">VM Templates</div>
-  <div class="tab" data-tab="scripts">Script Repository</div>
 </div>
 
-<main>
-  <!-- Templates tab -->
-  <section id="tab-templates">
-    <div class="toolbar">
-      <input type="text" id="tplSearch" placeholder="Search templates…">
-      <div class="spacer"></div>
-      <span class="hint" id="tplHiddenNote"></span>
-      <button class="btn" id="tplRefresh">↻ Refresh</button>
-    </div>
-    <div class="grid" id="tplGrid"><div class="empty">Loading templates…</div></div>
-  </section>
+<div id="appShell">
+  <header class="app-header">
+    <span class="logo">Infrastructure System (V/IS)</span>
+    <span class="spacer"></span>
+    <a href="/clusters" class="btn-chat-toggle" style="text-decoration:none; margin-right:0.5rem;">🌐 Clusters</a>
+    <button class="btn-chat-toggle" id="themeToggle" style="margin-right:0.5rem">🌓 Theme</button>
+    <button class="btn-logout" id="logoutBtn">Disconnect</button>
+  </header>
+  <div class="app-body">
+    <nav class="sidebar" id="appSidebar"></nav>
+    <main class="content">
+      <div class="panel active">
+        <div class="panel-header">
+          <h2>Marketplace</h2>
+          <span class="panel-badge">Templates and scripts</span>
+        </div>
+        <div class="mp-tabs">
+          <div class="mp-tab active" data-tab="templates">VM Templates</div>
+          <div class="mp-tab" data-tab="scripts">Script Repository</div>
+        </div>
+        <section id="tab-templates">
+          <div class="mp-toolbar">
+            <input type="text" id="tplSearch" placeholder="Search templates…">
+            <div class="spacer"></div>
+            <span class="hint" id="tplHiddenNote"></span>
+            <button class="btn btn-secondary" id="tplRefresh">↻ Refresh</button>
+          </div>
+          <div class="mp-grid" id="tplGrid"><div class="empty">Loading templates…</div></div>
+        </section>
+        <section id="tab-scripts" style="display:none">
+          <div class="mp-toolbar">
+            <div class="spacer"></div>
+            <button class="btn btn-primary" id="newScriptBtn">+ New Script</button>
+          </div>
+          <div class="table-card">
+            <table>
+              <thead><tr><th>Name</th><th>Description</th><th>Updated</th><th style="width:140px"></th></tr></thead>
+              <tbody id="scriptRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
 
-  <!-- Scripts tab -->
-  <section id="tab-scripts" style="display:none">
-    <div class="toolbar">
-      <div class="spacer"></div>
-      <button class="btn primary" id="newScriptBtn">+ New Script</button>
-    </div>
-    <table>
-      <thead><tr><th>Name</th><th>Description</th><th>Updated</th><th style="width:140px"></th></tr></thead>
-      <tbody id="scriptRows"></tbody>
-    </table>
-  </section>
-</main>
+<div id="toast"></div>
 
-<!-- Deploy modal -->
 <div class="overlay" id="deployOverlay">
   <div class="modal">
     <h2 id="deployTitle">Deploy VM</h2>
@@ -165,16 +159,15 @@
     <select id="depScript"></select>
     <textarea id="depScriptContent" rows="9" spellcheck="false" style="margin-top:8px; display:none"></textarea>
     <div class="ci-warn" id="depCiWarn"></div>
-    <div class="hint">Runs on first boot via cloud-init. Start with <code>#cloud-config</code> (YAML) or <code>#!/bin/bash</code>. Edits here apply to this deployment only.</div>
+    <div class="hint">Runs on first boot via cloud-init.</div>
     <div class="status-msg" id="deployStatus"></div>
     <div class="actions">
-      <button class="btn" id="depCancel">Cancel</button>
-      <button class="btn primary" id="depGo">Deploy</button>
+      <button class="btn btn-secondary" id="depCancel">Cancel</button>
+      <button class="btn btn-primary" id="depGo">Deploy</button>
     </div>
   </div>
 </div>
 
-<!-- Script editor modal -->
 <div class="overlay" id="scriptOverlay">
   <div class="modal">
     <h2 id="scriptModalTitle">New Script</h2>
@@ -183,412 +176,16 @@
     <label>Description</label>
     <input type="text" id="scrDesc" placeholder="What this script sets up">
     <label>Script Content</label>
-    <textarea id="scrContent" rows="14" spellcheck="false" placeholder="#cloud-config&#10;package_update: true&#10;packages:&#10;  - postgresql"></textarea>
+    <textarea id="scrContent" rows="14" spellcheck="false" placeholder="#cloud-config"></textarea>
     <div class="status-msg" id="scriptStatus"></div>
     <div class="actions">
-      <button class="btn" id="scrCancel">Cancel</button>
-      <button class="btn primary" id="scrSave">Save Script</button>
+      <button class="btn btn-secondary" id="scrCancel">Cancel</button>
+      <button class="btn btn-primary" id="scrSave">Save Script</button>
     </div>
   </div>
 </div>
 
-<!-- Login overlay -->
-<div class="overlay" id="loginOverlay">
-  <div class="modal">
-    <h2>Virtuozzo <span class="vz">Marketplace</span></h2>
-    <div class="sub">Connect to your infrastructure cluster</div>
-    <label>Cluster Address</label>
-    <input type="text" id="loginHost" placeholder="https://cluster.example.com">
-    <label>Username</label>
-    <input type="text" id="loginUser" value="admin">
-    <label>Password</label>
-    <input type="password" id="loginPass">
-    <label>Project</label>
-    <input type="text" id="loginProject" value="admin">
-    <div class="status-msg" id="loginStatus"></div>
-    <div class="actions">
-      <button class="btn primary" id="loginBtn" style="width:100%; justify-content:center">Connect</button>
-    </div>
-  </div>
-</div>
-
-<div id="toast"></div>
-
-<script>
-'use strict';
-
-// ── session ───────────────────────────────────────────────────────────────
-let session = null;
-let images = [], flavors = [], networks = [], scripts = [];
-let deployImage = null, editingScriptId = null;
-
-function authHeaders() {
-  const webPw = localStorage.getItem('webPassword') || '';
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(webPw ? { 'X-Web-Password': webPw } : {}),
-  };
-  if (!session) return headers;
-  return {
-    ...headers,
-    'X-VHI-Base-URL':   session.baseUrl,
-    'X-VHI-User':       session.username,
-    'X-VHI-Password':   session.password,
-    'X-VHI-Project':    session.project,
-    'X-VHI-Project-ID': session.projectId || '',
-    'X-VHI-Domain':     session.userDomain || 'Default',
-  };
-}
-
-async function api(path, opts = {}) {
-  const res = await fetch(path, { headers: authHeaders(), ...opts });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-  return data;
-}
-
-function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-}
-
-function toast(msg, isError = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = isError ? 'error' : '';
-  t.style.display = 'block';
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => { t.style.display = 'none'; }, isError ? 8000 : 4000);
-}
-
-// ── login ─────────────────────────────────────────────────────────────────
-async function connect(baseUrl, username, password, project) {
-  const data = await api('/api/vhi/auth', {
-    method: 'POST',
-    body: JSON.stringify({ baseUrl, username, password, project: project || 'admin' }),
-  });
-  if (!data.ok) throw new Error(data.error || 'Authentication failed');
-  session = {
-    baseUrl: data.baseUrl, username: data.username, password,
-    project: data.project, projectId: data.projectId || '', userDomain: data.userDomain,
-  };
-  document.getElementById('loginOverlay').classList.remove('open');
-  document.getElementById('clusterChip').style.display = 'flex';
-  document.getElementById('clusterName').textContent = data.baseUrl.replace(/https?:\/\//, '');
-  document.getElementById('projectName').textContent = data.project;
-  loadAll();
-}
-
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const el = document.getElementById('loginStatus');
-  el.className = 'status-msg'; el.textContent = '';
-  const btn = document.getElementById('loginBtn');
-  btn.disabled = true; btn.textContent = 'Connecting…';
-  try {
-    await connect(
-      document.getElementById('loginHost').value.trim(),
-      document.getElementById('loginUser').value.trim(),
-      document.getElementById('loginPass').value,
-      document.getElementById('loginProject').value.trim(),
-    );
-  } catch (err) {
-    el.className = 'status-msg error'; el.textContent = err.message;
-  } finally {
-    btn.disabled = false; btn.textContent = 'Connect';
-  }
-});
-
-// Auto-connect with credentials forwarded from the dashboard/clusters pages
-(async () => {
-  const b = localStorage.getItem('vhiBaseUrl'), u = localStorage.getItem('vhiUser'),
-        p = localStorage.getItem('vhiPassword'), pr = localStorage.getItem('vhiProject');
-  if (b && u && p) {
-    try { await connect(b, u, p, pr || 'admin'); return; } catch (_) { /* fall through to login */ }
-  }
-  document.getElementById('loginOverlay').classList.add('open');
-})();
-
-// ── tabs ──────────────────────────────────────────────────────────────────
-document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  tab.classList.add('active');
-  document.getElementById('tab-templates').style.display = tab.dataset.tab === 'templates' ? '' : 'none';
-  document.getElementById('tab-scripts').style.display = tab.dataset.tab === 'scripts' ? '' : 'none';
-}));
-
-// ── data loading ──────────────────────────────────────────────────────────
-async function loadAll() {
-  loadScripts();
-  loadTemplates();
-  try {
-    const [f, n] = await Promise.all([api('/api/vhi/flavors'), api('/api/vhi/networks')]);
-    flavors = f.flavors || [];
-    networks = n.networks || [];
-  } catch (err) { toast('Failed to load flavors/networks: ' + err.message, true); }
-}
-
-async function loadTemplates() {
-  const grid = document.getElementById('tplGrid');
-  grid.innerHTML = '<div class="empty">Loading templates…</div>';
-  try {
-    const data = await api('/api/vhi/images');
-    const active = (data.images || []).filter(i => i.status === 'active');
-    // Marketplace shows deployable templates only: no installer ISOs, no
-    // images that cannot run post-provision scripts (CoreOS/Ignition, ISO
-    // media), and no cluster system images (tagged hci.system).
-    images = active.filter(i =>
-      (i.disk_format || '').toLowerCase() !== 'iso' &&
-      cloudInitSupport(i).level !== 'no' &&
-      !(i.tags || []).includes('hci.system')
-    );
-    const hidden = active.length - images.length;
-    document.getElementById('tplHiddenNote').textContent =
-      hidden > 0 ? `${hidden} image${hidden === 1 ? '' : 's'} hidden (ISOs / system / no script support)` : '';
-    renderTemplates();
-  } catch (err) {
-    grid.innerHTML = `<div class="empty">Failed to load images: ${esc(err.message)}</div>`;
-  }
-}
-
-function osIcon(img) {
-  const n = ((img.os_distro || '') + ' ' + (img.name || '')).toLowerCase();
-  if (n.includes('win')) return '🪟';
-  if (n.includes('ubuntu')) return '🟠';
-  if (n.includes('centos') || n.includes('alma') || n.includes('rocky') || n.includes('rhel') || n.includes('fedora')) return '🔴';
-  if (n.includes('debian')) return '🌀';
-  if (n.includes('cirros') || n.includes('test')) return '🧪';
-  return '🐧';
-}
-
-function fmtSize(bytes) {
-  if (!bytes) return '–';
-  const gb = bytes / 1073741824;
-  return gb >= 1 ? gb.toFixed(1) + ' GB' : (bytes / 1048576).toFixed(0) + ' MB';
-}
-
-// Heuristic: will cloud-init run post-provision scripts on this image?
-function cloudInitSupport(img) {
-  const n = ((img.name || '') + ' ' + (img.os_distro || '')).toLowerCase();
-  const fmt = (img.disk_format || '').toLowerCase();
-  if (n.includes('coreos')) return {
-    level: 'no', label: '✗ no cloud-init (Ignition)',
-    title: 'CoreOS images use Ignition and ignore #cloud-config — post-provision scripts will NOT run.',
-  };
-  if (fmt === 'iso' || /\.iso(\s|$)/.test(n)) return {
-    level: 'no', label: '✗ installer ISO',
-    title: 'This is an installer ISO, not a cloud image — post-provision scripts will NOT run.',
-  };
-  if (n.includes('vmware') || n.includes('vporter')) return {
-    level: 'unknown', label: '? cloud-init unknown',
-    title: 'Migrated image — cloud-init may not be installed, so scripts may not run.',
-  };
-  const distros = ['ubuntu', 'debian', 'centos', 'alma', 'rocky', 'rhel', 'fedora', 'suse', 'cirros'];
-  if (distros.some(d => n.includes(d))) return {
-    level: 'yes', label: '✓ cloud-init ready',
-    title: 'Standard cloud image — post-provision scripts should run on first boot.',
-  };
-  return {
-    level: 'unknown', label: '? cloud-init unknown',
-    title: 'Could not tell from image metadata whether cloud-init is installed — scripts may not run.',
-  };
-}
-
-function ciBadge(img) {
-  const ci = cloudInitSupport(img);
-  const cls = ci.level === 'yes' ? 'active' : ci.level === 'no' ? 'off' : 'warn';
-  return `<span class="badge ${cls}" title="${esc(ci.title)}">${esc(ci.label)}</span>`;
-}
-
-function renderTemplates() {
-  const q = document.getElementById('tplSearch').value.trim().toLowerCase();
-  const list = images.filter(i => !q || (i.name || '').toLowerCase().includes(q));
-  const grid = document.getElementById('tplGrid');
-  if (!list.length) { grid.innerHTML = '<div class="empty">No templates found.</div>'; return; }
-  grid.innerHTML = list.map(img => `
-    <div class="card">
-      <div class="os-icon">${osIcon(img)}</div>
-      <h3>${esc(img.name || img.id)}</h3>
-      <div class="meta">
-        <span>${esc(img.os_distro || 'unknown os')}${img.os_version ? ' ' + esc(img.os_version) : ''}</span>
-        <span>${fmtSize(img.size)}</span>
-        <span>min disk ${img.min_disk || 0} GB</span>
-      </div>
-      <div><span class="badge active">ACTIVE</span> ${ciBadge(img)}</div>
-      <div class="deploy-row"><button class="btn primary" style="width:100%; justify-content:center" data-deploy="${esc(img.id)}">Deploy</button></div>
-    </div>`).join('');
-  grid.querySelectorAll('[data-deploy]').forEach(btn =>
-    btn.addEventListener('click', () => openDeploy(btn.dataset.deploy)));
-}
-
-document.getElementById('tplSearch').addEventListener('input', renderTemplates);
-document.getElementById('tplRefresh').addEventListener('click', loadTemplates);
-
-// ── deploy ────────────────────────────────────────────────────────────────
-function openDeploy(imageId) {
-  deployImage = images.find(i => i.id === imageId);
-  if (!deployImage) return;
-  document.getElementById('deployTitle').textContent = 'Deploy: ' + (deployImage.name || deployImage.id);
-  document.getElementById('deploySub').textContent = `Project “${session?.project}” on ${session?.baseUrl?.replace(/https?:\/\//, '')}`;
-  document.getElementById('depName').value = '';
-  document.getElementById('depDisk').value = Math.max(deployImage.min_disk || 0, 20);
-
-  document.getElementById('depFlavor').innerHTML = flavors.map(f =>
-    `<option value="${esc(f.id)}">${esc(f.name)} — ${f.vcpus} vCPU / ${Math.round((f.ram || 0) / 1024)} GB RAM</option>`).join('')
-    || '<option value="">No flavors available</option>';
-
-  document.getElementById('depNetwork').innerHTML = networks.map(n =>
-    `<option value="${esc(n.id)}">${esc(n.name || n.id)}</option>`).join('')
-    || '<option value="">No networks available</option>';
-
-  const sel = document.getElementById('depScript');
-  sel.innerHTML = '<option value="">None — no post-provision script</option>'
-    + scripts.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')
-    + '<option value="__custom__">Custom — write your own…</option>';
-  document.getElementById('depScriptContent').style.display = 'none';
-  document.getElementById('depScriptContent').value = '';
-  document.getElementById('depCiWarn').style.display = 'none';
-
-  const st = document.getElementById('deployStatus');
-  st.className = 'status-msg'; st.textContent = '';
-  document.getElementById('deployOverlay').classList.add('open');
-}
-
-function updateCiWarning() {
-  const warn = document.getElementById('depCiWarn');
-  const scriptChosen = !!document.getElementById('depScript').value;
-  const ci = deployImage ? cloudInitSupport(deployImage) : null;
-  if (scriptChosen && ci && ci.level !== 'yes') {
-    warn.textContent = '⚠ ' + ci.title;
-    warn.style.display = 'block';
-  } else {
-    warn.style.display = 'none';
-  }
-}
-
-document.getElementById('depScript').addEventListener('change', (e) => {
-  const ta = document.getElementById('depScriptContent');
-  const v = e.target.value;
-  updateCiWarning();
-  if (!v) { ta.style.display = 'none'; ta.value = ''; return; }
-  ta.style.display = 'block';
-  if (v === '__custom__') { ta.value = '#cloud-config\npackage_update: true\nruncmd:\n  - echo "provisioned by vz-bot marketplace"\n'; return; }
-  const s = scripts.find(x => x.id === v);
-  ta.value = s ? s.content : '';
-});
-
-document.getElementById('depCancel').addEventListener('click', () =>
-  document.getElementById('deployOverlay').classList.remove('open'));
-
-document.getElementById('depGo').addEventListener('click', async () => {
-  const st = document.getElementById('deployStatus');
-  const name = document.getElementById('depName').value.trim();
-  const flavorRef = document.getElementById('depFlavor').value;
-  const netId = document.getElementById('depNetwork').value;
-  const diskGb = parseInt(document.getElementById('depDisk').value, 10);
-  const userData = document.getElementById('depScript').value ? document.getElementById('depScriptContent').value.trim() : '';
-
-  st.className = 'status-msg'; st.textContent = '';
-  if (!name) { st.className = 'status-msg error'; st.textContent = 'VM name is required.'; return; }
-  if (!flavorRef) { st.className = 'status-msg error'; st.textContent = 'Pick a flavor.'; return; }
-  if (!netId) { st.className = 'status-msg error'; st.textContent = 'Pick a network.'; return; }
-  if (!diskGb || diskGb < (deployImage.min_disk || 1)) {
-    st.className = 'status-msg error'; st.textContent = `Boot volume must be at least ${deployImage.min_disk || 1} GB for this image.`; return;
-  }
-
-  const btn = document.getElementById('depGo');
-  btn.disabled = true; btn.textContent = 'Deploying…';
-  try {
-    const payload = {
-      name,
-      imageRef: deployImage.id,
-      flavorRef,
-      networks: [{ uuid: netId }],
-      volume_size: diskGb,
-    };
-    if (userData) payload.user_data = userData;
-    const data = await api('/api/vhi/servers', { method: 'POST', body: JSON.stringify(payload) });
-    st.className = 'status-msg ok';
-    st.textContent = `Deployed! Server ID ${data.server?.id || '(pending)'} — first boot will run your script via cloud-init.`;
-    toast(`VM “${name}” is deploying${userData ? ' with post-provision script' : ''}.`);
-    setTimeout(() => document.getElementById('deployOverlay').classList.remove('open'), 2500);
-  } catch (err) {
-    st.className = 'status-msg error'; st.textContent = err.message;
-  } finally {
-    btn.disabled = false; btn.textContent = 'Deploy';
-  }
-});
-
-// ── script repository ─────────────────────────────────────────────────────
-async function loadScripts() {
-  try {
-    const data = await api('/api/vhi/marketplace/scripts');
-    scripts = data.scripts || [];
-    renderScripts();
-  } catch (err) { toast('Failed to load scripts: ' + err.message, true); }
-}
-
-function renderScripts() {
-  const tbody = document.getElementById('scriptRows');
-  if (!scripts.length) {
-    tbody.innerHTML = '<tr><td colspan="4"><div class="empty">No scripts yet — add one.</div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = scripts.map(s => `
-    <tr>
-      <td><strong>${esc(s.name)}</strong></td>
-      <td class="desc">${esc(s.description || '')}</td>
-      <td class="desc">${s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : '–'}</td>
-      <td>
-        <button class="btn sm" data-edit="${esc(s.id)}">Edit</button>
-        <button class="btn sm danger" data-del="${esc(s.id)}">Delete</button>
-      </td>
-    </tr>`).join('');
-  tbody.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openScriptEditor(b.dataset.edit)));
-  tbody.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteScript(b.dataset.del)));
-}
-
-function openScriptEditor(id = null) {
-  editingScriptId = id;
-  const s = id ? scripts.find(x => x.id === id) : null;
-  document.getElementById('scriptModalTitle').textContent = s ? 'Edit Script' : 'New Script';
-  document.getElementById('scrName').value = s?.name || '';
-  document.getElementById('scrDesc').value = s?.description || '';
-  document.getElementById('scrContent').value = s?.content || '';
-  const st = document.getElementById('scriptStatus');
-  st.className = 'status-msg'; st.textContent = '';
-  document.getElementById('scriptOverlay').classList.add('open');
-}
-
-document.getElementById('newScriptBtn').addEventListener('click', () => openScriptEditor());
-document.getElementById('scrCancel').addEventListener('click', () =>
-  document.getElementById('scriptOverlay').classList.remove('open'));
-
-document.getElementById('scrSave').addEventListener('click', async () => {
-  const st = document.getElementById('scriptStatus');
-  const body = {
-    name: document.getElementById('scrName').value.trim(),
-    description: document.getElementById('scrDesc').value.trim(),
-    content: document.getElementById('scrContent').value,
-  };
-  if (editingScriptId) body.id = editingScriptId;
-  try {
-    await api('/api/vhi/marketplace/scripts', { method: 'POST', body: JSON.stringify(body) });
-    document.getElementById('scriptOverlay').classList.remove('open');
-    toast(`Script “${body.name}” saved.`);
-    loadScripts();
-  } catch (err) {
-    st.className = 'status-msg error'; st.textContent = err.message;
-  }
-});
-
-async function deleteScript(id) {
-  const s = scripts.find(x => x.id === id);
-  if (!confirm(`Delete script “${s?.name}”? This cannot be undone.`)) return;
-  try {
-    await api('/api/vhi/marketplace/scripts/' + id, { method: 'DELETE' });
-    toast('Script deleted.');
-    loadScripts();
-  } catch (err) { toast('Delete failed: ' + err.message, true); }
-}
-</script>
+<script src="/js/vhi-common.js"></script>
+<script src="/js/marketplace.js"></script>
 </body>
 </html>

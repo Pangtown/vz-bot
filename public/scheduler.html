@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VI Manager – Scheduler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/vhi.css">
+</head>
+<body data-nav="scheduler">
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="vz-brand">Infrastructure System (V/IS)</span>
+      <h1>VI Manager</h1>
+      <p>Connect to your infrastructure cluster</p>
+    </div>
+    <div class="form-group"><label>Cluster Address</label><input type="text" id="loginHost" value="172.16.218.7" autocomplete="off"></div>
+    <div class="form-group"><label>Username</label><input type="text" id="loginUser" value="admin" autocomplete="username"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="loginPass" value="Nexpass8188!" autocomplete="current-password"></div>
+    <button class="advanced-toggle" id="advToggle" type="button"><span id="advArrow">▶</span> <span>Advanced Options</span></button>
+    <div class="advanced-fields" id="advFields">
+      <div class="advanced-grid">
+        <div class="form-group"><label>User Domain</label><input type="text" id="loginUserDomain" value="Default"></div>
+        <div class="form-group"><label>Project Domain</label><input type="text" id="loginProjDomain" value="Default"></div>
+      </div>
+      <div class="form-group"><label>Project Name</label><input type="text" id="loginProject" value="admin"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" id="discoverBtn" type="button">Discover</button>
+      <button class="btn btn-primary" id="connectBtn" type="button">Connect</button>
+    </div>
+    <div class="login-status" id="loginStatus"></div>
+  </div>
+</div>
+
+<div id="appShell">
+  <header class="app-header">
+    <span class="logo">Infrastructure System (V/IS)</span>
+    <span class="spacer"></span>
+    <a href="/clusters" class="btn-chat-toggle" style="text-decoration:none; margin-right:0.5rem;">🌐 Clusters</a>
+    <button class="btn-chat-toggle" id="themeToggle" style="margin-right:0.5rem">🌓 Theme</button>
+    <button class="btn-logout" id="logoutBtn">Disconnect</button>
+  </header>
+  <div class="app-body">
+    <nav class="sidebar" id="appSidebar"></nav>
+    <main class="content">
+      <div class="panel active" id="panel-scheduler">
+        <div class="panel-header">
+          <h2>Scheduler</h2>
+          <span class="panel-badge" id="jobCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="act-btn act-start" style="padding:.4rem .9rem; margin-right:.5rem;" onclick="openCreateJobModal()">+ New job</button>
+            <button class="tbl-refresh" id="jobRefresh" onclick="loadJobs()"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <p style="color:var(--text-dim); font-size:.85rem; margin:-.6rem 0 1rem;">Run start/stop/reboot or volume snapshots on a cron, interval, or one-shot schedule. Jobs use the cluster credentials from this session and keep running while vz-bot is up.</p>
+        <div class="table-card">
+          <div class="table-toolbar"><input type="search" class="search-input" id="jobSearch" placeholder="Search jobs…"></div>
+          <table>
+            <thead><tr><th>Name</th><th>Action</th><th>Target</th><th>Schedule</th><th>Last run</th><th>Enabled</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody id="jobBody"><tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div id="toast"></div>
+
+<div id="createJobModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 500px;">
+    <div class="modal-header"><h3>New Scheduled Job</h3><button class="modal-close" onclick="closeModal('createJobModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Name</label><input type="text" id="newJobName" placeholder="Nightly snapshot"></div>
+      <div class="form-group"><label>Action</label>
+        <select id="newJobAction">
+          <option value="start_vm">Start VM</option>
+          <option value="stop_vm">Stop VM</option>
+          <option value="reboot_vm">Reboot VM</option>
+          <option value="snapshot_volume">Snapshot volume</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Target</label><select id="newJobTarget"></select></div>
+      <div class="form-group"><label>Schedule type</label>
+        <select id="newJobKind" onchange="syncJobScheduleFields()">
+          <option value="cron">Cron</option>
+          <option value="interval">Every N minutes</option>
+          <option value="once">Once at</option>
+        </select>
+      </div>
+      <div class="form-group" id="jobCronWrap"><label>Cron (min hour day month weekday)</label><input type="text" id="newJobCron" value="0 2 * * *"></div>
+      <div class="form-group hidden" id="jobIntervalWrap"><label>Minutes</label><input type="number" id="newJobMinutes" value="60" min="1"></div>
+      <div class="form-group hidden" id="jobOnceWrap">
+        <label>When</label>
+        <div class="dt-row">
+          <div>
+            <label for="newJobDate" style="text-transform:none; letter-spacing:0; font-weight:500;">Date</label>
+            <input type="date" id="newJobDate" onchange="updateJobOncePreview()">
+          </div>
+          <div>
+            <label for="newJobTime" style="text-transform:none; letter-spacing:0; font-weight:500;">Time</label>
+            <input type="time" id="newJobTime" step="60" onchange="updateJobOncePreview()">
+          </div>
+        </div>
+        <div class="dt-quick">
+          <button type="button" onclick="setJobOncePreset('15m')">In 15 min</button>
+          <button type="button" onclick="setJobOncePreset('1h')">In 1 hour</button>
+          <button type="button" onclick="setJobOncePreset('tomorrow9')">Tomorrow 9:00</button>
+          <button type="button" onclick="setJobOncePreset('2am')">Next 2:00 AM</button>
+        </div>
+        <div class="dt-preview" id="jobOncePreview">Pick a date and time, or use a shortcut.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createJobModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateJob()">Create job</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/vhi-common.js"></script>
+<script src="/js/scheduler.js"></script>
+</body>
+</html>

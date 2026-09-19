@@ -1,10 +1,11 @@
 import { runWithContext } from '../context.js';
-import { listServers, getServer, serverAction, startServer, stopServer, rebootServer, deleteServer, createServer, listFlavors, createFlavor, deleteFlavor, listKeypairs, createKeypair, deleteKeypair, getRemoteConsole } from '../../vhi/compute.js';
+import { listServers, getServer, serverAction, startServer, stopServer, rebootServer, deleteServer, createServer, listFlavors, createFlavor, deleteFlavor, listKeypairs, createKeypair, deleteKeypair, getRemoteConsole, getComputeQuota } from '../../vhi/compute.js';
 import { listImages, createImage, uploadImageData, updateImageVisibility, deleteImage } from '../../vhi/image.js';
 import { listPorts, listNetworks, updatePort } from '../../vhi/network.js';
+import { listUsers, listRoleAssignments } from '../../vhi/identity.js';
 import { listInterfaces, attachInterface, detachInterface } from '../../vhi/compute.js';
 import { getClient } from '../../vhi/client.js';
-import { attachVolume, detachVolume } from '../../vhi/block.js';
+import { attachVolume, detachVolume, getVolumeQuota, listVolumes, listVolumeTypes } from '../../vhi/block.js';
 import { json, readBody } from './helpers.js';
 import { logger, retryOperation } from '../../utils/index.js';
 import { runVinfraCommand } from '../../vhi/vinfra.js';
@@ -237,6 +238,102 @@ export async function handleCreateServer(req, res, ctx) {
     return json(res, 200, { server });
   } catch (err) {
     logger.error(`handleCreateServer error: ${err.message}`, { error: err.message });
+    return json(res, 502, { error: err.message });
+  }
+}
+
+function quotaField(raw) {
+  if (raw == null) return null;
+  if (typeof raw === 'object') {
+    return {
+      limit: raw.limit ?? raw.quota ?? null,
+      in_use: raw.in_use ?? raw.used ?? null,
+    };
+  }
+  return { limit: raw, in_use: null };
+}
+
+export async function handleQuotas(req, res, ctx) {
+  try {
+    const data = await runWithContext(ctx, async () => {
+      const compute = await getComputeQuota().catch(() => null);
+      const volume = await getVolumeQuota().catch(() => null);
+      return {
+        compute: compute ? {
+          instances: quotaField(compute.instances),
+          cores: quotaField(compute.cores),
+          ram: quotaField(compute.ram),
+        } : null,
+        volume: volume ? {
+          volumes: quotaField(volume.volumes),
+          gigabytes: quotaField(volume.gigabytes),
+          snapshots: quotaField(volume.snapshots),
+        } : null,
+      };
+    });
+    return json(res, 200, data);
+  } catch (err) {
+    logger.error(`handleQuotas error: ${err.message}`, { error: err.message });
+    return json(res, 502, { error: err.message });
+  }
+}
+
+function volumeProjectId(vol) {
+  return vol?.['os-vol-tenant-attr:tenant_id'] || vol?.tenant_id || vol?.project_id || '';
+}
+
+function networkForProject(net, projectId) {
+  if (net?.shared) return true;
+  if (net?.['router:external']) return true;
+  const tid = net?.tenant_id || net?.project_id;
+  return tid === projectId;
+}
+
+export async function handleCreateVmCatalog(req, res, ctx) {
+  try {
+    const projectId = new URL(req.url || '', 'http://localhost').searchParams.get('project_id');
+    if (!projectId) return json(res, 400, { error: 'project_id is required' });
+    const data = await runWithContext(ctx, async () => {
+      const userName = ctx.vhiUser || '';
+      const [flavors, networks, images, types, volumes, computeQuota, volumeQuota, assignments] = await Promise.all([
+        listFlavors().catch(() => []),
+        listNetworks().catch(() => []),
+        listImages().catch(() => []),
+        listVolumeTypes().catch(() => []),
+        listVolumes({ allTenants: true }).catch(() => []),
+        getComputeQuota(projectId).catch(() => null),
+        getVolumeQuota(projectId).catch(() => null),
+        listRoleAssignments({ project_id: projectId }).catch(() => []),
+      ]);
+      const users = userName ? await listUsers({ name: userName }).catch(() => []) : [];
+      const user = users.find((u) => u.name === userName);
+      const has_project_role = (assignments || []).some((a) =>
+        (user && (a.user?.id === user.id || a.user_id === user.id)) || a.user?.name === userName
+      );
+      return {
+        has_project_role,
+        flavors: (flavors || []).filter((f) => f['os-flavor-access:is_public'] !== false),
+        networks: (networks || []).filter((n) => networkForProject(n, projectId) && !(String(n.name || '').toLowerCase().startsWith('ha network'))),
+        images: images || [],
+        volume_types: types || [],
+        volumes: (volumes || []).filter((v) => volumeProjectId(v) === projectId),
+        quotas: {
+          compute: computeQuota ? {
+            instances: quotaField(computeQuota.instances),
+            cores: quotaField(computeQuota.cores),
+            ram: quotaField(computeQuota.ram),
+          } : null,
+          volume: volumeQuota ? {
+            volumes: quotaField(volumeQuota.volumes),
+            gigabytes: quotaField(volumeQuota.gigabytes),
+            snapshots: quotaField(volumeQuota.snapshots),
+          } : null,
+        },
+      };
+    });
+    return json(res, 200, data);
+  } catch (err) {
+    logger.error(`handleCreateVmCatalog error: ${err.message}`, { error: err.message });
     return json(res, 502, { error: err.message });
   }
 }

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>VI Manager – Disaster Recovery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/vhi.css">
+</head>
+<body data-nav="dr">
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="vz-brand">Infrastructure System (V/IS)</span>
+      <h1>VI Manager</h1>
+      <p>Connect to your infrastructure cluster</p>
+    </div>
+    <div class="form-group">
+      <label>Cluster Address</label>
+      <input type="text" id="loginHost" value="172.16.218.7" placeholder="hostname or IP" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="loginUser" value="admin" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="loginPass" value="Nexpass8188!" autocomplete="current-password">
+    </div>
+    <button class="advanced-toggle" id="advToggle" type="button">
+      <span id="advArrow">▶</span> <span>Advanced Options</span>
+    </button>
+    <div class="advanced-fields" id="advFields">
+      <div class="advanced-grid">
+        <div class="form-group">
+          <label>User Domain</label>
+          <input type="text" id="loginUserDomain" value="Default">
+        </div>
+        <div class="form-group">
+          <label>Project Domain</label>
+          <input type="text" id="loginProjDomain" value="Default">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Project Name</label>
+        <input type="text" id="loginProject" value="admin">
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" id="discoverBtn" type="button">Discover</button>
+      <button class="btn btn-primary" id="connectBtn" type="button">Connect</button>
+    </div>
+    <div class="login-status" id="loginStatus"></div>
+  </div>
+</div>
+
+<div id="appShell">
+  <header class="app-header">
+    <span class="logo">Infrastructure System (V/IS)</span>
+    <span class="spacer"></span>
+    <a href="/clusters" class="btn-chat-toggle" style="text-decoration:none; margin-right:0.5rem;">🌐 Clusters</a>
+    <button class="btn-chat-toggle" id="themeToggle" style="margin-right:0.5rem">🌓 Theme</button>
+    <button class="btn-logout" id="logoutBtn">Disconnect</button>
+  </header>
+  <div class="app-body">
+    <nav class="sidebar" id="appSidebar"></nav>
+    <main class="content">
+      <div class="panel active" id="panel-dr">
+        <div class="panel-header">
+          <h2>Disaster Recovery</h2>
+          <span class="panel-badge" id="drCount">Loading…</span>
+          <div class="panel-actions">
+            <button class="act-btn act-start" id="btnCreateDrPlan" style="padding:.4rem .9rem; margin-right:.5rem;">+ New plan</button>
+            <button class="tbl-refresh" id="drRefresh"><span class="ri">↻</span> Refresh</button>
+          </div>
+        </div>
+        <p style="color:var(--text-dim); font-size:.85rem; margin:-.6rem 0 1rem;">Warm-standby to a second VHI cluster. Each sync snapshots primary volumes, copies them through Glance, and keeps SHUTOFF standbys ready. Failover shuts down the source VM if the primary is reachable, then starts the DR guest.</p>
+        <div class="table-card">
+          <div class="table-toolbar"><input type="search" class="search-input" id="drSearch" placeholder="Search DR plans…"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Primary → DR</th>
+                <th>Status</th>
+                <th>VMs</th>
+                <th>Interval</th>
+                <th>Last sync</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="drBody">
+              <tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="createDrPlanModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 580px;">
+    <div class="modal-header">
+      <h3>New DR plan</h3>
+      <button class="modal-close" onclick="closeModal('createDrPlanModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-dim" style="font-size:.85rem; margin-bottom:1rem;">This only pairs the clusters. After you create the plan, a guide opens so you can add VMs, then Sync, Stage, and Failover.</p>
+      <div class="form-group">
+        <label>Plan name</label>
+        <input type="text" id="newDrName" placeholder="e.g. Production to DR site">
+      </div>
+      <div class="form-group">
+        <label>DR cluster</label>
+        <select id="drTargetSelect"></select>
+      </div>
+      <p class="text-dim" id="drNoClusterHint" style="font-size:.8rem; margin:-.4rem 0 .8rem; display:none;">No other cluster is saved yet. Enter the DR site below and click Connect cluster.</p>
+      <div id="drManualFields" class="hidden">
+        <div class="form-group"><label>Cluster address</label><input type="text" id="drManualHost" placeholder="hostname or IP"></div>
+        <div class="form-group"><label>Username</label><input type="text" id="drManualUser" placeholder="admin"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="drManualPass"></div>
+        <div class="form-group"><label>Project</label><input type="text" id="drManualProject" value="admin"></div>
+        <div class="form-group"><label>User domain</label><input type="text" id="drManualDomain" value="Default"></div>
+        <div class="form-group"><label>Project domain</label><input type="text" id="drManualProjDomain" value="Default"></div>
+      </div>
+      <div id="drSavedPassWrap" class="hidden">
+        <p class="text-dim" style="font-size:.8rem; margin:-.2rem 0 .6rem;">If probe fails, enter the password for this saved cluster.</p>
+        <div class="form-group"><label>DR password</label><input type="password" id="drSavedPass" autocomplete="off"></div>
+      </div>
+      <div class="form-group">
+        <label>Sync interval (minutes, min 15)</label>
+        <input type="number" id="newDrInterval" value="60" min="15">
+      </div>
+      <div class="form-group">
+        <label>DR network</label>
+        <select id="drNetworkSelect"><option value="">Probe the DR cluster to list networks</option></select>
+      </div>
+      <p class="text-dim" id="drProbeStatus" style="font-size:.8rem;"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createDrPlanModal')">Cancel</button>
+      <button class="btn btn-secondary" id="drConnectClusterBtn" onclick="connectDrCluster()">Connect cluster</button>
+      <button class="btn btn-secondary" onclick="probeDrTarget()">Probe DR</button>
+      <button class="btn btn-primary" onclick="submitCreateDrPlan()">Create plan</button>
+    </div>
+  </div>
+</div>
+
+<div id="drProgressModal" class="modal-overlay hidden">
+  <div class="modal-card" style="width: 720px; max-width: 95vw;">
+    <div class="modal-header">
+      <h3 id="drProgressTitle">DR procedure</h3>
+      <button class="modal-close" onclick="closeDrProgress()">✕</button>
+    </div>
+    <div class="modal-body">
+      <ol class="dr-steps" id="drProgressSteps"></ol>
+      <div id="drProgressProtectWrap" class="hidden">
+        <p class="text-dim" style="font-size:.82rem; margin:0 0 .55rem;">Select VMs on this primary cluster to protect. They are copied to the DR site on Sync.</p>
+        <div class="dr-check-list" id="drProgressProtectList"></div>
+      </div>
+      <p class="dr-progress-status" id="drProgressStatus"></p>
+      <h4 style="font-size:.75rem; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); margin:1rem 0 .5rem;">Live log</h4>
+      <div id="drProgressLogWrap"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeDrProgress()">Close</button>
+      <button class="btn btn-primary hidden" id="drProgressNextBtn">Continue</button>
+    </div>
+  </div>
+</div>
+
+<div id="drDrawer" class="info-drawer wide">
+  <div class="drawer-header">
+    <div>
+      <h2 id="drDetName" style="font-size:1.25rem; font-weight:700;">DR plan</h2>
+    </div>
+    <button class="chat-close" onclick="closeDrDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drDetBody"></div>
+  <div class="modal-footer" style="padding: 1rem 1.5rem; background: var(--bg-sidebar);">
+    <button class="btn btn-secondary" onclick="closeDrDrawer()">Close</button>
+  </div>
+</div>
+
+<script src="/js/vhi-common.js"></script>
+<script src="/js/dr.js"></script>
+</body>
+</html>

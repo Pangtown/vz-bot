@@ -1,5 +1,6 @@
 import { runWithContext } from '../context.js';
 import { listProjects, listUsers, listDomains, getDomain, updateDomain, listGroups, createDomain, createUser, createGroup, listRoleAssignments, listRoles, assignRole, updateProject, deleteProject } from '../../vhi/identity.js';
+import { clearTokenCache } from '../../vhi/client.js';
 import { json, readBody } from './helpers.js';
 import { logger } from '../../utils/index.js';
 
@@ -148,6 +149,53 @@ export async function handleRoleAssignments(req, res, ctx) {
     return json(res, 200, { role_assignments: assignments });
   } catch (err) {
     logger.error(`handleRoleAssignments error: ${err.message}`, { error: err.message });
+    return json(res, 502, { error: err.message });
+  }
+}
+
+function pickProjectRole(roles) {
+  const order = ['admin', 'project_admin', 'member', 'user', '_member_'];
+  for (const name of order) {
+    const hit = (roles || []).find((r) => String(r.name || '').toLowerCase() === name);
+    if (hit) return hit;
+  }
+  return (roles || [])[0] || null;
+}
+
+async function findUserByName(userName) {
+  const named = await listUsers({ name: userName }).catch(() => []);
+  let user = named.find((u) => u.name === userName);
+  if (user) return user;
+  const all = await listUsers({}).catch(() => []);
+  return all.find((u) => u.name === userName) || null;
+}
+
+export async function handleProjectAccess(req, res, ctx) {
+  try {
+    const body = await readBody(req);
+    const projectId = body.project_id;
+    if (!projectId) return json(res, 400, { error: 'project_id is required' });
+    const result = await runWithContext(ctx, async () => {
+      const userName = ctx.vhiUser;
+      if (!userName) throw new Error('No VHI user in this session');
+      const user = await findUserByName(userName);
+      if (!user) throw new Error(`Could not find user ${userName} in Keystone`);
+      const roles = await listRoles();
+      const role = pickProjectRole(roles);
+      if (!role) throw new Error('No admin or member role exists to assign');
+      const existing = await listRoleAssignments({ project_id: projectId });
+      const already = existing.some((a) =>
+        a.user?.id === user.id || a.user_id === user.id || a.user?.name === userName
+      );
+      if (!already) {
+        await assignRole({ user_id: user.id, role_id: role.id, project_id: projectId });
+      }
+      return { ok: true, granted: !already, user_id: user.id, role: role.name };
+    });
+    clearTokenCache();
+    return json(res, 200, result);
+  } catch (err) {
+    logger.error(`handleProjectAccess error: ${err.message}`, { error: err.message });
     return json(res, 502, { error: err.message });
   }
 }

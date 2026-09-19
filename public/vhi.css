@@ -352,21 +352,42 @@
       display: flex; flex-direction: column;
       overflow-y: auto;
     }
-    /* Virtuozzo brand block at top of sidebar */
+    /* Product brand block at top of sidebar */
     .sidebar-brand {
       padding: 1.1rem 1.2rem;
-      font-size: 1.15rem; font-weight: 800;
-      color: #ffffff; letter-spacing: -.5px;
+      font-size: .95rem; font-weight: 800;
+      color: var(--text); letter-spacing: -.3px;
+      line-height: 1.3;
       border-bottom: 1px solid #333;
       flex-shrink: 0;
     }
     .sidebar-brand span { color: var(--accent); }
     .sidebar-section {
-      padding: .9rem 1.2rem .3rem;
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%;
+      padding: .9rem 1.2rem .35rem;
+      margin: 0;
+      border: none;
+      background: transparent;
+      font: inherit;
       font-size: .68rem; font-weight: 700; letter-spacing: 1px;
       color: #666; text-transform: uppercase;
+      text-align: left;
+      cursor: pointer;
       user-select: none;
     }
+    .sidebar-section:hover { color: #bbb; }
+    .sidebar-section::after {
+      content: '';
+      width: 0; height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid currentColor;
+      transition: transform .15s ease;
+      flex-shrink: 0;
+    }
+    .nav-group.collapsed .sidebar-section::after { transform: rotate(-90deg); }
+    .nav-group.collapsed .nav-group-items { display: none; }
     .nav-item {
       display: flex; align-items: center; gap: .7rem;
       padding: .6rem 1.2rem .6rem 1.5rem;
@@ -647,7 +668,7 @@
     .info-drawer {
       position: fixed;
       top: 58px;
-      right: -520px;
+      right: 0;
       width: 520px;
       max-width: 95vw;
       bottom: 0;
@@ -656,9 +677,57 @@
       box-shadow: -12px 0 48px rgba(0,0,0,.3);
       display: flex; flex-direction: column;
       z-index: 850;
-      transition: right .3s cubic-bezier(.4,0,.2,1);
+      transform: translateX(calc(100% + 32px));
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+      pointer-events: none;
     }
-    .info-drawer.open { right: 0; }
+    .info-drawer.open {
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+    .info-drawer.wide { width: 640px; }
+
+    .dr-check-list { display: flex; flex-direction: column; gap: .45rem; max-height: 220px; overflow-y: auto; }
+    .dr-check { display: flex; align-items: center; gap: .5rem; font-size: .88rem; color: var(--text); }
+    .dr-check input { accent-color: var(--accent); }
+    #drManualFields.hidden { display: none !important; }
+    .dr-log {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .7rem .85rem;
+      max-height: 280px;
+      overflow-y: auto;
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: .75rem;
+      line-height: 1.5;
+    }
+    .dr-log-row { margin: 0 0 .28rem; color: var(--text); }
+    .dr-log-info { color: var(--text-dim); }
+    .dr-log-warn { color: #e67e22; }
+    .dr-log-error { color: var(--accent); }
+    .dr-log-time { opacity: .65; margin-right: .45rem; }
+    .dr-steps { list-style: none; padding: 0; margin: 0 0 .8rem; }
+    .dr-step {
+      display: flex; gap: .7rem; align-items: flex-start;
+      padding: .55rem 0; border-bottom: 1px solid var(--border);
+      font-size: .88rem;
+    }
+    .dr-step-mark {
+      width: 1.4rem; height: 1.4rem; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: .75rem; font-weight: 700;
+      background: var(--bg-light); color: var(--text-dim); border: 1px solid var(--border);
+    }
+    .dr-step.done .dr-step-mark { background: rgba(39,174,96,.15); color: #27ae60; border-color: rgba(39,174,96,.3); }
+    .dr-step.active .dr-step-mark { background: rgba(243,156,18,.15); color: #e67e22; border-color: rgba(243,156,18,.35); }
+    .dr-step.blocked .dr-step-mark { background: rgba(227,0,15,.1); color: var(--accent); border-color: rgba(227,0,15,.25); }
+    .dr-step-detail { font-size: .78rem; color: var(--text-dim); margin-top: .2rem; line-height: 1.4; }
+    .dr-progress-status { font-size: .88rem; margin: .4rem 0 .2rem; }
+    .dr-progress-status.err { color: var(--accent); }
+    #drProgressProtectWrap { margin: .2rem 0 1rem; padding: .75rem .85rem; border: 1px solid var(--border); border-radius: 8px; }
+    #drProgressProtectWrap.hidden { display: none !important; }
+    #drProgressProtectList { max-height: 180px; }
     
     .drawer-header {
       padding: 1.2rem 1.5rem;

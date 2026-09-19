@@ -14,6 +14,7 @@ import { tickMigrations } from '../vmware/migration-engine.js';
 import { sweepIdleCloneStore } from '../vmware/windows-replica-fill.js';
 import { getLastValidContext } from './context.js';
 import { prefetchClusterNodeInventory } from './vhi-api/compute.js';
+import { tickDueDrPlans } from '../vhi/dr-engine.js';
 
 let healthJob = null;
 let lastHealthResult = null;
@@ -148,6 +149,15 @@ export function start(config = {}) {
     }
   });
   console.log('Scheduler: node hardware inventory prefetch on start and every 15 min (new nodes only)');
+
+  cron.schedule('* * * * *', async () => {
+    try {
+      await tickDueDrPlans();
+    } catch (err) {
+      console.error('DR sync tick error:', err.message);
+    }
+  });
+  console.log('Scheduler: DR warm-standby sync tick every minute');
 }
 
 /**

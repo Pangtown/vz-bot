@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/vhi.css">
 
 </head>
-<body>
+<body data-nav="overview">
   
 <!-- ═══════════════ CONSOLE SELECTION MODAL ═══════════════ -->
 <div id="consoleModal" class="modal-overlay hidden">
@@ -60,7 +60,7 @@
 <div id="loginOverlay">
   <div class="login-card">
     <div class="login-logo">
-      <span class="vz-brand">Virtuozzo<span> Infrastructure</span></span>
+      <span class="vz-brand">Infrastructure System (V/IS)</span>
       <h1>VI Manager</h1>
       <p>Connect to your infrastructure cluster</p>
     </div>
@@ -112,108 +112,18 @@
 
   <!-- header -->
   <header class="app-header">
-    <span class="logo">Virtuozzo<span> Infrastructure</span></span>
+    <span class="logo">Infrastructure System (V/IS)</span>
     <span class="spacer"></span>
-    <a href="/marketplace" class="btn-chat-toggle" id="marketplaceLink" style="text-decoration:none; margin-right:0.5rem;" title="Deploy VMs from templates">🛒 Marketplace</a>
     <a href="/clusters" class="btn-chat-toggle" style="text-decoration:none; margin-right:0.5rem;" title="Multi-Cluster Dashboard">🌐 Clusters</a>
     <button class="btn-chat-toggle" id="themeToggle" title="Toggle Theme" style="margin-right:0.5rem">🌓 Theme</button>
     <button class="btn-chat-toggle" id="settingsToggle" title="Settings" style="margin-right:0.5rem">⚙ Settings</button>
-    <button class="btn-chat-toggle" id="chatToggle" title="Open AI Chat">💬 AI Chat</button>
+    <a href="/assistant" class="btn-chat-toggle" id="chatToggle" style="text-decoration:none;" title="AI Assistant">💬 AI Chat</a>
     <button class="btn-logout" id="logoutBtn">Disconnect</button>
   </header>
 
   <div class="app-body">
 
-    <!-- sidebar -->
-    <nav class="sidebar">
-      <!-- Brand -->
-      <div class="sidebar-brand">Virtuozzo<span> Infrastructure</span></div>
-
-      <!-- Monitoring -->
-      <div class="sidebar-section">Monitoring</div>
-      <div class="nav-item active" data-panel="overview">
-        <span class="nav-icon">📊</span>
-        <span class="nav-label">Dashboard</span>
-      </div>
-      <div class="nav-item" data-panel="alerts">
-        <span class="nav-icon">🔔</span>
-        <span class="nav-label">Alerts</span>
-      </div>
-      <div class="nav-item" data-panel="audit">
-        <span class="nav-icon">📜</span>
-        <span class="nav-label">Audit Log</span>
-      </div>
-      <div class="nav-item" data-panel="chat">
-        <span class="nav-icon">🤖</span>
-        <span class="nav-label">AI Assistant</span>
-      </div>
-      <div class="nav-item" data-panel="scheduler">
-        <span class="nav-icon">⏱</span>
-        <span class="nav-label">Scheduler</span>
-      </div>
-
-      <!-- Compute -->
-      <div class="sidebar-section">Compute</div>
-      <div class="nav-item" data-panel="vms">
-        <span class="nav-icon">🖥</span>
-        <span class="nav-label">Virtual Machines</span>
-        <span class="nav-badge" id="vmBadge">–</span>
-      </div>
-      <div class="nav-item" data-panel="flavors">
-        <span class="nav-icon">📐</span>
-        <span class="nav-label">Flavors</span>
-      </div>
-      <div class="nav-item" data-panel="sshkeys">
-        <span class="nav-icon">🔑</span>
-        <span class="nav-label">SSH Keys</span>
-      </div>
-      <div class="nav-item" data-panel="nodes">
-        <span class="nav-icon">📦</span>
-        <span class="nav-label">Nodes</span>
-        <span class="nav-badge" id="nodeBadge">–</span>
-      </div>
-      <a href="/migrations" class="nav-item" id="migrationsNavLink">
-        <span class="nav-icon">🔄</span>
-        <span class="nav-label">Migrations</span>
-        <span class="nav-badge" id="migrationBadge" style="display: none;">–</span>
-      </a>
-
-      <!-- Storage Services -->
-      <div class="sidebar-section">Storage Services</div>
-      <div class="nav-item" data-panel="storage">
-        <span class="nav-icon">💾</span>
-        <span class="nav-label">Volumes</span>
-        <span class="nav-badge" id="volBadge">–</span>
-      </div>
-
-      <!-- Infrastructure -->
-      <div class="sidebar-section">Infrastructure</div>
-      <div class="nav-item" data-panel="networks">
-        <span class="nav-icon">🌐</span>
-        <span class="nav-label">Networks</span>
-        <span class="nav-badge" id="netBadge">–</span>
-      </div>
-      <div class="nav-item" data-panel="images">
-        <span class="nav-icon">🗂</span>
-        <span class="nav-label">Images</span>
-        <span class="nav-badge" id="imgBadge">–</span>
-      </div>
-
-      <!-- Settings -->
-      <div class="sidebar-section">Settings</div>
-      <div class="nav-item" data-panel="domains">
-        <span class="nav-icon">🏛</span>
-        <span class="nav-label">Projects and users</span>
-        <span class="nav-badge" id="domainBadge">–</span>
-      </div>
-      <!-- Cluster footer -->
-      <div class="sidebar-footer">
-        <div class="cluster-dot" id="clusterDot"></div>
-        <select class="cluster-switcher" id="clusterSwitcher" title="Switch cluster">
-          <option value="">Not connected</option>
-        </select>
-      </div>
-    </nav>
+    <nav class="sidebar" id="appSidebar"></nav>
 
     <!-- main content -->
     <main class="content">
@@ -828,26 +738,6 @@
         </div>
       </div>
 
-      <!-- ── SCHEDULER ── -->
-      <div class="panel" id="panel-scheduler">
-        <div class="panel-header">
-          <h2>Scheduler</h2>
-          <span class="panel-badge" id="jobCount">Loading…</span>
-          <div class="panel-actions">
-            <button class="act-btn act-start" style="padding:.4rem .9rem; margin-right:.5rem;" onclick="openCreateJobModal()">+ New job</button>
-            <button class="tbl-refresh" id="jobRefresh" onclick="loadJobs()"><span class="ri">↻</span> Refresh</button>
-          </div>
-        </div>
-        <p style="color:var(--text-dim); font-size:.85rem; margin:-.6rem 0 1rem;">Run start/stop/reboot or volume snapshots on a cron, interval, or one-shot schedule. Jobs use the cluster credentials from this session and keep running while vz-bot is up. Ask the AI assistant to create jobs by name.</p>
-        <div class="table-card">
-          <div class="table-toolbar"><input type="search" class="search-input" id="jobSearch" placeholder="Search jobs…"></div>
-          <table>
-            <thead><tr><th>Name</th><th>Action</th><th>Target</th><th>Schedule</th><th>Last run</th><th>Enabled</th><th style="text-align:right;">Actions</th></tr></thead>
-            <tbody id="jobBody"><tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr></tbody>
-          </table>
-        </div>
-      </div>
-
       <!-- ── IMAGES ── -->
       <div class="panel" id="panel-images">
         <div class="panel-header">
@@ -878,21 +768,6 @@
               <tr class="skeleton-row"><td colspan="7"><div class="skeleton"></div></td></tr>
             </tbody>
           </table>
-        </div>
-      </div>
-
-      <!-- ── AI ASSISTANT PANEL ── -->
-      <div class="panel" id="panel-chat" style="height: 100%; display: flex; flex-direction: column; padding: 0;">
-        <div class="panel-header" style="padding: 1rem 1.5rem; margin-bottom: 0; border-bottom: 1px solid var(--border);">
-          <h2>AI Assistant</h2>
-          <span class="panel-badge">Powered by VZ Bot</span>
-        </div>
-        <div id="panelChatMessages" class="chat-messages" style="flex: 1; padding: 1.5rem;">
-          <!-- Messages will be mirrored here -->
-        </div>
-        <div class="chat-input-wrap" style="padding: 1.5rem; background: var(--bg-card);">
-          <textarea id="panelChatInput" placeholder="Ask anything about your VHI infrastructure..." rows="1" style="flex: 1; padding: .8rem 1rem; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; font-size: .95rem; outline: none; resize: none; height: 48px; max-height: 150px; transition: border-color var(--transition); line-height: 1.5;"></textarea>
-          <button id="panelChatSend" style="padding: 0 1.5rem; border: none; border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer; font: inherit; font-weight: 600; font-size: 1rem; transition: background var(--transition), transform .1s; flex-shrink: 0;">Send</button>
         </div>
       </div>
 
@@ -955,29 +830,54 @@
 
 <!-- ═══════════════ CREATE VM MODAL ═══════════════ -->
 <div id="createVmModal" class="modal-overlay hidden">
-  <div class="modal-card">
+  <div class="modal-card" style="width: 560px;">
     <div class="modal-header">
       <h3>Create Virtual Machine</h3>
       <button class="modal-close" id="closeVmModal">✕</button>
     </div>
     <div class="modal-body">
+      <p class="text-dim" style="font-size:.82rem; margin-bottom:1rem;">Choose the domain and project first. Flavors, networks, and volumes then load from that tenant (quota and access as defined on the cluster). Your admin session is not switched.</p>
+      <div class="form-group">
+        <label>Domain</label>
+        <select id="newVmDomain"><option>Loading...</option></select>
+      </div>
+      <div class="form-group">
+        <label>Project</label>
+        <select id="newVmProject"><option>Loading...</option></select>
+      </div>
+      <p class="text-dim" id="vmCreateQuota" style="font-size:.8rem; margin:-.4rem 0 .9rem;">Select a project to load flavors, networks, and volumes.</p>
+      <div id="vmGrantAccessWrap" class="hidden" style="margin:-.2rem 0 1rem; padding:.75rem .9rem; border:1px solid var(--border); border-radius:8px;">
+        <p class="text-dim" style="font-size:.8rem; margin:0 0 .6rem;">This admin user has no role on the selected project, so Keystone will not issue a token for it. Grant a project role to create VMs in that tenant. Flavors, networks, and volumes below are still listed with admin rights.</p>
+        <button type="button" class="btn btn-secondary" id="vmGrantAccessBtn">Grant access</button>
+      </div>
       <div class="form-group">
         <label>VM Name</label>
         <input type="text" id="newVmName" placeholder="e.g. web-server-01">
       </div>
       <div class="form-group">
+        <label>Disk source</label>
+        <select id="newVmDiskSource">
+          <option value="image">Image (create a boot volume)</option>
+          <option value="volume">Existing volume in this project</option>
+        </select>
+      </div>
+      <div class="form-group" id="vmImageGroup">
         <label>Image (OS)</label>
         <select id="newVmImage"><option>Loading...</option></select>
+      </div>
+      <div class="form-group hidden" id="vmVolumeGroup">
+        <label>Boot volume</label>
+        <select id="newVmVolume"><option>Select a project first</option></select>
       </div>
       <div class="form-group">
         <label>Flavor (Size)</label>
         <select id="newVmFlavor"><option>Loading...</option></select>
       </div>
-      <div class="form-group">
+      <div class="form-group" id="vmPolicyGroup">
         <label>Storage Policy (Volume Type)</label>
         <select id="newVmPolicy"><option>Loading...</option></select>
       </div>
-      <div class="form-group">
+      <div class="form-group" id="vmDiskSizeGroup">
         <label>Disk Size (GB)</label>
         <input type="number" id="newVmDiskSize" value="60" min="1">
       </div>
@@ -1239,57 +1139,6 @@
   </div>
 </div>
 
-<div id="createJobModal" class="modal-overlay hidden">
-  <div class="modal-card" style="width: 500px;">
-    <div class="modal-header"><h3>New Scheduled Job</h3><button class="modal-close" onclick="closeModal('createJobModal')">✕</button></div>
-    <div class="modal-body">
-      <div class="form-group"><label>Name</label><input type="text" id="newJobName" placeholder="Nightly snapshot"></div>
-      <div class="form-group"><label>Action</label>
-        <select id="newJobAction">
-          <option value="start_vm">Start VM</option>
-          <option value="stop_vm">Stop VM</option>
-          <option value="reboot_vm">Reboot VM</option>
-          <option value="snapshot_volume">Snapshot volume</option>
-        </select>
-      </div>
-      <div class="form-group"><label>Target</label><select id="newJobTarget"></select></div>
-      <div class="form-group"><label>Schedule type</label>
-        <select id="newJobKind" onchange="syncJobScheduleFields()">
-          <option value="cron">Cron</option>
-          <option value="interval">Every N minutes</option>
-          <option value="once">Once at</option>
-        </select>
-      </div>
-      <div class="form-group" id="jobCronWrap"><label>Cron (min hour day month weekday)</label><input type="text" id="newJobCron" value="0 2 * * *"></div>
-      <div class="form-group hidden" id="jobIntervalWrap"><label>Minutes</label><input type="number" id="newJobMinutes" value="60" min="1"></div>
-      <div class="form-group hidden" id="jobOnceWrap">
-        <label>When</label>
-        <div class="dt-row">
-          <div>
-            <label for="newJobDate" style="text-transform:none; letter-spacing:0; font-weight:500;">Date</label>
-            <input type="date" id="newJobDate" onchange="updateJobOncePreview()">
-          </div>
-          <div>
-            <label for="newJobTime" style="text-transform:none; letter-spacing:0; font-weight:500;">Time</label>
-            <input type="time" id="newJobTime" step="60" onchange="updateJobOncePreview()">
-          </div>
-        </div>
-        <div class="dt-quick">
-          <button type="button" onclick="setJobOncePreset('15m')">In 15 min</button>
-          <button type="button" onclick="setJobOncePreset('1h')">In 1 hour</button>
-          <button type="button" onclick="setJobOncePreset('tomorrow9')">Tomorrow 9:00</button>
-          <button type="button" onclick="setJobOncePreset('2am')">Next 2:00 AM</button>
-        </div>
-        <div class="dt-preview" id="jobOncePreview">Pick a date and time, or use a shortcut.</div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('createJobModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitCreateJob()">Create job</button>
-    </div>
-  </div>
-</div>
-
 <div id="createDomainModal" class="modal-overlay hidden">
   <div class="modal-card" style="width: 480px;">
     <div class="modal-header"><h3>Create domain</h3><button class="modal-close" onclick="closeModal('createDomainModal')">✕</button></div>
@@ -1531,7 +1380,6 @@
   </div>
 </div>
 
-<!-- ═══════════════ CREATE IMAGE FROM SNAPSHOT MODAL ═══════════════ -->
 <div id="createImgFromSnapModal" class="modal-overlay hidden">
   <div class="modal-card" style="width: 450px;">
     <div class="modal-header">
@@ -1660,6 +1508,7 @@
 
 <!-- ═══════════════ JAVASCRIPT ═══════════════ -->
 <script src="/js/vhi-common.js"></script>
+<script src="/js/vm-create.js"></script>
 <script>
 'use strict';
 
@@ -1687,15 +1536,9 @@ document.querySelectorAll('.nav-item').forEach(item => {
     const panel = document.getElementById(panelId);
     if (panel) panel.classList.add('active');
     
-    // AI Assistant focus/scroll
-    if (item.dataset.panel === 'chat') {
-      panelChatMsgs.scrollTop = panelChatMsgs.scrollHeight;
-      setTimeout(() => panelChatInput.focus(), 50);
-    }
     if (item.dataset.panel === 'networks') { loadNetworks(); loadSecurityGroups(); loadFloatingIPs(); loadRouters(); loadPortsList(); }
     if (item.dataset.panel === 'flavors') loadFlavors(true);
     if (item.dataset.panel === 'sshkeys') loadKeypairs();
-    if (item.dataset.panel === 'scheduler') loadJobs();
     if (item.dataset.panel === 'domains') { closeProjectDrawer(); closeDomainDetail(); loadDomains(); }
   });
 });
@@ -1729,7 +1572,7 @@ function hookSearch(inputId, renderFn) {
 
 // ── DATA STORES ───────────────────────────────────────────────────────────
 let _vms = [], _nodes = [], _vols = [], _nets = [], _subnets = [], _imgs = [], _flavors = [], _volTypes = [], _projs = [], _users = [], _sgs = [];
-let _keypairs = [], _fips = [], _routers = [], _ports = [], _jobs = [];
+let _keypairs = [], _fips = [], _routers = [], _ports = [];
 let _domains = [], _groups = [];
 let _activeDomain = null;
 let _domainProjects = [], _domainUsers = [], _roleAssignments = [];
@@ -1765,7 +1608,6 @@ function loadAll() {
   loadRouters();
   loadPortsList();
   loadKeypairs();
-  loadJobs();
   loadHealthStatus();
   loadBillingStatus();
   loadAuditLogs();
@@ -1889,106 +1731,7 @@ function renderFlavors(query) {
   if (c) c.textContent = `${_flavors.length} flavors`;
 }
 
-// ── CREATE VM MODAL ───────────────────────────────────────────────────────
-
-const vmModal = document.getElementById('createVmModal');
-const vmMName = document.getElementById('newVmName');
-const vmMImage = document.getElementById('newVmImage');
-const vmMFlavor = document.getElementById('newVmFlavor');
-const vmMNetwork = document.getElementById('newVmNetwork');
-const vmMPolicy = document.getElementById('newVmPolicy');
-const vmMDiskSize = document.getElementById('newVmDiskSize');
-const vmMSubmit = document.getElementById('submitVmBtn');
-
-function openVmModal() {
-  vmMName.value = '';
-  vmMImage.innerHTML = '<option value="">Select Image...</option>' + 
-    _imgs.map(i => `<option value="${i.id}">${i.name || i.id} (${fmtBytes(i.size)})</option>`).join('');
-  
-  vmMFlavor.innerHTML = '<option value="">Select Flavor...</option>' + 
-    _flavors.map(f => `<option value="${f.id}">${f.name} (${f.vcpus} vCPU, ${fmtBytes(f.ram * 1024 * 1024)} RAM)</option>`).join('');
-  
-  vmMPolicy.innerHTML = '<option value="">Select Storage Policy...</option>' + 
-    _volTypes.map(vt => `<option value="${vt.name}">${vt.name}</option>`).join('');
-  
-  vmMNetwork.innerHTML = '<option value="">Select Network...</option>' + 
-    _nets.map(n => `<option value="${n.id}">${n.name || n.id}</option>`).join('');
-  const kpSel = document.getElementById('newVmKeypair');
-  if (kpSel) {
-    kpSel.innerHTML = '<option value="">None</option>' +
-        (_keypairs || []).map(k => `<option value="${escapeHtml(k.name)}">${escapeHtml(k.name)}</option>`).join('');
-  }
-  
-  vmMDiskSize.value = 60;
-  
-  vmModal.classList.remove('hidden');
-  vmMName.focus();
-}
-
-function closeVmModal() {
-  vmModal.classList.add('hidden');
-}
-
-async function submitVmForm() {
-  const name = vmMName.value.trim();
-  const imageRef = vmMImage.value;
-  const flavorRef = vmMFlavor.value;
-  const networkUuid = vmMNetwork.value;
-  const volumeType = vmMPolicy.value;
-  const diskSize = parseInt(vmMDiskSize.value, 10);
-
-  if (!name || !imageRef || !flavorRef || !networkUuid || !volumeType || !diskSize) {
-    return toast('Please fill out all fields', 'warn');
-  }
-
-  vmMSubmit.disabled = true;
-  vmMSubmit.textContent = 'Creating...';
-
-  try {
-    const payload = {
-      name,
-      imageRef,
-      flavorRef,
-      volume_size: diskSize,
-      volume_type: volumeType,
-      networks: [{ uuid: networkUuid }],
-      min_count: 1,
-      max_count: 1,
-      block_device_mapping_v2: [{
-        boot_index: 0,
-        uuid: imageRef,
-        source_type: 'image',
-        destination_type: 'volume',
-        volume_size: diskSize,
-        volume_type: volumeType,
-        delete_on_termination: true
-      }]
-    };
-    const keyName = document.getElementById('newVmKeypair')?.value;
-    if (keyName) payload.key_name = keyName;
-
-    const res = await fetch('/api/vhi/servers', {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error(await res.text());
-
-    toast(`VM "${name}" is being created`, 'ok');
-    closeVmModal();
-    loadVMs(); // refresh list
-  } catch (err) {
-    toast('Creation failed: ' + err.message, 'err');
-  } finally {
-    vmMSubmit.disabled = false;
-    vmMSubmit.textContent = 'Create';
-  }
-}
-
-document.getElementById('btnCreateVm').addEventListener('click', openVmModal);
-document.getElementById('closeVmModal').addEventListener('click', closeVmModal);
-document.getElementById('cancelVmBtn').addEventListener('click', closeVmModal);
-document.getElementById('submitVmBtn').addEventListener('click', submitVmForm);
+// Create VM modal: public/js/vm-create.js
 
 // ── AUDIT LOGS ────────────────────────────────────────────────────────────
 
@@ -4714,183 +4457,12 @@ async function deleteKeypairRow(encName) {
   }
 }
 
-function jobScheduleLabel(j) {
-  const s = j.schedule || {};
-  if (s.kind === 'cron') return s.expr || 'cron';
-  if (s.kind === 'interval') return 'every ' + (s.minutes || 60) + 'm';
-  if (s.kind === 'once') return s.at ? new Date(s.at).toLocaleString() : 'once';
-  return '–';
-}
-async function loadJobs() {
-  const tbody = document.getElementById('jobBody');
-  if (tbody) tbody.innerHTML = skeletonRows(7);
-  try {
-    const data = await apiGet('/api/vhi/jobs');
-    _jobs = data.jobs || [];
-    renderJobs('');
-  } catch (err) {
-    if (tbody) tbody.innerHTML = emptyState('⚠️', 'Could not load jobs: ' + err.message);
-  }
-}
-function renderJobs(query) {
-  const tbody = document.getElementById('jobBody');
-  if (!tbody) return;
-  const rows = (_jobs || []).map(j => `<tr>
-    <td><strong>${escapeHtml(j.name)}</strong></td>
-    <td>${escapeHtml((j.action || '').replace(/_/g, ' '))}</td>
-    <td class="text-dim">${escapeHtml(j.targetName || j.targetId || '–')}</td>
-    <td class="mono">${escapeHtml(jobScheduleLabel(j))}</td>
-    <td class="text-dim">${j.lastRunAt ? escapeHtml(new Date(j.lastRunAt).toLocaleString()) : '–'}${j.lastStatus ? ' · ' + escapeHtml(j.lastStatus) : ''}${j.lastError ? '<br><span class="text-dim">' + escapeHtml(j.lastError) + '</span>' : ''}</td>
-    <td>${j.enabled === false ? '<span class="badge badge-error">Off</span>' : '<span class="badge badge-active">On</span>'}</td>
-    <td style="text-align:right;">
-      <button class="act-btn" onclick="runJobNow('${j.id}')">Run</button>
-      <button class="act-btn" onclick="toggleJob('${j.id}', ${j.enabled === false})">${j.enabled === false ? 'Enable' : 'Disable'}</button>
-      <button class="act-btn act-danger" onclick="deleteJobRow('${j.id}')">Delete</button>
-    </td>
-  </tr>`);
-  const filtered = filterRows(rows, query);
-  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('⏱', 'No scheduled jobs');
-  const c = document.getElementById('jobCount');
-  if (c) c.textContent = `${_jobs.length} jobs`;
-}
-function syncJobScheduleFields() {
-  const kind = document.getElementById('newJobKind').value;
-  document.getElementById('jobCronWrap').classList.toggle('hidden', kind !== 'cron');
-  document.getElementById('jobIntervalWrap').classList.toggle('hidden', kind !== 'interval');
-  document.getElementById('jobOnceWrap').classList.toggle('hidden', kind !== 'once');
-  if (kind === 'once') {
-    const dateEl = document.getElementById('newJobDate');
-    const timeEl = document.getElementById('newJobTime');
-    if (!dateEl.value || !timeEl.value) setJobOncePreset('15m');
-    else updateJobOncePreview();
-  }
-}
-function pad2(n) { return String(n).padStart(2, '0'); }
-function fillJobOnceFromDate(d) {
-  document.getElementById('newJobDate').value = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-  document.getElementById('newJobTime').value = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  const dateInput = document.getElementById('newJobDate');
-  const today = new Date();
-  dateInput.min = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
-  updateJobOncePreview();
-}
-function getJobOnceDate() {
-  const date = document.getElementById('newJobDate')?.value;
-  const time = document.getElementById('newJobTime')?.value;
-  if (!date || !time) return null;
-  const d = new Date(`${date}T${time}`);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-function updateJobOncePreview() {
-  const el = document.getElementById('jobOncePreview');
-  if (!el) return;
-  const d = getJobOnceDate();
-  if (!d) {
-    el.textContent = 'Pick a date and time, or use a shortcut.';
-    return;
-  }
-  const local = d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-  el.textContent = d.getTime() < Date.now()
-    ? `That time is in the past (${local}). Choose a future time.`
-    : `Runs at ${local} (local time).`;
-}
-function setJobOncePreset(kind) {
-  const d = new Date();
-  d.setSeconds(0, 0);
-  if (kind === '15m') d.setMinutes(d.getMinutes() + 15);
-  else if (kind === '1h') d.setHours(d.getHours() + 1);
-  else if (kind === 'tomorrow9') {
-    d.setDate(d.getDate() + 1);
-    d.setHours(9, 0, 0, 0);
-  } else if (kind === '2am') {
-    d.setHours(2, 0, 0, 0);
-    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
-  }
-  fillJobOnceFromDate(d);
-}
-function fillJobTargets() {
-  const action = document.getElementById('newJobAction').value;
-  const sel = document.getElementById('newJobTarget');
-  if (action === 'snapshot_volume') {
-    sel.innerHTML = (_vols || []).map(v =>
-      `<option value="${v.id}">${escapeHtml(v.name || v.id)}</option>`
-    ).join('') || '<option value="">No volumes</option>';
-  } else {
-    sel.innerHTML = (_vms || []).map(v =>
-      `<option value="${v.id}">${escapeHtml(v.name || v.id)}</option>`
-    ).join('') || '<option value="">No VMs</option>';
-  }
-}
-function openCreateJobModal() {
-  document.getElementById('newJobName').value = '';
-  document.getElementById('newJobKind').value = 'cron';
-  document.getElementById('newJobCron').value = '0 2 * * *';
-  syncJobScheduleFields();
-  fillJobTargets();
-  openModal('createJobModal');
-}
-async function submitCreateJob() {
-  const name = document.getElementById('newJobName').value.trim();
-  const action = document.getElementById('newJobAction').value;
-  const targetId = document.getElementById('newJobTarget').value;
-  if (!name || !targetId) return toast('Name and target are required', 'warn');
-  const targetSel = document.getElementById('newJobTarget');
-  const targetName = targetSel.options[targetSel.selectedIndex]?.text || targetId;
-  const kind = document.getElementById('newJobKind').value;
-  const schedule = { kind };
-  if (kind === 'cron') schedule.expr = document.getElementById('newJobCron').value.trim();
-  if (kind === 'interval') schedule.minutes = Number(document.getElementById('newJobMinutes').value) || 60;
-  if (kind === 'once') {
-    const d = getJobOnceDate();
-    if (!d) return toast('Pick a date and time', 'warn');
-    if (d.getTime() < Date.now() - 30000) return toast('Choose a future date and time', 'warn');
-    schedule.at = d.toISOString();
-  }
-  try {
-    await apiPost('/api/vhi/jobs', { name, action, targetId, targetName, schedule });
-    closeModal('createJobModal');
-    toast('Job scheduled', 'ok');
-    loadJobs();
-  } catch (err) {
-    toast('Create failed: ' + err.message, 'err');
-  }
-}
-async function runJobNow(id) {
-  try {
-    await apiPost('/api/vhi/jobs/' + id + '/run', {});
-    toast('Job started', 'ok');
-    loadJobs();
-  } catch (err) {
-    toast('Run failed: ' + err.message, 'err');
-  }
-}
-async function toggleJob(id, enable) {
-  try {
-    await apiPatch('/api/vhi/jobs/' + id, { enabled: !!enable });
-    loadJobs();
-  } catch (err) {
-    toast('Update failed: ' + err.message, 'err');
-  }
-}
-async function deleteJobRow(id) {
-  if (!confirm('Delete this scheduled job?')) return;
-  try {
-    await apiDelete('/api/vhi/jobs/' + id);
-    toast('Job deleted', 'ok');
-    loadJobs();
-  } catch (err) {
-    toast('Delete failed: ' + err.message, 'err');
-  }
-}
-
 hookSearch('flavorSearch', renderFlavors);
 hookSearch('kpSearch', renderKeypairs);
-hookSearch('jobSearch', renderJobs);
 hookSearch('sgSearch', renderSgs);
 hookSearch('fipSearch', renderFips);
 hookSearch('rtrSearch', renderRouters);
 hookSearch('portSearch', renderPorts);
-document.getElementById('newJobAction')?.addEventListener('change', fillJobTargets);
 
 window.closeModal = closeModal;
 window.openCreateNetModal = openCreateNetModal;
@@ -4913,14 +4485,6 @@ window.deleteFlavorRow = deleteFlavorRow;
 window.openCreateKeypairModal = openCreateKeypairModal;
 window.submitCreateKeypair = submitCreateKeypair;
 window.deleteKeypairRow = deleteKeypairRow;
-window.openCreateJobModal = openCreateJobModal;
-window.submitCreateJob = submitCreateJob;
-window.syncJobScheduleFields = syncJobScheduleFields;
-window.setJobOncePreset = setJobOncePreset;
-window.updateJobOncePreview = updateJobOncePreview;
-window.runJobNow = runJobNow;
-window.toggleJob = toggleJob;
-window.deleteJobRow = deleteJobRow;
 
 // ── IMAGES ────────────────────────────────────────────────────────────────
 
@@ -5729,78 +5293,51 @@ const chatMsgs    = document.getElementById('chatMessages');
 const chatInput   = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSend');
 
-// Panel Chat elements
-const panelChatMsgs    = document.getElementById('panelChatMessages');
-const panelChatInput   = document.getElementById('panelChatInput');
-const panelChatSendBtn = document.getElementById('panelChatSend');
-
 let chatOpen = false;
 let chatHistory = []; // [{role,content}]
 
 function setChatOpen(open) {
+  if (!chatDrawer) return;
   chatOpen = open;
   chatDrawer.classList.toggle('open', open);
-  chatToggle.classList.toggle('open', open);
-  chatToggle.title = open ? 'Close AI Chat' : 'Open AI Chat';
-  if (open) {
-    if (document.getElementById('panel-chat').classList.contains('active')) {
-      setTimeout(() => panelChatInput.focus(), 50);
-    } else {
-      setTimeout(() => chatInput.focus(), 280);
-    }
+  chatToggle?.classList.toggle('open', open);
+  if (chatToggle && chatToggle.tagName !== 'A') {
+    chatToggle.title = open ? 'Close AI Chat' : 'Open AI Chat';
   }
+  if (open && chatInput) setTimeout(() => chatInput.focus(), 280);
 }
 
-chatToggle.addEventListener('click', () => setChatOpen(!chatOpen));
-chatClose.addEventListener('click',  () => setChatOpen(false));
+if (chatToggle && chatToggle.tagName !== 'A') {
+  chatToggle.addEventListener('click', () => setChatOpen(!chatOpen));
+}
+chatClose?.addEventListener('click', () => setChatOpen(false));
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && chatOpen) setChatOpen(false);
 });
 
-// Sync both textareas
-[chatInput, panelChatInput].forEach(inp => {
-  inp.addEventListener('input', () => {
-    const val = inp.value;
-    chatInput.value = val;
-    panelChatInput.value = val;
-    
-    // auto-grow logic for both
-    [chatInput, panelChatInput].forEach(ti => {
-      ti.style.height = (ti === chatInput ? '42px' : '48px');
-      ti.style.height = Math.min(ti.scrollHeight, (ti === chatInput ? 130 : 150)) + 'px';
-    });
-  });
-
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendChat();
-    }
-  });
+chatInput?.addEventListener('input', () => {
+  chatInput.style.height = '42px';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 130) + 'px';
 });
-
-chatSendBtn.addEventListener('click', sendChat);
-panelChatSendBtn.addEventListener('click', sendChat);
+chatInput?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
+});
+chatSendBtn?.addEventListener('click', sendChat);
 
 function appendMsg(role, text, cls = '') {
   const msgClass = 'msg ' + (role === 'user' ? 'msg-user' : 'msg-ai') + (cls ? ' ' + cls : '');
-  
-  // Create for drawer
-  const div1 = document.createElement('div');
-  div1.className = msgClass;
-  div1.textContent = text;
-  chatMsgs.appendChild(div1);
-  chatMsgs.scrollTop = chatMsgs.scrollHeight;
-
-  // Create for panel
-  const div2 = document.createElement('div');
-  div2.className = msgClass;
-  div2.textContent = text;
-  panelChatMsgs.appendChild(div2);
-  panelChatMsgs.scrollTop = panelChatMsgs.scrollHeight;
-
-  return [div1, div2];
+  const div = document.createElement('div');
+  div.className = msgClass;
+  div.textContent = text;
+  if (chatMsgs) {
+    chatMsgs.appendChild(div);
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  }
+  return div;
 }
 
 function buildSystemContext() {
@@ -5830,27 +5367,26 @@ Guidelines:
 }
 
 async function sendChat() {
-  const text = chatInput.value.trim();
+  const text = (chatInput?.value || '').trim();
   if (!text) return;
 
-  chatInput.value = '';
-  panelChatInput.value = '';
-  chatInput.style.height = '42px';
-  panelChatInput.style.height = '48px';
-  chatSendBtn.disabled = true;
-  panelChatSendBtn.disabled = true;
+  if (chatInput) {
+    chatInput.value = '';
+    chatInput.style.height = '42px';
+  }
+  if (chatSendBtn) chatSendBtn.disabled = true;
 
   appendMsg('user', text);
   chatHistory.push({ role: 'user', content: text });
 
-  const [thinkingEl1, thinkingEl2] = appendMsg('assistant', 'Thinking…', 'thinking');
+  const thinkingEl = appendMsg('assistant', 'Thinking…', 'thinking');
 
   try {
     const payload = {
       message: text,
       conversationId: 'web-session',
       systemContext: buildSystemContext(),
-      chatHistory: chatHistory.slice(-10), // Send last 10 messages
+      chatHistory: chatHistory.slice(-10),
       llmProvider: localStorage.getItem('llmProvider') || undefined,
       apiKey: localStorage.getItem('llmApiKey') || undefined,
       llmBaseUrl: localStorage.getItem('llmBaseUrl') || undefined,
@@ -5878,28 +5414,18 @@ async function sendChat() {
     }
 
     const reply = data.reply || 'No response from AI agent.';
-    [thinkingEl1, thinkingEl2].forEach(el => {
-      el.classList.remove('thinking');
-      el.textContent = reply;
-    });
-    chatMsgs.scrollTop = chatMsgs.scrollHeight;
-    panelChatMsgs.scrollTop = panelChatMsgs.scrollHeight;
+    thinkingEl.classList.remove('thinking');
+    thinkingEl.textContent = reply;
+    if (chatMsgs) chatMsgs.scrollTop = chatMsgs.scrollHeight;
 
     chatHistory.push({ role: 'assistant', content: reply });
 
   } catch (err) {
-    [thinkingEl1, thinkingEl2].forEach(el => {
-      el.classList.remove('thinking');
-      el.textContent = '⚠ ' + (err.message || 'Request failed');
-    });
+    thinkingEl.classList.remove('thinking');
+    thinkingEl.textContent = '⚠ ' + (err.message || 'Request failed');
   } finally {
-    chatSendBtn.disabled = false;
-    panelChatSendBtn.disabled = false;
-    if (document.getElementById('panel-chat').classList.contains('active')) {
-      panelChatInput.focus();
-    } else {
-      chatInput.focus();
-    }
+    if (chatSendBtn) chatSendBtn.disabled = false;
+    chatInput?.focus();
   }
 }
 
@@ -5964,6 +5490,11 @@ async function runExport() {
 function startDashboard() {
   loadAll();
   const startPanel = new URLSearchParams(location.search).get('panel');
+  if (startPanel === 'dr') { location.replace('/dr'); return; }
+  if (startPanel === 'migrations') { location.replace('/migrations'); return; }
+  if (startPanel === 'marketplace') { location.replace('/marketplace'); return; }
+  if (startPanel === 'chat' || startPanel === 'assistant') { location.replace('/assistant'); return; }
+  if (startPanel === 'scheduler') { location.replace('/scheduler'); return; }
   if (startPanel) {
     const item = document.querySelector('.nav-item[data-panel="' + startPanel + '"]');
     if (item) item.click();

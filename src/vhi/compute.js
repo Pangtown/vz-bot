@@ -159,6 +159,10 @@ export async function createServer(options = {}) {
     payload.key_name = options.key_name;
   }
 
+  if (options.metadata && typeof options.metadata === 'object' && Object.keys(options.metadata).length) {
+    payload.metadata = options.metadata;
+  }
+
   if (volumeBoot) {
     payload.block_device_mapping_v2 = incomingBdm;
   } else if (volumeSize || volumeType || imageRef) {
@@ -246,13 +250,27 @@ export async function getRemoteConsole(serverId, protocol = 'vnc', type = 'novnc
 
 export async function listFlavors() {
   const client = await getClient();
-  const res = await client.fetch(await computeUrl('/flavors/detail?is_public=None'));
+  let res = await client.fetch(await computeUrl('/flavors/detail?is_public=None'));
+  if (!res.ok) {
+    res = await client.fetch(await computeUrl('/flavors/detail'));
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`VHI Compute listFlavors failed (${res.status}): ${text.slice(0, 300)}`);
   }
   const data = await res.json();
   return data.flavors || [];
+}
+
+export async function getComputeQuota(projectId) {
+  const client = await getClient();
+  const pid = projectId || client.projectId;
+  if (!pid) return null;
+  let res = await client.fetch(await computeUrl(`/os-quota-sets/${pid}/detail`));
+  if (!res.ok) res = await client.fetch(await computeUrl(`/os-quota-sets/${pid}`));
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.quota_set || null;
 }
 
 export async function createFlavor(options = {}) {

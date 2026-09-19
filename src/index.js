@@ -51,10 +51,27 @@ async function getMigrationsPage() {
   return readFile(join(__dirname, '..', 'public', 'migrations.html'), 'utf8');
 }
 
+async function getDrPage() {
+  return readFile(join(__dirname, '..', 'public', 'dr.html'), 'utf8');
+}
+
+async function getAssistantPage() {
+  return readFile(join(__dirname, '..', 'public', 'assistant.html'), 'utf8');
+}
+
+async function getSchedulerPage() {
+  return readFile(join(__dirname, '..', 'public', 'scheduler.html'), 'utf8');
+}
+
 const PUBLIC_ASSETS = {
   '/vhi.css': { file: 'vhi.css', type: 'text/css; charset=utf-8' },
   '/js/vhi-common.js': { file: 'js/vhi-common.js', type: 'text/javascript; charset=utf-8' },
   '/js/migrations.js': { file: 'js/migrations.js', type: 'text/javascript; charset=utf-8' },
+  '/js/dr.js': { file: 'js/dr.js', type: 'text/javascript; charset=utf-8' },
+  '/js/vm-create.js': { file: 'js/vm-create.js', type: 'text/javascript; charset=utf-8' },
+  '/js/marketplace.js': { file: 'js/marketplace.js', type: 'text/javascript; charset=utf-8' },
+  '/js/assistant.js': { file: 'js/assistant.js', type: 'text/javascript; charset=utf-8' },
+  '/js/scheduler.js': { file: 'js/scheduler.js', type: 'text/javascript; charset=utf-8' },
 };
 
 async function getSpicePage() {
@@ -158,6 +175,39 @@ const app = async (req, res) => {
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Error loading migrations page.');
+    }
+    return;
+  }
+  if (method === 'GET' && (url === '/dr' || url === '/dr/' || url === '/dr.html')) {
+    try {
+      const html = await getDrPage();
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error loading disaster recovery page.');
+    }
+    return;
+  }
+  if (method === 'GET' && (url === '/assistant' || url === '/assistant/' || url === '/assistant.html')) {
+    try {
+      const html = await getAssistantPage();
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error loading AI assistant page.');
+    }
+    return;
+  }
+  if (method === 'GET' && (url === '/scheduler' || url === '/scheduler/' || url === '/scheduler.html')) {
+    try {
+      const html = await getSchedulerPage();
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error loading scheduler page.');
     }
     return;
   }

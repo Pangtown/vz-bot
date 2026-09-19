@@ -2,6 +2,9 @@
  * VHI 7.x Image API (Glance-style) – images list, get
  */
 
+import { createReadStream, createWriteStream } from 'fs';
+import { stat } from 'fs/promises';
+import { pipeline } from 'stream/promises';
 import { Agent } from 'undici';
 import { getClient } from './client.js';
 import { getContextValue } from '../gateway/context.js';
@@ -160,6 +163,22 @@ export async function importImageFromUrl(imageId, uri) {
         throw new Error(`VHI Image web-download import failed (${res.status}): ${text.slice(0, 400)}`);
     }
     return { ok: true };
+}
+
+export async function downloadImageToFile(imageId, destPath) {
+    const client = await getClient();
+    const res = await client.fetch(imageUrl(`/${imageId}/file`), { dispatcher: longBodyAgent });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Glance download failed (${res.status}): ${text.slice(0, 300)}`);
+    }
+    await pipeline(res.body, createWriteStream(destPath));
+    return destPath;
+}
+
+export async function uploadImageFromFile(imageId, filePath) {
+    const info = await stat(filePath);
+    return uploadImageData(imageId, createReadStream(filePath), info.size);
 }
 
 export async function waitImage(imageId, statuses, timeoutMs = 2 * 60 * 60 * 1000) {
