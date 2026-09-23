@@ -23,21 +23,7 @@ function isExpiringSoon(expiresAt) {
   return Date.now() >= t;
 }
 
-export async function getClient() {
-  const key = getCacheKey();
-  let cached = cache.get(key);
-
-  if (cached && !isExpiringSoon(cached.expiresAt)) {
-    return {
-      token: cached.token,
-      projectId: cached.projectId,
-      async fetch(url, opts = {}) {
-        const headers = { ...opts.headers, 'X-Auth-Token': cached.token };
-        return fetch(url, { ...opts, headers });
-      },
-    };
-  }
-
+function fetchToken(key) {
   let tokenPromise = inFlightTokens.get(key);
   if (!tokenPromise) {
     tokenPromise = getToken()
@@ -50,14 +36,30 @@ export async function getClient() {
       });
     inFlightTokens.set(key, tokenPromise);
   }
+  return tokenPromise;
+}
 
-  const { token, projectId } = await tokenPromise;
+function canReplayBody(body) {
+  return body === undefined || body === null || typeof body === 'string'
+    || body instanceof URLSearchParams || body instanceof ArrayBuffer || ArrayBuffer.isView(body);
+}
+
+export async function getClient() {
+  const key = getCacheKey();
+  const cached = cache.get(key);
+  let current = cached && !isExpiringSoon(cached.expiresAt) ? cached : await fetchToken(key);
+
   return {
-    token,
-    projectId,
+    get token() { return current.token; },
+    get projectId() { return current.projectId; },
     async fetch(url, opts = {}) {
-      const headers = { ...opts.headers, 'X-Auth-Token': token };
-      return fetch(url, { ...opts, headers });
+      const send = (token) => fetch(url, { ...opts, headers: { ...opts.headers, 'X-Auth-Token': token } });
+      const res = await send(current.token);
+      if (res.status !== 401 || !canReplayBody(opts.body)) return res;
+      if (cache.get(key)?.token === current.token) cache.delete(key);
+      current = await fetchToken(key);
+      await res.body?.cancel().catch(() => {});
+      return send(current.token);
     },
   };
 }

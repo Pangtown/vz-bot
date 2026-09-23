@@ -12,7 +12,8 @@ import { runAlertPoll } from '../monitoring/alert-poller.js';
 import { tickDueJobs } from './jobs.js';
 import { tickMigrations } from '../vmware/migration-engine.js';
 import { sweepIdleCloneStore } from '../vmware/windows-replica-fill.js';
-import { getLastValidContext } from './context.js';
+import { runWithContext } from './context.js';
+import { allClusterContexts, primaryClusterContext } from './cluster-store.js';
 import { prefetchClusterNodeInventory } from './vhi-api/compute.js';
 import { tickDueDrPlans } from '../vhi/dr-engine.js';
 
@@ -34,16 +35,26 @@ export function getLastBilling() {
   return { result: lastBillingResult, time: lastBillingTime };
 }
 
+function hasEnvCredentials() {
+  return !!(process.env.VHI_BASE_URL && process.env.VHI_USER && process.env.VHI_PASSWORD);
+}
+
+/** Run a background poll against the first saved cluster, or the .env cluster when none is saved. */
+function onPrimaryCluster(fn) {
+  const ctx = primaryClusterContext();
+  if (ctx) return runWithContext(ctx, fn);
+  if (hasEnvCredentials()) return fn();
+  return null;
+}
+
 export function start(config = {}) {
   // Clamp to 1–59: cron `*/N` syntax is invalid for N > 59
   const intervalMinutes = Math.min(59, Math.max(1, Number(config.healthPollIntervalMinutes) || 5));
   if (healthJob) return;
   healthJob = cron.schedule(`*/${intervalMinutes} * * * *`, async () => {
-    if (!process.env.VHI_USER || !process.env.VHI_PASSWORD) {
-      return; // Skip health poll if credentials are not set in the environment
-    }
     try {
-      const result = await healthPoller.runHealthPoll();
+      const result = await onPrimaryCluster(() => healthPoller.runHealthPoll());
+      if (!result) return;
       lastHealthResult = result;
       lastHealthTime = new Date().toISOString();
       await alerts.emitAlerts(result);
@@ -56,9 +67,9 @@ export function start(config = {}) {
 
   if (!billingJob) {
     billingJob = cron.schedule('0 * * * *', async () => {
-      if (!process.env.VHI_USER || !process.env.VHI_PASSWORD) return;
       try {
-        const result = await billingMeter.calculateHourlyConsumption();
+        const result = await onPrimaryCluster(() => billingMeter.calculateHourlyConsumption());
+        if (!result) return;
         lastBillingResult = result;
         lastBillingTime = new Date().toISOString();
         await billingStorage.saveSnapshot(result);
@@ -68,15 +79,14 @@ export function start(config = {}) {
     });
 
     setInterval(async () => {
-      const ctx = getLastValidContext();
-      if (!ctx) return; // Wait for first user login
-      if (!lastBillingResult) {
-        try {
-          lastBillingResult = await billingMeter.calculateHourlyConsumption();
-          lastBillingTime = new Date().toISOString();
-          await billingStorage.saveSnapshot(lastBillingResult);
-        } catch(e) {}
-      }
+      if (lastBillingResult) return;
+      try {
+        const result = await onPrimaryCluster(() => billingMeter.calculateHourlyConsumption());
+        if (!result) return;
+        lastBillingResult = result;
+        lastBillingTime = new Date().toISOString();
+        await billingStorage.saveSnapshot(result);
+      } catch (e) {}
     }, 10000);
     console.log(`Scheduler: billing meter active (hourly)`);
   }
@@ -134,20 +144,17 @@ export function start(config = {}) {
   });
   console.log('Scheduler: clone cache sweep on start and every 5 min (keeps retryable caches)');
 
-  setTimeout(() => {
-    const ctx = getLastValidContext();
-    if (!ctx) return;
-    prefetchClusterNodeInventory(ctx).catch((err) => console.error('Node inventory prefetch:', err.message));
-  }, 8000);
-  cron.schedule('*/15 * * * *', async () => {
-    const ctx = getLastValidContext();
-    if (!ctx) return;
-    try {
-      await prefetchClusterNodeInventory(ctx);
-    } catch (err) {
-      console.error('Node inventory prefetch:', err.message);
+  const prefetchAllNodeInventory = async () => {
+    for (const ctx of allClusterContexts()) {
+      try {
+        await prefetchClusterNodeInventory(ctx);
+      } catch (err) {
+        console.error(`Node inventory prefetch (${ctx.vhiBaseUrl}):`, err.message);
+      }
     }
-  });
+  };
+  setTimeout(() => { prefetchAllNodeInventory(); }, 8000);
+  cron.schedule('*/15 * * * *', prefetchAllNodeInventory);
   console.log('Scheduler: node hardware inventory prefetch on start and every 15 min (new nodes only)');
 
   cron.schedule('* * * * *', async () => {
@@ -165,7 +172,6 @@ export function start(config = {}) {
  */
 export async function forceBillingRefresh(ctx) {
   console.log(`[Billing] Manual refresh triggered for ${ctx.vhiBaseUrl}`);
-  const { runWithContext } = await import('./context.js');
   const result = await runWithContext(ctx, () => billingMeter.calculateHourlyConsumption());
   
   // Update the process-global cache with the fresh data

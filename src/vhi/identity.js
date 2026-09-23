@@ -5,6 +5,7 @@
 
 import { getContextValue } from '../gateway/context.js';
 import { registerInsecureHost } from '../utils/tls.js';
+import { getClient } from './client.js';
 
 const getBaseUrl = () => {
   const base = getContextValue('vhiBaseUrl', 'VHI_BASE_URL');
@@ -64,7 +65,6 @@ export async function getToken() {
     ? { id: requestedProjectId }
     : projectNameScope;
 
-  console.log('Fetching', url, 'for user', user);
   const headers = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -113,7 +113,6 @@ export function getIdentityUrl(path = '') {
 }
 
 async function identityFetch(path, opts = {}) {
-  const { getClient } = await import('./client.js');
   const client = await getClient();
   const res = await client.fetch(getIdentityUrl(path), opts);
   if (!res.ok) {

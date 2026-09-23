@@ -1,6 +1,5 @@
 import { runVinfraCommand, runVinfraBatch } from '../vhi/vinfra.js';
 import { saveAlerts, getLastTimestamp } from './alert-storage.js';
-import { getLastValidContext } from '../gateway/context.js';
 import { loadGlobalSshConfig, normalizeUrl } from './ssh-storage.js';
 
 export async function runAlertPoll(ctx = null) {
@@ -18,8 +17,7 @@ export async function runAlertPoll(ctx = null) {
             }
             return;
         }
-        // Fallback or legacy (singleton)
-        ctx = getLastValidContext() || configs;
+        ctx = configs;
     }
 
     let context = ctx;

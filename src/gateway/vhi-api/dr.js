@@ -1,7 +1,15 @@
 import { json, readBody } from './helpers.js';
 import { logger } from '../../utils/index.js';
 import { listPlans, getPlan, deletePlan, sanitizePlan } from '../../vhi/dr-store.js';
+import { clusterContext } from '../cluster-store.js';
 import { createPlan, protectServers, unprotectServer, syncPlan, stagePlan, failoverPlan, probeDrContext, teardownAndDeletePlan } from '../../vhi/dr-engine.js';
+
+function withSavedDrCredentials(target = {}) {
+  if (!target.clusterId) return target;
+  const saved = clusterContext(target.clusterId);
+  if (!saved) return target;
+  return { ...saved, ...target, vhiPassword: target.vhiPassword || saved.vhiPassword };
+}
 
 export async function handleDr(req, res, ctx, rest) {
   const m = req.method || 'GET';
@@ -10,7 +18,7 @@ export async function handleDr(req, res, ctx, rest) {
   try {
     if (m === 'POST' && parts[0] === 'probe') {
       const body = await readBody(req);
-      const result = await probeDrContext(body);
+      const result = await probeDrContext(withSavedDrCredentials(body));
       return json(res, 200, result);
     }
 
@@ -21,7 +29,7 @@ export async function handleDr(req, res, ctx, rest) {
 
     if (m === 'POST' && parts.length === 0) {
       const body = await readBody(req);
-      const plan = await createPlan(body, ctx);
+      const plan = await createPlan({ ...body, dr: withSavedDrCredentials(body.dr) }, ctx);
       return json(res, 200, { plan });
     }
 

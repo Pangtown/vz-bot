@@ -1,5 +1,7 @@
 import { extractContext, json, verifyWebPassword } from './vhi-api/helpers.js';
+import { destroyConsoleSession, publicSession, tokenFromRequest, touchConsoleSession } from './console-session.js';
 import { handleAuth } from './vhi-api/auth.js';
+import { handleConnectCluster, handleDeleteCluster, handleListClusters, handleSaveCluster } from './vhi-api/clusters.js';
 import { handleMarketplaceScripts } from './vhi-api/marketplace.js';
 import { handleServers, handleServerGet, handleServerDelete, handleServerAction, handleCreateServer, handleFlavors, handleFlavorDelete, handleKeypairs, handleNodes, handleNodeGet, handleNodeAction, handleImages, handleCreateImage, handleUploadImage, handleUpdateImage, handleDeleteImage, handleServerInterfaces, handleServerVolumes, handleQuotas, handleCreateVmCatalog } from './vhi-api/compute.js';
 import { handleNetworks, handleNetworkDelete, handleSubnetCreate, handleSubnetDelete, handleSecurityGroups, handleSecurityGroupDelete, handleSecurityGroupRule, handleSecurityGroupRuleDelete, handleFloatingIPs, handleRouters, handleRouterInterface, handlePorts, handlePortGet, handlePortUpdate } from './vhi-api/network.js';
@@ -12,7 +14,6 @@ import { handleCloudTest, handleGetClouds, handleCreateCloud, handleDeleteCloud,
 import { handleCloneBlob, handleCloneProgress } from '../vmware/porter-clone.js';
 import { searchAlerts } from '../monitoring/alert-storage.js';
 import { runAlertPoll } from '../monitoring/alert-poller.js';
-import { loadGlobalSshConfig } from '../monitoring/ssh-storage.js';
 import { logger } from '../utils/index.js';
 
 export async function handleVhiApi(req, res) {
@@ -32,7 +33,25 @@ export async function handleVhiApi(req, res) {
     return true;
   }
 
-  if (!verifyWebPassword(req)) {
+  if (!process.env.WEB_PASSWORD) {
+    json(res, 503, { error: 'WEB_PASSWORD is not set. Add it to .env and restart.' });
+    return true;
+  }
+  const consoleSession = touchConsoleSession(tokenFromRequest(req));
+  if (m === 'GET' && p === '/api/vhi/session') {
+    if (!consoleSession) {
+      json(res, 401, { error: 'Session expired' });
+      return true;
+    }
+    json(res, 200, publicSession(consoleSession));
+    return true;
+  }
+  if (m === 'POST' && p === '/api/vhi/logout') {
+    destroyConsoleSession(tokenFromRequest(req));
+    json(res, 200, { ok: true });
+    return true;
+  }
+  if (!consoleSession && !verifyWebPassword(req)) {
     json(res, 401, { error: 'Unauthorized: Invalid or missing web password' });
     return true;
   }
@@ -42,16 +61,28 @@ export async function handleVhiApi(req, res) {
     return true;
   }
 
-  if (p.startsWith('/api/vhi/marketplace/scripts')) {
-    await handleMarketplaceScripts(req, res, m, p);
+  if (m === 'GET' && p === '/api/vhi/clusters') {
+    await handleListClusters(req, res);
+    return true;
+  }
+  if (m === 'POST' && p === '/api/vhi/clusters') {
+    await handleSaveCluster(req, res);
+    return true;
+  }
+  const clusterConnectMatch = p.match(/^\/api\/vhi\/clusters\/([^/]+)\/connect$/);
+  if (m === 'POST' && clusterConnectMatch) {
+    await handleConnectCluster(req, res, decodeURIComponent(clusterConnectMatch[1]));
+    return true;
+  }
+  const clusterItemMatch = p.match(/^\/api\/vhi\/clusters\/([^/]+)$/);
+  if (m === 'DELETE' && clusterItemMatch) {
+    await handleDeleteCluster(req, res, decodeURIComponent(clusterItemMatch[1]));
     return true;
   }
 
-  if (m === 'GET' && p === '/api/vhi/clusters/all') {
-      const allConfigs = await loadGlobalSshConfig();
-      const clusterUrls = Object.keys(allConfigs);
-      json(res, 200, { clusters: clusterUrls });
-      return true;
+  if (p.startsWith('/api/vhi/marketplace/scripts')) {
+    await handleMarketplaceScripts(req, res, m, p);
+    return true;
   }
 
   // ── VMware / ESXi Clouds Management (VDDK Bypass) ─────────────────────────

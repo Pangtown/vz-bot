@@ -3,13 +3,13 @@ import { listVolumes, getVolume, listVolumeTypes, attachVolume, detachVolume, cr
 import { json, readBody } from './helpers.js';
 import { logger } from '../../utils/index.js';
 import { loadMigrations } from '../../vmware/cloud-storage.js';
+import { getClient } from '../../vhi/client.js';
 
 export async function handleVolumeTypes(req, res, ctx) {
   try {
     const data = await runWithContext(ctx, async () => {
       const base = ctx.vhiBaseUrl.replace(/\/$/, '');
       const port = process.env.VHI_BLOCK_PORT || 8776;
-      const { getClient } = await import('../../vhi/client.js');
       const client = await getClient();
 
       const projectId = ctx.vhiProjectId;

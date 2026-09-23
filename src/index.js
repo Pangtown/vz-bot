@@ -16,6 +16,10 @@ import { join, dirname } from 'path';
 import * as scheduler from './gateway/scheduler.js';
 import { runWithContext } from './gateway/context.js';
 import { handleVhiApi } from './gateway/vhi-api.js';
+import { tokenFromRequest, touchConsoleSession } from './gateway/console-session.js';
+import { safeEqual } from './gateway/vhi-api/helpers.js';
+import { createRouter } from './gateway/router.js';
+import { testConnection } from './llm/provider.js';
 import { logger } from './utils/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -72,6 +76,8 @@ const PUBLIC_ASSETS = {
   '/js/marketplace.js': { file: 'js/marketplace.js', type: 'text/javascript; charset=utf-8' },
   '/js/assistant.js': { file: 'js/assistant.js', type: 'text/javascript; charset=utf-8' },
   '/js/scheduler.js': { file: 'js/scheduler.js', type: 'text/javascript; charset=utf-8' },
+  '/js/vhi-dashboard.js': { file: 'js/vhi-dashboard.js', type: 'text/javascript; charset=utf-8' },
+  '/js/vhi-networks.js': { file: 'js/vhi-networks.js', type: 'text/javascript; charset=utf-8' },
 };
 
 async function getSpicePage() {
@@ -251,15 +257,15 @@ async function readJsonBody(req) {
 
 function verifyWebPassword(payload) {
   const expected = process.env.WEB_PASSWORD;
-  if (!expected) return true;
-  return payload && payload.webPassword === expected;
+  if (!expected) return false;
+  return safeEqual(payload?.webPassword, expected);
 }
 
 async function handleLlmTest(req, res) {
   let provider = process.env.LLM_PROVIDER || 'anthropic';
   try {
     const payload = await readJsonBody(req);
-    if (!verifyWebPassword(payload)) {
+    if (!touchConsoleSession(tokenFromRequest(req)) && !verifyWebPassword(payload)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'Unauthorized: Invalid web password' }));
       return;
@@ -267,7 +273,6 @@ async function handleLlmTest(req, res) {
     provider = payload?.provider || payload?.llmProvider || provider;
     const apiKey = payload?.apiKey || process.env.ANTHROPIC_API_KEY || '';
     const baseUrl = payload?.llmBaseUrl || process.env.OPENAI_BASE_URL || '';
-    const { testConnection } = await import('./llm/provider.js');
     const result = await testConnection({ provider, apiKey: apiKey.trim() || undefined, baseUrl: baseUrl.trim() || undefined });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
@@ -288,7 +293,8 @@ async function handlePostChat(req, res) {
     res.end(JSON.stringify({ error: e.message || 'Invalid JSON' }));
     return;
   }
-  if (!verifyWebPassword(payload)) {
+  const consoleSession = touchConsoleSession(tokenFromRequest(req));
+  if (!consoleSession && !verifyWebPassword(payload)) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized: Invalid web password' }));
     return;
@@ -298,10 +304,10 @@ async function handlePostChat(req, res) {
   const llmProvider = payload?.llmProvider || process.env.LLM_PROVIDER || 'anthropic';
   const apiKey = payload?.apiKey || null;
   const llmBaseUrl = payload?.llmBaseUrl || null;
-  const vhiBaseUrl = payload?.vhiBaseUrl || null;
-  const vhiUser = payload?.vhiUser || null;
-  const vhiPassword = payload?.vhiPassword || null;
-  const vhiProject = payload?.vhiProject || null;
+  const vhiBaseUrl = payload?.vhiBaseUrl || consoleSession?.baseUrl || null;
+  const vhiUser = payload?.vhiUser || consoleSession?.username || null;
+  const vhiPassword = payload?.vhiPassword || consoleSession?.password || null;
+  const vhiProject = payload?.vhiProject || consoleSession?.project || null;
   const vhiSshHost = payload?.vhiSshHost || null;
   const vhiSshUser = payload?.vhiSshUser || null;
   const vhiSshPassword = payload?.vhiSshPassword || null;
@@ -313,7 +319,6 @@ async function handlePostChat(req, res) {
   }
   try {
     if (vhiBaseUrl) registerInsecureHost(vhiBaseUrl);
-    const { createRouter } = await import('./gateway/router.js');
     const router = createRouter(() => { });
     const reply = await runWithContext({
       vhiBaseUrl, vhiUser, vhiPassword, vhiProject, vhiSshHost, vhiSshUser, vhiSshPassword
@@ -360,8 +365,8 @@ wss.on('connection', (ws) => {
       // Initialize shell on 'init' message
       if (data.type === 'init') {
         // Require web password (when configured) before opening an SSH shell
-        if (process.env.WEB_PASSWORD && data.webPassword !== process.env.WEB_PASSWORD) {
-          safeSend(JSON.stringify({ type: 'error', message: 'Unauthorized: Invalid web password' }));
+        if (!touchConsoleSession(data.sessionToken) && !verifyWebPassword(data)) {
+          safeSend(JSON.stringify({ type: 'error', message: process.env.WEB_PASSWORD ? 'Unauthorized: Invalid web password' : 'WEB_PASSWORD is not set. Add it to .env and restart.' }));
           ws.close();
           return;
         }
@@ -390,6 +395,9 @@ wss.on('connection', (ws) => {
 
 server.listen(PORT, () => {
   const url = 'http://localhost:' + PORT;
+  if (!process.env.WEB_PASSWORD) {
+    logger.error('WEB_PASSWORD is not set. Dashboard, chat, and SSH routes will refuse requests until it is set in .env.');
+  }
   logger.info(`VZ Bot listening on ${url}`);
   logger.info('Open this URL in your browser for the chat page (text box to type messages):');
   logger.info(`  ${url}`);

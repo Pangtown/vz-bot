@@ -706,7 +706,6 @@ export async function handleNodeAction(req, res, ctx, nodeId) {
     let result = null;
     await runWithContext(ctx, async () => {
       if (action === 'reboot') {
-        const { runVinfraCommand } = await import('../../vhi/vinfra.js');
         logger.info(`Putting node ${nodeId} into maintenance...`);
         try {
           await runVinfraCommand(['node', 'maintenance', 'start', nodeId, '--wait'], creds);

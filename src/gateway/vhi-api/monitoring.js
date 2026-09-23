@@ -1,5 +1,6 @@
 import { runWithContext } from '../context.js';
-import { getLastHealth, getLastBilling } from '../scheduler.js';
+import { getLastHealth, getLastBilling, forceBillingRefresh } from '../scheduler.js';
+import { calculateHourlyConsumption } from '../../monitoring/billing-meter.js';
 import * as healthPoller from '../../monitoring/health-poller.js';
 import * as billingStorage from '../../monitoring/billing-storage.js';
 import { searchEvents } from '../../monitoring/audit-storage.js';
@@ -28,7 +29,6 @@ export async function handleBillingStatus(req, res, ctx) {
   try {
     let billing = getLastBilling();
     if (!billing.result) {
-      const { calculateHourlyConsumption } = await import('../../monitoring/billing-meter.js');
       const result = await runWithContext(ctx, () => calculateHourlyConsumption());
       billing = { result, time: new Date().toISOString() };
     }
@@ -41,7 +41,6 @@ export async function handleBillingStatus(req, res, ctx) {
 
 export async function handleBillingRefresh(req, res, ctx) {
   try {
-    const { forceBillingRefresh } = await import('../scheduler.js');
     const result = await forceBillingRefresh(ctx);
     logger.info('Billing data refreshed forcibly');
     return json(res, 200, { ok: true, ...result });

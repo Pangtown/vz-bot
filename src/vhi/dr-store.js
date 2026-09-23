@@ -55,7 +55,6 @@ export function toContext(ctx = {}) {
     vhiDomain: ctx.vhiDomain || ctx.userDomain || 'Default',
     vhiProjectDomain: ctx.vhiProjectDomain || ctx.projectDomain || ctx.vhiDomain || 'Default',
     vhiProjectId: ctx.vhiProjectId || ctx.projectId || '',
-    persistLast: false,
   };
 }
 

@@ -38,9 +38,9 @@ function listDrTargets() {
     out.push({
       id: c.id || url,
       label: hostFromUrl(url) + ' · ' + (c.project || 'admin'),
+      hasPassword: !!c.hasPassword,
       vhiBaseUrl: url,
       vhiUser: c.username,
-      vhiPassword: c.password,
       vhiProject: c.project || 'admin',
       vhiDomain: c.userDomain || 'Default',
       vhiProjectDomain: c.projectDomain || c.userDomain || 'Default',
@@ -67,9 +67,11 @@ function selectedDrContext() {
   if (!hit) return readManualDrContext();
   const overridePass = document.getElementById('drSavedPass')?.value || '';
   return {
+    clusterId: hit.id,
+    hasSavedPassword: hit.hasPassword,
     vhiBaseUrl: hit.vhiBaseUrl,
     vhiUser: hit.vhiUser,
-    vhiPassword: overridePass || hit.vhiPassword,
+    vhiPassword: overridePass,
     vhiProject: hit.vhiProject,
     vhiDomain: hit.vhiDomain,
     vhiProjectDomain: hit.vhiProjectDomain,
@@ -394,7 +396,7 @@ function renderDrPlans(query) {
   }).join('');
 }
 
-function openCreateDrPlanModal() {
+async function openCreateDrPlanModal() {
   if (!session) {
     toast('Connect to the primary cluster first', 'err');
     return;
@@ -404,6 +406,7 @@ function openCreateDrPlanModal() {
   document.getElementById('drNetworkSelect').innerHTML = '<option value="">Probe the DR cluster to list networks</option>';
   document.getElementById('drProbeStatus').textContent = '';
   _drProbe = null;
+  await loadSavedClusters();
   fillDrTargetSelect();
   openModal('createDrPlanModal');
 }
@@ -433,19 +436,10 @@ async function connectDrCluster() {
       projectDomain: ctx.vhiProjectDomain,
     });
     if (!data.ok) throw new Error(data.error || 'Authentication failed');
-    const saved = upsertSavedCluster({
-      baseUrl: data.baseUrl || ctx.vhiBaseUrl,
-      username: ctx.vhiUser,
-      password: ctx.vhiPassword,
-      project: data.project || ctx.vhiProject,
-      userDomain: ctx.vhiDomain,
-      projectDomain: ctx.vhiProjectDomain,
-      projectId: data.projectId || '',
-    });
-    refreshClusterSwitcher();
+    await refreshClusterSwitcher();
     fillDrTargetSelect();
     const sel = document.getElementById('drTargetSelect');
-    if (sel) sel.value = saved.id;
+    if (sel && data.clusterId) sel.value = data.clusterId;
     syncDrManualFields();
     toast('DR cluster connected and saved to Clusters. This session stays on the primary.', 'ok');
     await probeDrTarget();
@@ -477,7 +471,7 @@ function isDrAuthError(err) {
 async function probeDrTarget() {
   const status = document.getElementById('drProbeStatus');
   const ctx = selectedDrContext();
-  if (!ctx.vhiBaseUrl || !ctx.vhiUser || !ctx.vhiPassword) {
+  if (!ctx.vhiBaseUrl || !ctx.vhiUser || (!ctx.vhiPassword && !ctx.hasSavedPassword)) {
     const savedWrap = document.getElementById('drSavedPassWrap');
     if (savedWrap) savedWrap.classList.remove('hidden');
     toast('DR cluster URL, user, and password are required', 'err');
@@ -489,23 +483,6 @@ async function probeDrTarget() {
     applyDrProbeResult(await apiPost('/api/vhi/dr/probe', ctx));
     return;
   } catch (err) {
-    const sessionPass = session?.password || '';
-    if (isDrAuthError(err) && sessionPass && sessionPass !== ctx.vhiPassword) {
-      try {
-        const retried = await apiPost('/api/vhi/dr/probe', { ...ctx, vhiPassword: sessionPass, vhiProjectId: '' });
-        upsertSavedCluster({
-          baseUrl: ctx.vhiBaseUrl,
-          username: ctx.vhiUser,
-          password: sessionPass,
-          project: ctx.vhiProject,
-          userDomain: ctx.vhiDomain,
-          projectDomain: ctx.vhiProjectDomain,
-        });
-        applyDrProbeResult(retried);
-        if (status) status.textContent = (status.textContent || '') + ' Saved the working password for this DR cluster.';
-        return;
-      } catch (_) { /* fall through to the original error */ }
-    }
     const savedWrap = document.getElementById('drSavedPassWrap');
     if (savedWrap && isDrAuthError(err)) savedWrap.classList.remove('hidden');
     if (status) status.textContent = err.message;
@@ -518,7 +495,7 @@ async function submitCreateDrPlan() {
   const interval = Number(document.getElementById('newDrInterval')?.value) || 60;
   const drNetworkId = document.getElementById('drNetworkSelect')?.value || '';
   const dr = selectedDrContext();
-  if (!dr.vhiBaseUrl || !dr.vhiUser || !dr.vhiPassword) {
+  if (!dr.vhiBaseUrl || !dr.vhiUser || (!dr.vhiPassword && !dr.hasSavedPassword)) {
     toast('DR cluster credentials are incomplete', 'err');
     return;
   }

@@ -1,4 +1,5 @@
 import { extractContext, verifyWebPassword } from '../src/gateway/vhi-api/helpers.js';
+import { createConsoleSession, destroyConsoleSession } from '../src/gateway/console-session.js';
 import { validateVinfraArgs } from '../src/vhi/vinfra.js';
 import { vinfraCli } from '../src/tools/vinfra.js';
 
@@ -9,9 +10,15 @@ describe('Security & Authentication Gates', () => {
     process.env = { ...origEnv };
   });
 
-  test('verifyWebPassword - validates when WEB_PASSWORD is unset or matching', () => {
+  test('verifyWebPassword - rejects when unset and validates when matching', () => {
     delete process.env.WEB_PASSWORD;
-    expect(verifyWebPassword({ headers: {} })).toBe(true);
+    expect(verifyWebPassword({ headers: {} })).toBe(false);
+    expect(verifyWebPassword({ headers: { 'x-web-password': 'anything' } })).toBe(false);
+
+    process.env.VHI_PASSWORD = 'cluster-root-secret';
+    const closed = extractContext({ headers: {} });
+    expect(closed.vhiPassword).toBe('');
+    delete process.env.VHI_PASSWORD;
 
     process.env.WEB_PASSWORD = 'super-secret-pw';
     expect(verifyWebPassword({ headers: {} })).toBe(false);
@@ -48,6 +55,23 @@ describe('Security & Authentication Gates', () => {
     });
     expect(explicit.vhiUser).toBe('custom-user');
     expect(explicit.vhiPassword).toBe('custom-password');
+  });
+
+  test('extractContext - console session supplies its own cluster password only', () => {
+    process.env.WEB_PASSWORD = 'admin-password';
+    const token = createConsoleSession({ baseUrl: 'https://primary.local', username: 'admin', password: 'primary-pw' });
+    const auth = { authorization: 'Bearer ' + token };
+
+    const same = extractContext({ headers: { ...auth, 'x-vhi-password': 'spoofed' } });
+    expect(same.vhiBaseUrl).toBe('https://primary.local');
+    expect(same.vhiPassword).toBe('primary-pw');
+
+    const other = extractContext({ headers: { ...auth, 'x-vhi-base-url': 'https://dr.local', 'x-vhi-password': 'dr-pw' } });
+    expect(other.vhiBaseUrl).toBe('https://dr.local');
+    expect(other.vhiPassword).toBe('dr-pw');
+
+    destroyConsoleSession(token);
+    expect(extractContext({ headers: auth }).vhiPassword).toBe('');
   });
 
   test('validateVinfraArgs - restricts raw shell execution and allows safe commands', () => {

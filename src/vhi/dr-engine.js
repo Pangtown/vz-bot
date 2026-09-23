@@ -868,7 +868,6 @@ export async function tickDueDrPlans() {
 export async function probeDrContext(body) {
   const dr = requireCtx(body || {}, 'DR');
   dr.vhiProjectId = '';
-  dr.persistLast = false;
   try {
     const servers = await runWithContext(dr, () => listServers({ limit: 5 }));
     const networks = await runWithContext(dr, () => listNetworks());

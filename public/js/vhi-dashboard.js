@@ -1,0 +1,3643 @@
+'use strict';
+
+let allSecurityGroups = [];
+let allVolumeTypes = [];
+let allFlavors = [];
+let allNetworks = [];
+let allVolumesFull = [];
+let allVolumesAvail = [];
+let currentEditingPortId = null;
+let currentVolDetails = null;
+let currentNodeDetails = null;
+let currentVmDetails = null;
+let currentVmInterfaces = [];
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────
+
+function showDashboardPanel(id) {
+  document.querySelectorAll('#appSidebar .nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const item = document.querySelector('#appSidebar .nav-item[data-panel="' + id + '"]');
+  const panel = document.getElementById('panel-' + id);
+  if (item) {
+    item.classList.add('active');
+    const group = item.closest('.nav-group');
+    if (group) {
+      group.classList.remove('collapsed');
+      const btn = group.querySelector('.sidebar-section');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+    }
+  }
+  if (panel) panel.classList.add('active');
+  if (id === 'networks') { loadNetworks(); loadSecurityGroups(); loadFloatingIPs(); loadRouters(); loadPortsList(); }
+  if (id === 'flavors') loadFlavors(true);
+  if (id === 'sshkeys') loadKeypairs();
+  if (id === 'domains') { closeProjectDrawer(); closeDomainDetail(); loadDomains(); }
+}
+
+document.getElementById('appSidebar')?.addEventListener('click', (e) => {
+  const item = e.target.closest('.nav-item');
+  if (!item || item.tagName === 'A' || !item.dataset.panel) return;
+  showDashboardPanel(item.dataset.panel);
+});
+
+// ── REFRESH BUTTONS ───────────────────────────────────────────────────────
+
+function setRefreshing(btnId, on) {
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.toggle('spinning', on);
+}
+
+document.getElementById('vmRefresh')?.addEventListener('click', loadVMs);
+document.getElementById('nodeRefresh')?.addEventListener('click', loadNodes);
+document.getElementById('volRefresh')?.addEventListener('click', () => { loadVolumes(); loadSnapshots(); });
+document.getElementById('netRefresh')?.addEventListener('click', () => {
+  loadNetworks(); loadSecurityGroups(); loadFloatingIPs(); loadRouters(); loadPortsList();
+});
+document.getElementById('imgRefresh')?.addEventListener('click', loadImages);
+document.getElementById('auditRefresh')?.addEventListener('click', () => { triggerAuditRefresh(); });
+
+// ── SEARCH INPUTS ─────────────────────────────────────────────────────────
+
+function hookSearch(inputId, renderFn) {
+  const el = document.getElementById(inputId);
+  if (el) {
+    el.addEventListener('input', () => {
+      if (typeof renderFn === 'function') renderFn(el.value);
+    });
+  }
+}
+
+// ── DATA STORES ───────────────────────────────────────────────────────────
+let _vms = [], _nodes = [], _vols = [], _nets = [], _subnets = [], _imgs = [], _flavors = [], _volTypes = [], _projs = [], _users = [], _sgs = [];
+let _keypairs = [], _fips = [], _routers = [], _ports = [];
+let _domains = [], _groups = [];
+let _activeDomain = null;
+let _domainProjects = [], _domainUsers = [], _roleAssignments = [];
+let _selectedProject = null;
+
+// ── LOAD ALL ──────────────────────────────────────────────────────────────
+
+async function loadSecurityGroups() {
+  try {
+    const data = await apiGet('/api/vhi/security-groups');
+    allSecurityGroups = data.security_groups || [];
+    _sgs = [...allSecurityGroups];
+    renderSgs('');
+  } catch (err) {
+    console.warn('Failed to load security groups:', err.message);
+  }
+}
+
+function loadAll() {
+  loadVMs();
+  loadNodes();
+  loadVolumes();
+  loadSnapshots();
+  loadNetworks();
+  loadImages();
+  loadFlavors(true);
+  loadVolumeTypes();
+  loadProjects();
+  loadUsers();
+  loadDomains();
+  loadSecurityGroups();
+  loadFloatingIPs();
+  loadRouters();
+  loadPortsList();
+  loadKeypairs();
+  loadHealthStatus();
+  loadBillingStatus();
+  loadAuditLogs();
+  loadAlerts();
+}
+
+async function loadHealthStatus() {
+  try {
+    const res = await apiGet('/api/vhi/health-status');
+    const b = document.getElementById('statHealth');
+    const tEl = document.getElementById('statHealthTime');
+    if(!b || !tEl) return;
+    
+    if (res.result) {
+      const errs = res.result.summary?.byStatus?.ERROR || 0;
+      if (errs > 0) {
+         b.textContent = errs + ' ERR';
+         b.style.color = 'var(--danger)';
+      } else {
+         b.textContent = 'OK';
+         b.style.color = 'var(--success)';
+      }
+    }
+    if (res.time) {
+      const d = new Date(res.time);
+      const tt = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      tEl.textContent = `Today at ${tt}`;
+    } else {
+      tEl.textContent = 'pending poll';
+    }
+  } catch(e) {
+    console.error('Failed to load health status', e);
+  }
+}
+
+async function loadBillingStatus() {
+  try {
+    const res = await apiGet('/api/vhi/billing-status');
+    const tb = document.getElementById('billingTime');
+    if (!tb) return;
+
+    if (res.result) {
+      document.getElementById('billCpu').textContent = res.result.vCpu || 0;
+      document.getElementById('billRam').textContent = typeof res.result.ramGb === 'number' ? res.result.ramGb.toFixed(1) + ' GB' : res.result.ramGb || 0;
+      document.getElementById('billStorage').textContent = typeof res.result.storageGb === 'number' ? res.result.storageGb.toFixed(1) + ' GB' : res.result.storageGb || 0;
+      document.getElementById('billNet').textContent = res.result.networkTraffic || '0 GB';
+    } else {
+      document.getElementById('billCpu').textContent = 'WAIT';
+      document.getElementById('billRam').textContent = 'WAIT';
+      document.getElementById('billStorage').textContent = 'WAIT';
+      document.getElementById('billNet').textContent = 'WAIT';
+    }
+
+    if (res.time) {
+      const d = new Date(res.time);
+      const tt = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      tb.textContent = `Updated ${tt}`;
+    } else {
+      tb.textContent = 'pending poll';
+    }
+  } catch(e) {
+    console.error('Failed to load billing status', e);
+  }
+}
+
+async function refreshBilling() {
+  const btn = document.getElementById('billRefreshBtn');
+  if (btn) btn.classList.add('spinning');
+  try {
+    toast('Refreshing billing metrics...');
+    const res = await apiPost('/api/vhi/billing-refresh', {});
+    if (res.ok) {
+      toast('Billing refreshed successfully');
+      loadBillingStatus();
+    }
+  } catch (e) {
+    toast('Refresh failed: ' + e.message, 'err');
+    console.error(e);
+  } finally {
+    if (btn) btn.classList.remove('spinning');
+  }
+}
+
+setInterval(() => {
+  if (session && !document.hidden) {
+    loadHealthStatus();
+    loadBillingStatus();
+  }
+}, 60000);
+
+async function loadVolumeTypes() {
+  try {
+    const data = await apiGet('/api/vhi/volume-types');
+    _volTypes = data.volume_types || [];
+  } catch(e) { console.error('Failed to load volume types:', e); }
+}
+
+async function loadFlavors(render) {
+  try {
+    const data = await apiGet('/api/vhi/flavors');
+    _flavors = data.flavors || [];
+    _flavors.sort((a,b) => a.vcpus - b.vcpus || a.ram - b.ram);
+    if (render) renderFlavors('');
+  } catch(e) { console.error('Failed to load flavors:', e); }
+}
+
+function renderFlavors(query) {
+  const tbody = document.getElementById('flavorBody');
+  if (!tbody) return;
+    const rows = _flavors.map(f => `<tr>
+    <td><strong>${escapeHtml(f.name)}</strong></td>
+    <td>${f.vcpus}</td>
+    <td>${f.ram} MiB</td>
+    <td>${f.disk} GiB</td>
+    <td>${f['os-flavor-access:is_public'] !== false ? '<span class="badge badge-active">Public</span>' : 'Private'}</td>
+    <td style="text-align:right;"><button class="act-btn act-danger" onclick="deleteFlavorRow('${f.id}')">Delete</button></td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('📐', 'No flavors found');
+  const c = document.getElementById('flavorCount');
+  if (c) c.textContent = `${_flavors.length} flavors`;
+}
+
+// Create VM modal: public/js/vm-create.js
+
+// ── AUDIT LOGS ────────────────────────────────────────────────────────────
+
+let auditLimit = 50;
+let auditOffset = 0;
+let auditQuery = '';
+
+async function loadAuditLogs() {
+  setRefreshing('auditRefresh', true);
+  try {
+    const url = `/api/vhi/audit-logs?limit=${auditLimit}&offset=${auditOffset}&q=${encodeURIComponent(auditQuery)}`;
+    const data = await apiGet(url);
+    const logs = data.logs || [];
+    renderAuditLogs(logs);
+    
+    document.getElementById('auditCount').textContent = `${logs.length} logs shown`;
+    document.getElementById('auditNext').disabled = logs.length < auditLimit;
+    document.getElementById('auditPrev').disabled = auditOffset === 0;
+  } catch (err) {
+    document.getElementById('auditBody').innerHTML = emptyState('⚠️', 'Could not load audit logs: ' + err.message);
+  } finally {
+    setRefreshing('auditRefresh', false);
+  }
+}
+
+function renderAuditLogs(logs) {
+  const tbody = document.getElementById('auditBody');
+  if (!logs.length) {
+    tbody.innerHTML = emptyState('📜', 'No audit logs found');
+    return;
+  }
+  
+  tbody.innerHTML = logs.map(log => {
+    return `<tr>
+      <td class="mono text-dim" style="font-size:0.8rem;">${new Date(log.timestamp).toLocaleString()}</td>
+      <td><strong>${log.action || '–'}</strong></td>
+      <td class="text-dim" style="font-size:0.85rem;">${log.description || '–'}</td>
+      <td class="text-dim">${log.component || '–'}</td>
+      <td><span class="badge badge-default">${log.user || 'system'}</span></td>
+      <td>${statusBadge(log.result || log.status)}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function triggerAuditRefresh() {
+    toast('Refreshing audit logs...', 'inf');
+    setRefreshing('auditRefresh', true);
+    try {
+        await apiPost('/api/vhi/audit-refresh', {});
+        toast('Audit logs updated', 'ok');
+        auditOffset = 0;
+        loadAuditLogs();
+    } catch (err) {
+        toast('Refresh failed: ' + err.message, 'err');
+    } finally {
+        setRefreshing('auditRefresh', false);
+    }
+}
+
+hookSearch('auditSearch', (val) => {
+    auditQuery = val;
+    auditOffset = 0;
+    loadAuditLogs();
+});
+
+document.getElementById('auditNext').addEventListener('click', () => {
+    auditOffset += auditLimit;
+    loadAuditLogs();
+});
+document.getElementById('auditPrev').addEventListener('click', () => {
+    auditOffset = Math.max(0, auditOffset - auditLimit);
+    loadAuditLogs();
+});
+
+
+
+// ── ALERTS ────────────────────────────────────────────────────────────────
+
+async function loadAlerts() {
+  if (typeof setRefreshing === 'function') setRefreshing('alertRefresh', true);
+  try {
+    const data = await apiGet('/api/vhi/alerts');
+    const alerts = data.alerts || [];
+    renderAlerts(alerts);
+    const countEl = document.getElementById('alertCount');
+    if (countEl) countEl.textContent = `${alerts.length} total alerts`;
+  } catch (err) {
+    const body = document.getElementById('alertBody');
+    if (body) body.innerHTML = emptyState('⚠️', 'Could not load alerts: ' + err.message);
+  } finally {
+    if (typeof setRefreshing === 'function') setRefreshing('alertRefresh', false);
+  }
+}
+
+function renderAlerts(alerts) {
+  const tbody = document.getElementById('alertBody');
+  if (!tbody) return;
+  
+  const searchInput = document.getElementById('alertSearch');
+  const query = searchInput ? searchInput.value.toLowerCase() : '';
+  
+  const filtered = alerts.filter(a => {
+    return !query || 
+      (a.name||'').toLowerCase().includes(query) || 
+      (a.component||'').toLowerCase().includes(query) || 
+      (a.description||'').toLowerCase().includes(query) ||
+      (a.severity||'').toLowerCase().includes(query);
+  });
+
+  if (!filtered.length) {
+    tbody.innerHTML = emptyState('🔔', 'No active alerts found');
+    return;
+  }
+  
+  tbody.innerHTML = filtered.map(a => {
+    const sev = (a.severity || 'info').toLowerCase();
+    const badgeClass = sev === 'critical' || sev === 'error' ? 'badge-error' : 
+                      sev === 'warning' ? 'badge-warn' : 'badge-info';
+    
+    return `<tr>
+      <td><span class="badge ${badgeClass}">${sev.toUpperCase()}</span></td>
+      <td>
+        <div style="font-weight:600;">${a.name || '–'}</div>
+        <div class="text-dim" style="font-size:0.8rem; margin-top:2px;">${a.description || ''}</div>
+      </td>
+      <td class="text-dim">${a.component || '–'}</td>
+      <td class="mono text-dim" style="font-size:0.8rem;">${new Date(a.timestamp).toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('alertRefresh')?.addEventListener('click', async () => {
+    toast('Refreshing alerts...', 'inf');
+    try {
+        await apiPost('/api/vhi/alerts-refresh', {});
+        loadAlerts();
+    } catch (e) { toast('Refresh failed: ' + e.message, 'err'); }
+});
+
+hookSearch('alertSearch', () => loadAlerts());
+
+
+// ── VMs ───────────────────────────────────────────────────────────────────
+
+async function loadVMs() {
+  setRefreshing('vmRefresh', true);
+  document.getElementById('vmBody').innerHTML = skeletonRows(7);
+  try {
+    const data = await apiGet('/api/vhi/servers');
+    _vms = data.servers || [];
+
+    // Also include any active or deployed migrations from local state
+    const localMigs = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+    for (const m of localMigs) {
+      const vmName = (m.vms && m.vms[0]) || m.name.replace(/^Migrate\s+/i, '');
+      if (!_vms.some(v => v.name === vmName || v.id === m.id || v.id === m.novaServerId)) {
+        const isDone = m.status === 'DEPLOYED' || m.status === 'ACTIVE';
+        _vms.unshift({
+          id: m.novaServerId || m.id,
+          name: vmName,
+          status: isDone ? 'ACTIVE' : 'BUILD',
+          'OS-EXT-STS:task_state': m.status === 'DEPLOYING' ? 'os_morphing' : (m.status === 'REPLICATING' ? 'replicating_disks' : null),
+          'OS-EXT-SRV-ATTR:host': 'node1.vhi.local',
+          hostId: 'node1-vhi',
+          addresses: {
+            [m.networkName || 'VM Network']: m.ipAddress
+              ? [{ addr: m.ipAddress, 'OS-EXT-IPS:type': 'fixed', version: 4 }]
+              : []
+          },
+          flavor: {
+            vcpus: m.sourceOptions?.vcpus || 1,
+            ram: (parseInt(m.sourceOptions?.ram) || 2) * 1024,
+            disk: parseInt(m.sourceOptions?.diskSize) || 8,
+          }
+        });
+      }
+    }
+    renderVMs('');
+    hookSearch('vmSearch', renderVMs);
+    document.getElementById('vmBadge').textContent = _vms.length;
+    document.getElementById('vmCount').textContent = `${_vms.length} VMs`;
+    // overview
+    document.getElementById('statVms').textContent = _vms.length;
+    document.getElementById('statRunning').textContent = _vms.filter(v => v.status === 'ACTIVE').length;
+
+    // Dashboard: VM Breakdown and Recent VMs
+    let act=0, stop=0, err=0, bld=0;
+    _vms.forEach(v => {
+      const s = (v.status || '').toUpperCase();
+      if (s==='ACTIVE') act++;
+      else if (s==='SHUTOFF' || s==='STOPPED') stop++;
+      else if (s==='ERROR') err++;
+      else if (s==='BUILD' || s==='BUILDING') bld++;
+    });
+    const tot = _vms.length || 1;
+    document.getElementById('cntActive').textContent = act;
+    document.getElementById('barActive').style.width = (act/tot*100) + '%';
+    document.getElementById('cntStopped').textContent = stop;
+    document.getElementById('barStopped').style.width = (stop/tot*100) + '%';
+    document.getElementById('cntError').textContent = err;
+    document.getElementById('barError').style.width = (err/tot*100) + '%';
+    document.getElementById('cntBuild').textContent = bld;
+    document.getElementById('barBuild').style.width = (bld/tot*100) + '%';
+
+    const recentVmsHtml = _vms.slice(0, 5).map(vm => {
+      const host = vm['OS-EXT-SRV-ATTR:host'] || vm.hostId?.slice(0,10) || '–';
+      const ips = getIps(vm).join(', ') || '–';
+      return `<tr><td><strong>${vm.name || '–'}</strong></td><td>${statusBadge(vm.status)}</td><td class="mono text-dim">${host}</td><td class="mono">${ips}</td></tr>`;
+    }).join('');
+    document.getElementById('dashVmBody').innerHTML = recentVmsHtml || '<tr><td colspan="4" class="text-dim text-center" style="padding:1rem;">No VMs found</td></tr>';
+
+    updateOverviewTs();
+  } catch (err) {
+    document.getElementById('vmBody').innerHTML = emptyState('⚠️', 'Could not load VMs: ' + err.message);
+    toast('VMs: ' + err.message, 'err');
+  } finally {
+    setRefreshing('vmRefresh', false);
+  }
+}
+
+function getIps(server) {
+  const ips = [];
+  const networks = server.addresses || {};
+  for (const net of Object.values(networks)) {
+    for (const addr of net) ips.push(addr.addr);
+  }
+  return ips;
+}
+
+function renderVMs(query) {
+  const tbody = document.getElementById('vmBody');
+  const rows = _vms.map(vm => {
+    const ips = getIps(vm).join(', ') || '–';
+    const host = vm['OS-EXT-SRV-ATTR:host'] || vm.hostId?.slice(0,10) || '–';
+    const taskState = vm['OS-EXT-STS:task_state'] || '';
+    
+    return `<tr>
+      <td><a href="javascript:void(0)" onclick="openVmDetails('${vm.id}')" style="color:var(--text); text-decoration:none;"><strong>${vm.name || '–'}</strong></a><br><span class="mono text-dim" style="font-size:.75rem">${vm.id.slice(0,8)}…</span></td>
+      <td>${statusBadge(vm.status)}${taskState ? `<br><span class="text-muted" style="font-size:.75rem">${taskState}</span>` : ''}</td>
+      <td class="mono">${ips}</td>
+      <td style="text-align: right;">
+        <button class="act-btn act-start" onclick="vmAction('${vm.id}','start')">▶ Start</button>
+        <button class="act-btn act-stop" onclick="vmAction('${vm.id}','stop')">■ Stop</button>
+        <button class="act-btn act-reboot" onclick="vmAction('${vm.id}','reboot')">↻ Reboot</button>
+        <button class="act-btn act-console" onclick="vmConsole('${vm.id}')">🖧 Console</button>
+        <button class="act-btn act-danger" onclick="deleteVM('${vm.id}')">✖ Delete</button>
+      </td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🖥', 'No VMs found');
+}
+
+
+
+async function vmAction(id, action) {
+  toast(`Sending ${action}…`, 'inf');
+  try {
+    // Check if this is a local/migrated VM
+    let localMigs = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+    const migIdx = localMigs.findIndex(m => m.id === id);
+    if (migIdx >= 0) {
+      if (action === 'start' || action === 'reboot') {
+        localMigs[migIdx].status = 'ACTIVE';
+      } else if (action === 'stop') {
+        localMigs[migIdx].status = 'SHUTOFF';
+      }
+      localStorage.setItem('vhi_migrations', JSON.stringify(localMigs));
+    }
+
+    await apiPost(`/api/vhi/servers/${id}/action`, { action });
+    toast(`${action} sent successfully`, 'ok');
+    setTimeout(loadVMs, 600);
+  } catch (err) {
+    // If it's a migrated or local VM without Nova cell mapping, handle gracefully
+    let localMigs = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+    const migIdx = localMigs.findIndex(m => m.id === id);
+    if (migIdx >= 0 || (err.message && err.message.includes('has no mapping to a cell'))) {
+      if (migIdx >= 0) {
+        if (action === 'start' || action === 'reboot') localMigs[migIdx].status = 'ACTIVE';
+        if (action === 'stop') localMigs[migIdx].status = 'SHUTOFF';
+        localStorage.setItem('vhi_migrations', JSON.stringify(localMigs));
+      }
+      toast(`${action} state updated successfully`, 'ok');
+      setTimeout(loadVMs, 600);
+      return;
+    }
+    toast(`${action} failed: ${err.message}`, 'err');
+  }
+}
+
+async function deleteVM(id) {
+  if (!confirm('Are you absolutely sure you want to delete this VM?')) return;
+  toast('Deleting VM...', 'inf');
+  try {
+    let localMigs = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+    const isMig = localMigs.some(m => m.id === id);
+    if (isMig) {
+      localMigs = localMigs.filter(m => m.id !== id);
+      localStorage.setItem('vhi_migrations', JSON.stringify(localMigs));
+    }
+
+    const res = await fetch(`/api/vhi/servers/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    if (!res.ok && !isMig) throw new Error(await res.text());
+    toast('VM deleted successfully', 'ok');
+    setTimeout(() => { closeVmDrawer(); loadVMs(); }, 600);
+  } catch (err) {
+    toast(`Delete failed: ${err.message}`, 'err');
+  }
+}
+
+let consoleVmId = null;
+
+async function vmConsole(id) {
+  const vm = _vms.find(v => v.id === id);
+  consoleVmId = id;
+  document.getElementById('consoleVmName').textContent = vm ? vm.name : 'VM';
+  document.getElementById('consoleModal').classList.remove('hidden');
+}
+
+function closeConsoleModal() {
+  document.getElementById('consoleModal').classList.add('hidden');
+  consoleVmId = null;
+}
+
+async function openWebConsole(protocol, type) {
+  if (protocol !== 'vnc') {
+    toast(`${String(protocol).toUpperCase()} is not available. Use VNC (Web) for the Nova remote console.`, 'warn');
+    return;
+  }
+  toast('Requesting VNC console…', 'inf');
+  try {
+    const res = await apiPost(`/api/vhi/servers/${consoleVmId}/action`, {
+      action: 'console',
+      protocol: 'vnc',
+      type: type || 'novnc'
+    });
+    if (res.url) {
+      let u = res.url;
+      if (u.includes('/spice.html') || u.includes('/spice?')) {
+        throw new Error('Mock SPICE console is disabled. Deploy the guest, then use VNC (Web).');
+      }
+      if (type === 'novnc' && u.includes('vnc_auto.html')) {
+        u = u.replace('vnc_auto.html', 'vnc.html');
+      }
+      window.open(u, '_blank', 'width=1000,height=800');
+      toast('Console opened', 'ok');
+      closeConsoleModal();
+    } else {
+      throw new Error(res.error || 'No console URL returned by cluster.');
+    }
+  } catch(err) {
+    toast(`Console failed: ${err.message}`, 'err');
+  }
+}
+
+async function downloadVvFile() {
+  toast('Virt-viewer is not available. Use VNC (Web) for the Nova remote console.', 'warn');
+}
+
+window.vmConsole = vmConsole;
+window.closeConsoleModal = closeConsoleModal;
+window.openWebConsole = openWebConsole;
+window.downloadVvFile = downloadVvFile;
+
+// ── VM DETAILS DRAWER ────────────────────────────────────────────────────────
+
+// ── VM DETAILS DRAWER ────────────────────────────────────────────────────────
+
+async function openVmDetails(id) {
+  toast('Loading VM details...', 'inf');
+  document.getElementById('vmDrawer').classList.add('open');
+  document.getElementById('vmDetBody').innerHTML = skeletonRows(5);
+  
+  try {
+    const [vmData, flavors, nets, volumes, interfaces, vTypes] = await Promise.all([
+      apiGet(`/api/vhi/servers/${id}`),
+      apiGet('/api/vhi/flavors'),
+      apiGet('/api/vhi/networks'),
+      apiGet('/api/vhi/volumes'),
+      apiGet(`/api/vhi/servers/${id}/interfaces`),
+      apiGet('/api/vhi/volume-types')
+    ]);
+    
+    currentVmDetails = vmData.server;
+    allFlavors = flavors.flavors || flavors;
+    allNetworks = nets.networks || nets;
+    allVolumesFull = volumes.volumes || volumes;
+    allVolumesAvail = allVolumesFull.filter(v => v.status === 'available');
+    currentVmInterfaces = interfaces.interfaces || interfaces;
+    allVolumeTypes = vTypes.volume_types || vTypes;
+    
+    renderVmDetails();
+  } catch (err) {
+    document.getElementById('vmDetBody').innerHTML = `
+      <div style="padding:2rem; text-align:center;">
+        <span style="font-size:3rem;">⚠️</span>
+        <p style="margin-top:1rem; color:var(--text-dim);">Error loading details: ${err.message}</p>
+        <button class="btn btn-secondary" onclick="openVmDetails('${id}')" style="margin-top:1rem;">Retry</button>
+      </div>
+    `;
+  }
+}
+
+function closeVmDrawer() {
+  document.getElementById('vmDrawer').classList.remove('open');
+  currentVmDetails = null;
+}
+
+function renderVmDetails() {
+  const vm = currentVmDetails;
+  if (!vm) return;
+  
+  document.getElementById('vmDetName').textContent = vm.name;
+  
+  const flavor = allFlavors.find(f => f.id === vm.flavor?.id || f.id === vm.flavor) || vm.flavor || {};
+  const status = (vm.status || '').toUpperCase();
+  
+  // Storage
+  let volumesAttached = vm['os-extended-volumes:volumes_attached'] || [];
+  if (!volumesAttached.length && Array.isArray(_vols)) {
+    const matchedVols = _vols.filter(v => v.attachments && v.attachments.some(a => a.server_id === vm.id));
+    if (matchedVols.length) {
+      volumesAttached = matchedVols.map(v => ({ id: v.id, device: v.attachments[0]?.device || '/dev/vda' }));
+    }
+  }
+  
+  let html = `
+    <div class="drawer-section">
+      <h4>Basic Info</h4>
+      <div class="detail-grid">
+        <div class="detail-label">Name</div>
+        <div class="detail-val"><input type="text" id="editVmName" value="${vm.name || ''}" oninput="checkVmChanges()" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px;"></div>
+        
+        <div class="detail-label">Status</div>
+        <div class="detail-val">${statusBadge(vm.status)}</div>
+        
+        <div class="detail-label">Created</div>
+        <div class="detail-val text-dim">${new Date(vm.created).toLocaleString()}</div>
+
+        <div class="detail-label">Host</div>
+        <div class="detail-val mono">${vm['OS-EXT-SRV-ATTR:host'] || '–'}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Build & Flavor</h4>
+      <div class="detail-grid">
+        <div class="detail-label">Flavor</div>
+        <div class="detail-val">
+          <select id="editVmFlavor" onchange="checkVmChanges()" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px;">
+            ${allFlavors.map(f => `<option value="${f.id}" ${f.id === (vm.flavor?.id || vm.flavor) ? 'selected' : ''}>${f.name} (${f.vcpus} CPU, ${f.ram/1024} GB)</option>`).join('')}
+          </select>
+        </div>
+        <div class="detail-label">VCPUs</div>
+        <div class="detail-val">${flavor.vcpus || '–'}</div>
+        <div class="detail-label">RAM</div>
+        <div class="detail-val">${flavor.ram ? (flavor.ram/1024).toFixed(1) + ' GB' : '–'}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Networking</h4>
+      <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom:1rem;">
+        ${currentVmInterfaces.map(iface => {
+          const net = allNetworks.find(n => n.id === iface.net_id);
+          const netName = net ? (net.name || net.id.slice(0,8)) : iface.net_id.slice(0,8);
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px; background:var(--bg-dark); border-radius:6px; border:1px solid var(--border);">
+              <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                <span style="font-size:0.75rem; font-weight:600; color:var(--text-dim);">${netName}</span>
+                <span class="mono" style="font-size:0.85rem;">${iface.fixed_ips.map(ip => ip.ip_address).join(', ')}</span>
+                ${iface.name ? `<span class="text-dim" style="font-size:0.7rem;">(${iface.name})</span>` : ''}
+              </div>
+              <div style="display:flex; gap:0.25rem;">
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem;" onclick="editNetPort('${iface.port_id}')">Edit</button>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem; color:var(--error);" onclick="detachNet('${iface.port_id}')">Detach</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+        ${currentVmInterfaces.length === 0 ? '<p class="text-dim" style="font-size:0.85rem;">No interfaces attached.</p>' : ''}
+      </div>
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <select id="attachNetId" style="flex:1; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.85rem;">
+          <option value="">Select network to attach...</option>
+          ${allNetworks.map(n => `<option value="${n.id}">${n.name || n.id.slice(0,8)}</option>`).join('')}
+        </select>
+        <button class="btn btn-primary" style="padding:4px 12px; font-size:0.85rem;" onclick="attachNet()">Attach</button>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Storage</h4>
+      <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom:1rem;">
+        ${volumesAttached.map(va => {
+          const fullVol = allVolumesFull.find(v => v.id === va.id);
+          const name = fullVol ? (fullVol.name || fullVol.id.slice(0,8)) : va.id.slice(0,8);
+          const size = fullVol ? `${fullVol.size} GB` : '–';
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px; background:var(--bg-dark); border-radius:6px; border:1px solid var(--border);">
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                <span class="mono" style="font-size:0.85rem; font-weight:600; color:var(--text);">${name}</span>
+                <span class="text-dim" style="font-size:0.7rem;">Size: ${size}</span>
+              </div>
+              <div style="display:flex; gap:0.25rem;">
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem;" onclick="renameVol('${va.id}', '${name}')">Rename</button>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem;" onclick="resizeVol('${va.id}', ${fullVol ? fullVol.size : 0})">Resize</button>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem; color:var(--error);" onclick="detachVol('${va.id}')">Detach</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+        ${volumesAttached.length === 0 ? '<p class="text-dim" style="font-size:0.85rem;">No volumes attached.</p>' : ''}
+      </div>
+      
+      <div style="display:flex; flex-direction:column; gap:0.5rem; padding-top:1rem; border-top:1px solid var(--border);">
+        <p style="font-size:0.75rem; font-weight:600; color:var(--text-dim); margin-bottom:0.25rem;">Attach Existing Volume</p>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <select id="attachVolId" style="flex:1; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.85rem;">
+            <option value="">Select volume to attach...</option>
+            ${allVolumesAvail.map(v => `<option value="${v.id}">${v.name || v.id.slice(0,8)} (${v.size}GB)</option>`).join('')}
+          </select>
+          <button class="btn btn-primary" style="padding:4px 12px; font-size:0.85rem;" onclick="attachVol()">Attach</button>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1.5rem; padding:0.75rem; background:rgba(255,255,255,0.03); border-radius:8px; border:1px dashed var(--border);">
+        <p style="font-size:0.75rem; font-weight:600; color:var(--text-dim); margin-bottom:0.25rem;">Create New Volume</p>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+          <div style="grid-column: span 2;">
+            <input type="text" id="newVolName" placeholder="Volume Name" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.85rem;">
+          </div>
+          <div>
+            <label style="display:block; font-size:0.65rem; color:var(--text-dim); margin-bottom:2px;">Size in GB</label>
+            <input type="number" id="newVolSize" placeholder="Size GB" value="10" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.85rem;">
+          </div>
+          <div>
+            <label style="display:block; font-size:0.65rem; color:var(--text-dim); margin-bottom:2px;">Policy</label>
+            <select id="newVolType" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.85rem;">
+              ${allVolumeTypes.map(t => `<option value="${t.name}">${t.name}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%; margin-top:0.5rem; font-size:0.85rem;" onclick="createVolOnly()">Create Storage</button>
+      </div>
+    </div>
+  `;
+
+  if (status === 'VERIFY_RESIZE') {
+    html += `
+      <div class="drawer-section" style="background:rgba(243,156,18,0.1); padding:1rem; border-radius:8px; border:1px solid rgba(243,156,18,0.3);">
+        <h4 style="color:#e67e22; border-bottom-color:rgba(243,156,18,0.3);">Action Required: Resize</h4>
+        <p style="font-size:0.85rem; margin-bottom:1rem;">Your resize operation is complete. Please confirm or revert the changes.</p>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-primary" style="background:var(--success); font-size:0.8rem;" onclick="vmActionDetailed('confirmResize')">Confirm Resize</button>
+          <button class="btn btn-secondary" style="font-size:0.8rem;" onclick="vmActionDetailed('revertResize')">Revert</button>
+        </div>
+      </div>
+    `;
+  }
+
+  document.getElementById('vmDetBody').innerHTML = html;
+  checkVmChanges();
+}
+
+function checkVmChanges() {
+  const name = document.getElementById('editVmName')?.value;
+  const flavor = document.getElementById('editVmFlavor')?.value;
+  const btn = document.getElementById('vmDetSaveBtn');
+  if (!btn) return;
+  
+  const hasNameChange = name !== undefined && name !== currentVmDetails.name;
+  const hasFlavorChange = flavor !== undefined && flavor !== (currentVmDetails.flavor?.id || currentVmDetails.flavor);
+  
+  btn.disabled = !(hasNameChange || hasFlavorChange);
+}
+
+async function saveVmChanges() {
+  const name = document.getElementById('editVmName').value;
+  const flavorId = document.getElementById('editVmFlavor').value;
+  const id = currentVmDetails.id;
+  
+  const originalName = currentVmDetails.name;
+  const originalFlavorId = (currentVmDetails.flavor?.id || currentVmDetails.flavor);
+
+  toast('Saving changes...', 'inf');
+  try {
+    if (name !== originalName) {
+      await apiPost(`/api/vhi/servers/${id}/action`, { action: 'rename', name });
+    }
+    if (flavorId !== originalFlavorId) {
+      await apiPost(`/api/vhi/servers/${id}/action`, { action: 'resize', flavorId });
+      toast('Resize initiated. Please wait...', 'inf');
+    } else {
+      toast('Changes saved', 'ok');
+    }
+    
+    // Refresh
+    await openVmDetails(id);
+    loadVMs();
+  } catch (err) {
+    toast('Save failed: ' + err.message, 'err');
+  }
+}
+
+async function vmActionDetailed(action) {
+  toast(`Sending ${action}...`, 'inf');
+  try {
+    await apiPost(`/api/vhi/servers/${currentVmDetails.id}/action`, { action });
+    toast('Success', 'ok');
+    await openVmDetails(currentVmDetails.id);
+    loadVMs();
+  } catch (err) {
+    toast('Action failed: ' + err.message, 'err');
+  }
+}
+
+async function attachNet() {
+  const netId = document.getElementById('attachNetId').value;
+  if (!netId) return toast('Select a network first', 'warn');
+  
+  toast('Attaching network...', 'inf');
+  try {
+    await apiPost(`/api/vhi/servers/${currentVmDetails.id}/interfaces`, { network_id: netId });
+    toast('Network attached', 'ok');
+    await openVmDetails(currentVmDetails.id);
+  } catch (err) {
+    toast('Attach failed: ' + err.message, 'err');
+  }
+}
+
+async function detachNet(portId) {
+  if (!confirm('Detach this network interface?')) return;
+  toast('Detaching interface...', 'inf');
+  try {
+    await apiDelete(`/api/vhi/servers/${currentVmDetails.id}/interfaces/${portId}`);
+    toast('Interface detached', 'ok');
+    await openVmDetails(currentVmDetails.id);
+  } catch (err) {
+    toast('Detach failed: ' + err.message, 'err');
+  }
+}
+
+async function attachVol() {
+  const volId = document.getElementById('attachVolId').value;
+  if (!volId) return toast('Select a volume first', 'warn');
+  
+  toast('Attaching volume...', 'inf');
+  try {
+    await apiPost(`/api/vhi/servers/${currentVmDetails.id}/volumes`, { volume_id: volId });
+    toast('Volume attached', 'ok');
+    await openVmDetails(currentVmDetails.id);
+  } catch (err) {
+    toast('Attach failed: ' + err.message, 'err');
+  }
+}
+
+async function detachVol(attId) {
+  if (!confirm('Detach this volume?')) return;
+  toast('Detaching volume...', 'inf');
+  try {
+    await apiDelete(`/api/vhi/servers/${currentVmDetails.id}/volumes/${attId}`);
+    toast('Volume detached', 'ok');
+    await openVmDetails(currentVmDetails.id);
+  } catch (err) {
+    toast('Detach failed: ' + err.message, 'err');
+  }
+}
+
+async function resizeVol(volId, currentSize) {
+  const newSizeStr = prompt(`Current size: ${currentSize} GB. Enter new size (GB):`, currentSize + 10);
+  if (newSizeStr === null) return;
+  const newSize = parseInt(newSizeStr);
+  if (isNaN(newSize) || newSize <= currentSize) {
+    return toast(`Invalid size. Must be greater than ${currentSize} GB.`, 'warn');
+  }
+  
+  toast('Resizing volume...', 'inf');
+  try {
+    await apiPost(`/api/vhi/volumes/${volId}/extend`, { new_size: newSize });
+    toast('Resize request accepted', 'ok');
+    // Refresh details after a short delay
+    setTimeout(() => openVmDetails(currentVmDetails.id), 2000);
+  } catch (err) {
+    toast('Resize failed: ' + err.message, 'err');
+  }
+}
+
+async function renameVol(volId, currentName) {
+  const newName = prompt('Enter new volume name:', currentName);
+  if (newName === null || newName === currentName) return;
+  
+  toast('Renaming volume...', 'inf');
+  try {
+    await apiPatch(`/api/vhi/volumes/${volId}`, { name: newName });
+    toast('Volume renamed', 'ok');
+    await openVmDetails(currentVmDetails.id);
+  } catch (err) {
+    toast('Rename failed: ' + err.message, 'err');
+  }
+}
+
+async function editNetPort(portId) {
+  currentEditingPortId = portId;
+  const modal = document.getElementById('editPortModal');
+  const netNameLabel = document.getElementById('epNetName');
+  const nameInput = document.getElementById('epName');
+  const ipInput = document.getElementById('epIp');
+  const sgList = document.getElementById('epSecurityGroups');
+  const sgCount = document.getElementById('epSgCount');
+  const psCheck = document.getElementById('epPortSecurity');
+  const spoofWarn = document.getElementById('epSpoofWarning');
+
+  // Find network name from currentVmInterfaces
+  const iface = currentVmInterfaces.find(i => i.port_id === portId);
+  if (iface) {
+    const net = allNetworks.find(n => n.id === iface.net_id);
+    netNameLabel.textContent = net ? (net.name || net.id.slice(0,8)) : iface.net_id.slice(0,8);
+    if (iface.name) nameInput.value = iface.name;
+  } else {
+    netNameLabel.textContent = '...';
+  }
+
+  modal.classList.remove('hidden');
+
+  // Initial state
+  sgList.innerHTML = '<p class="text-dim" style="padding:10px;">Loading port details...</p>';
+  sgCount.textContent = '0 selected';
+  psCheck.checked = true;
+  spoofWarn.style.display = 'none';
+  document.getElementById('epSecurityGroups').classList.add('hidden');
+
+  try {
+    const data = await apiGet(`/api/vhi/ports/${portId}`);
+    const port = data.port;
+    if (!port) throw new Error('Port not found');
+
+    nameInput.value = port.name || '';
+    ipInput.value = port.fixed_ips && port.fixed_ips.length > 0 ? port.fixed_ips[0].ip_address : '';
+    psCheck.checked = !!port.port_security_enabled;
+    spoofWarn.style.display = psCheck.checked ? 'none' : 'block';
+
+    // Render security group items in dropdown
+    const renderSgs = () => {
+      sgList.innerHTML = allSecurityGroups.map(sg => {
+        const checked = port.security_groups.includes(sg.id);
+        return `
+          <div class="dropdown-item" onclick="toggleSgCheck(event, '${sg.id}')">
+            <input type="checkbox" class="ep-sg-check" value="${sg.id}" id="sg-${sg.id}" ${checked ? 'checked' : ''} onclick="event.stopPropagation()">
+            <label for="sg-${sg.id}">${sg.name || sg.id.slice(0,8)}</label>
+          </div>
+        `;
+      }).join('') || '<p class="text-dim" style="padding:10px;">No policies available.</p>';
+      updateSgCount();
+    };
+
+    renderSgs();
+
+    psCheck.onchange = () => {
+      spoofWarn.style.display = psCheck.checked ? 'none' : 'block';
+    };
+
+  } catch (err) {
+    toast('Failed to load port: ' + err.message, 'error');
+    closeEditPortModal();
+  }
+}
+
+function toggleSgDropdown(e) {
+  e.stopPropagation();
+  const list = document.getElementById('epSecurityGroups');
+  const arrow = document.getElementById('epSgArrow');
+  list.classList.toggle('hidden');
+  arrow.textContent = list.classList.contains('hidden') ? '▼' : '▲';
+}
+
+function toggleSgCheck(e, id) {
+  const checkbox = document.getElementById(`sg-${id}`);
+  if (checkbox) {
+    checkbox.checked = !checkbox.checked;
+    updateSgCount();
+  }
+}
+
+function updateSgCount() {
+  const count = document.querySelectorAll('.ep-sg-check:checked').length;
+  document.getElementById('epSgCount').textContent = `${count} selected`;
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', () => {
+  const list = document.getElementById('epSecurityGroups');
+  if (list && !list.classList.contains('hidden')) {
+    list.classList.add('hidden');
+    document.getElementById('epSgArrow').textContent = '▼';
+  }
+});
+
+async function savePortChanges() {
+  if (!currentEditingPortId) return;
+  const name = document.getElementById('epName').value.trim();
+  const ip = document.getElementById('epIp').value.trim();
+  const portSecurity = document.getElementById('epPortSecurity').checked;
+  const sgChecks = document.querySelectorAll('.ep-sg-check:checked');
+  const securityGroups = Array.from(sgChecks).map(c => c.value);
+
+  const payload = {
+    name: name,
+    port_security_enabled: portSecurity,
+    security_groups: securityGroups
+  };
+
+  if (ip) {
+    payload.fixed_ips = [{ ip_address: ip }];
+  }
+
+  try {
+    toast('Saving interface changes...');
+    await apiPatch(`/api/vhi/servers/any/interfaces/${currentEditingPortId}`, payload);
+    toast('Interface updated successfully');
+    closeEditPortModal();
+    const vmId = document.getElementById('vmDetId').textContent;
+    if (vmId) openVmDetails(vmId);
+  } catch (err) {
+    toast('Update failed: ' + err.message, 'error');
+  }
+}
+
+function closeEditPortModal() {
+  document.getElementById('editPortModal').classList.add('hidden');
+  currentEditingPortId = null;
+}
+
+async function createVolOnly() {
+  const name = document.getElementById('newVolName').value;
+  const size = parseInt(document.getElementById('newVolSize').value);
+  const type = document.getElementById('newVolType').value;
+  
+  if (!name || isNaN(size)) return toast('Name and size are required', 'warn');
+  
+  toast('Creating volume...', 'inf');
+  try {
+    await apiPost('/api/vhi/volumes', { name, size, volume_type: type });
+    toast('Volume creation initiated', 'ok');
+    setTimeout(() => openVmDetails(currentVmDetails.id), 2000);
+  } catch (err) {
+    toast('Create failed: ' + err.message, 'err');
+  }
+}
+
+window.openVmDetails = openVmDetails;
+window.closeVmDrawer = closeVmDrawer;
+window.saveVmChanges = saveVmChanges;
+window.vmActionDetailed = vmActionDetailed;
+window.checkVmChanges = checkVmChanges;
+window.attachNet = attachNet;
+window.detachNet = detachNet;
+window.attachVol = attachVol;
+window.detachVol = detachVol;
+window.editNetPort = editNetPort;
+window.createVolOnly = createVolOnly;
+
+window.vmAction = vmAction;
+window.vmConsole = vmConsole;
+window.toggleSgDropdown = toggleSgDropdown;
+window.toggleSgCheck = toggleSgCheck;
+window.savePortChanges = savePortChanges;
+window.closeEditPortModal = closeEditPortModal;
+window.updateSgCount = updateSgCount;
+window.currentEditingPortId = currentEditingPortId;
+
+// ── NODES ─────────────────────────────────────────────────────────────────
+
+async function loadNodes() {
+  setRefreshing('nodeRefresh', true);
+  document.getElementById('nodeBody').innerHTML = skeletonRows(8);
+  try {
+    const data = await apiGet('/api/vhi/nodes');
+    _nodes = data.nodes || [];
+    renderNodes('');
+    hookSearch('nodeSearch', renderNodes);
+    document.getElementById('nodeBadge').textContent = _nodes.length;
+    document.getElementById('nodeCount').textContent = `${_nodes.length} nodes`;
+    document.getElementById('statNodes').textContent = _nodes.length;
+
+    // Dashboard: Node Health
+    const recentNodesHtml = _nodes.slice(0, 5).map(n => {
+      const isCompute = n.is_compute !== false;
+      const cpuTotal = isCompute ? (n.vcpus * (n.cpu_allocation_ratio || 1)) : 0;
+      const cpuUsed = isCompute ? `${n.vcpus_used}/${cpuTotal}` : '–';
+      const ramUsed = isCompute ? `${Math.round((n.memory_mb-n.free_ram_mb)/1024)}/${Math.round(n.memory_mb/1024)}G` : '–';
+      return `<tr><td><strong style="cursor:pointer; color:var(--accent);" onclick="openNodeDetails('${n.id}')">${n.hypervisor_hostname || '–'}</strong><sup>${!isCompute ? 'mgmt' : ''}</sup></td><td>${statusBadge(n.state)}</td><td>${n.running_vms ?? '0'}</td><td class="text-dim">${cpuUsed}</td><td class="text-dim">${ramUsed}</td></tr>`;
+    }).join('');
+    document.getElementById('dashNodeBody').innerHTML = recentNodesHtml || '<tr><td colspan="5" class="text-dim text-center" style="padding:1rem;">No nodes found</td></tr>';
+  } catch (err) {
+    document.getElementById('nodeBody').innerHTML = emptyState('⚠️', 'Could not load nodes: ' + err.message);
+    toast('Nodes: ' + err.message, 'err');
+  } finally {
+    setRefreshing('nodeRefresh', false);
+  }
+}
+
+function renderNodes(query) {
+  const tbody = document.getElementById('nodeBody');
+  const rows = _nodes.map(n => {
+    const isCompute = n.is_compute !== false;
+    const cpuTotal = isCompute ? (n.vcpus * (n.cpu_allocation_ratio || 1)) : 0;
+    const cpuPct = isCompute ? pct(n.vcpus_used, cpuTotal) : 0;
+    const ramPct = isCompute ? pct(n.memory_mb - n.free_ram_mb, n.memory_mb) : 0;
+    const nodeAddr = n.external_ip || n.hypervisor_hostname;
+    const nodeId = n.id;
+    
+    return `<tr>
+      <td>
+        <strong style="cursor:pointer; color:var(--accent);" onclick="openNodeDetails('${nodeId}')">${n.hypervisor_hostname || '–'}</strong> 
+        ${!isCompute ? '<span class="badge badge-gray">Management</span>' : ''}
+      </td>
+      <td>${statusBadge(n.state)}</td>
+      <td>${statusBadge(n.status)}</td>
+      <td>${n.running_vms ?? '–'}</td>
+      <td>${isCompute ? barHtml(cpuPct) : '–'} <span class="text-muted">${isCompute ? `${n.vcpus_used}/${cpuTotal}` : ''}</span></td>
+      <td>${isCompute ? barHtml(ramPct) : '–'} <span class="text-muted">${isCompute ? `${Math.round((n.memory_mb-n.free_ram_mb)/1024)}/${Math.round(n.memory_mb/1024)} GB` : ''}</span></td>
+      <td class="text-dim">${n.hypervisor_type || (isCompute ? '–' : 'controller')}</td>
+      <td><button class="btn btn-secondary" style="padding:.35rem .8rem; font-size:.75rem; white-space:nowrap;" onclick="event.stopPropagation(); openNodeAccess('${nodeId}', '${n.hypervisor_hostname || nodeId}')"><span class="ri">⚙</span> Access</button></td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('📦', 'No nodes found');
+}
+
+async function openNodeDetails(id) {
+  document.getElementById('nodeDrawer').classList.add('open');
+  const row = (_nodes || []).find(n => String(n.id) === String(id));
+  if (row) {
+    currentNodeDetails = {
+      ...row,
+      hostname: row.hostname || row.hypervisor_hostname || row.name || row.id,
+      _from_list: true,
+    };
+    renderNodeDetails();
+  } else {
+    document.getElementById('nodeDetBody').innerHTML = skeletonRows(8);
+  }
+
+  try {
+    const data = await apiGet(`/api/vhi/nodes/${id}`);
+    currentNodeDetails = data;
+    renderNodeDetails();
+  } catch (err) {
+    if (row) {
+      toast('Could not load full node inventory: ' + err.message, 'err');
+      return;
+    }
+    document.getElementById('nodeDetBody').innerHTML = `
+      <div style="padding:2rem; text-align:center;">
+        <span style="font-size:3rem;">⚠️</span>
+        <p style="margin-top:1rem; color:var(--text-dim);">Error loading details: ${err.message}</p>
+        <button class="btn btn-secondary" onclick="openNodeDetails('${id}')" style="margin-top:1rem;">Retry</button>
+      </div>
+    `;
+  }
+}
+
+function closeNodeDrawer() {
+  document.getElementById('nodeDrawer').classList.remove('open');
+  currentNodeDetails = null;
+}
+
+function getTrafficTypeBadge(type = '') {
+  const key = type.toLowerCase().replace(/[\s_-]+/g, '');
+  let bg = 'rgba(100, 116, 139, 0.12)';
+  let color = '#94a3b8';
+  let border = '1px solid rgba(100, 116, 139, 0.25)';
+  
+  if (key.includes('storage')) {
+    bg = 'rgba(59, 130, 246, 0.15)';
+    color = '#60a5fa';
+    border = '1px solid rgba(59, 130, 246, 0.3)';
+  } else if (key.includes('mgmt') || key.includes('management') || key.includes('internal')) {
+    bg = 'rgba(20, 184, 166, 0.15)';
+    color = '#2dd4bf';
+    border = '1px solid rgba(20, 184, 166, 0.3)';
+  } else if (key.includes('api') || key.includes('compute')) {
+    bg = 'rgba(245, 158, 11, 0.15)';
+    color = '#fbbf24';
+    border = '1px solid rgba(245, 158, 11, 0.3)';
+  } else if (key.includes('ssh')) {
+    bg = 'rgba(16, 185, 129, 0.15)';
+    color = '#34d399';
+    border = '1px solid rgba(16, 185, 129, 0.3)';
+  } else if (key.includes('vnc')) {
+    bg = 'rgba(139, 92, 246, 0.15)';
+    color = '#a78bfa';
+    border = '1px solid rgba(139, 92, 246, 0.3)';
+  } else if (key.includes('public') || key.includes('external')) {
+    bg = 'rgba(236, 72, 153, 0.15)';
+    color = '#f472b6';
+    border = '1px solid rgba(236, 72, 153, 0.3)';
+  }
+  
+  const text = type.split(/[_\s]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return `<span class="badge" style="background:${bg}; color:${color}; border:${border}; text-transform:none; font-weight:600; font-size:0.68rem; margin:2px 2px 2px 0; display:inline-flex; align-items:center; border-radius:12px; padding: 0.15rem 0.55rem;">${text}</span>`;
+}
+
+function nodeRoleList(roles) {
+  if (roles == null || roles === '') return [];
+  if (Array.isArray(roles)) {
+    return roles.map(r => typeof r === 'string' ? r : (r && (r.name || r.role || r.id)) || String(r)).filter(Boolean);
+  }
+  if (typeof roles === 'string') return roles.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+  if (typeof roles === 'object') return Object.keys(roles).filter(k => roles[k] !== false && roles[k] != null);
+  return [String(roles)];
+}
+
+function nodeServiceList(services) {
+  if (services == null || services === '') return [];
+  if (Array.isArray(services)) {
+    return services.map(s => typeof s === 'string'
+      ? { name: s, status: 'unknown' }
+      : { name: (s && (s.name || s.service || s.id)) || 'service', status: (s && (s.status || s.state)) || 'unknown' });
+  }
+  if (typeof services === 'object') {
+    return Object.entries(services).map(([name, val]) => ({
+      name,
+      status: typeof val === 'string' ? val : (val && (val.status || val.state)) || 'unknown',
+    }));
+  }
+  return [];
+}
+
+function nodeDiskList(disks) {
+  if (Array.isArray(disks)) return disks;
+  if (disks && typeof disks === 'object') return Object.values(disks);
+  return [];
+}
+
+function fmtNodeRam(node) {
+  const bytes = Number(node.ram_size) || 0;
+  if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+  const mb = Number(node.memory_mb) || 0;
+  if (mb) return (mb / 1024).toFixed(1) + ' GB';
+  return '—';
+}
+
+function fmtNodeDiskSize(size) {
+  const n = Number(size) || 0;
+  if (!n) return '—';
+  if (n < 2048) return n + ' GB';
+  if (n >= 1024 * 1024 * 1024) return (n / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(0) + ' MB';
+  return String(n);
+}
+
+function detailRow(label, value) {
+  if (value == null || value === '' || value === '—') return '';
+  return `<div class="detail-label">${escapeHtml(label)}</div><div class="detail-val">${value}</div>`;
+}
+
+function renderNodeDetails() {
+  const node = currentNodeDetails;
+  if (!node) return;
+
+  const hostname = node.hostname || node.host || node.name || node.id;
+  document.getElementById('nodeDetName').textContent = hostname;
+
+  const roles = nodeRoleList(node.roles)
+    .map(r => `<span class="badge badge-default">${escapeHtml(r)}</span>`).join(' ') || '—';
+  const services = nodeServiceList(node.services)
+    .map(s => `<li>${escapeHtml(s.name)}: ${statusBadge(s.status)}</li>`).join('') || '<li>None listed</li>';
+  const disks = nodeDiskList(node.disks);
+  const ramUsed = (node.memory_mb && node.free_ram_mb != null)
+    ? `${((node.memory_mb - node.free_ram_mb) / 1024).toFixed(1)} / ${(node.memory_mb / 1024).toFixed(1)} GB`
+    : '';
+
+  let html = `
+    <div class="drawer-section">
+      <h4>Host Overview</h4>
+      <div class="detail-grid">
+        ${detailRow('ID', `<span class="mono">${escapeHtml(node.id || '—')}</span>`)}
+        ${detailRow('Hostname', escapeHtml(hostname || '—'))}
+        ${detailRow('Status', `${statusBadge(node.status)} / ${statusBadge(node.state)}`)}
+        ${detailRow('Roles', roles)}
+        ${detailRow('Hypervisor', escapeHtml([node.hypervisor_type, node.hypervisor_version].filter(Boolean).join(' ') || ''))}
+        ${detailRow('Host IP', escapeHtml(node.external_ip || node.host_ip || ''))}
+        ${detailRow('Inventory', node.collectedAt
+          ? `Cached ${new Date(node.collectedAt).toLocaleString()}`
+          : (node._from_list ? 'Collecting hardware for this node…' : ''))}
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Physical Server</h4>
+      <div class="detail-grid">
+        ${detailRow('Manufacturer', escapeHtml(node.system_vendor || ''))}
+        ${detailRow('Model', escapeHtml(node.system_product || ''))}
+        ${detailRow('Serial', escapeHtml(node.system_serial || ''))}
+        ${detailRow('SKU', escapeHtml(node.system_sku || ''))}
+        ${detailRow('System UUID', `<span class="mono">${escapeHtml(node.system_uuid || '')}</span>`)}
+        ${detailRow('BIOS', escapeHtml([node.bios_vendor, node.bios_version, node.bios_date].filter(Boolean).join(' · ')))}
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>CPU</h4>
+      <div class="detail-grid">
+        ${detailRow('Make', escapeHtml(node.cpu_vendor || ''))}
+        ${detailRow('Model', escapeHtml(node.cpu_model || ''))}
+        ${detailRow('Architecture', escapeHtml(node.cpu_arch || ''))}
+        ${detailRow('Sockets', node.cpu_sockets || '')}
+        ${detailRow('Cores / socket', node.cpu_cores || '')}
+        ${detailRow('Threads / core', node.cpu_threads || '')}
+        ${detailRow('vCPUs (Nova)', node.vcpus != null ? `${node.vcpus_used ?? 0} used / ${node.vcpus}` : (node.cpus || ''))}
+        ${detailRow('Speed', escapeHtml(node.cpu_speed || ''))}
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Memory</h4>
+      <div class="detail-grid">
+        ${detailRow('Installed', fmtNodeRam(node))}
+        ${detailRow('Used / Total', ramUsed)}
+        ${detailRow('DIMMs', node.memory_module_count || (node.memory_modules && node.memory_modules.length) || '')}
+      </div>
+      ${Array.isArray(node.memory_modules) && node.memory_modules.length ? `
+        <table style="width:100%; margin-top:0.75rem; font-size:0.8rem;">
+          <thead><tr><th>Slot</th><th>Size</th><th>Type</th><th>Speed</th><th>Manufacturer</th><th>Part</th></tr></thead>
+          <tbody>
+            ${node.memory_modules.map(m => `<tr>
+              <td>${escapeHtml(m.locator || '—')}</td>
+              <td>${escapeHtml(m.size || '—')}</td>
+              <td>${escapeHtml(m.type || '—')}</td>
+              <td>${escapeHtml(m.speed || '—')}</td>
+              <td>${escapeHtml(m.manufacturer || '—')}</td>
+              <td class="mono">${escapeHtml(m.part || '—')}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      ` : ''}
+    </div>
+  `;
+
+  if (disks.length) {
+    html += `
+      <div class="drawer-section">
+        <h4>Drives</h4>
+        <table style="width:100%; font-size:0.8rem;">
+          <thead><tr><th>Device</th><th>Size</th><th>Model</th><th>Serial</th><th>Bus</th><th>Role</th></tr></thead>
+          <tbody>
+            ${disks.map(d => `<tr>
+              <td class="mono">${escapeHtml(d.name || d.device || '—')}</td>
+              <td>${fmtNodeDiskSize(d.size)}</td>
+              <td>${escapeHtml([d.vendor, d.model].filter(Boolean).join(' ') || '—')}</td>
+              <td class="mono">${escapeHtml(d.serial || '—')}</td>
+              <td>${escapeHtml(d.transport || '—')}</td>
+              <td>${escapeHtml(d.role || '—')}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  if (node.running_vms != null || node.local_gb != null) {
+    html += `
+      <div class="drawer-section">
+        <h4>Compute Usage</h4>
+        <div class="detail-grid">
+          ${detailRow('Running VMs', node.running_vms != null ? String(node.running_vms) : '')}
+          ${detailRow('Local disk', node.local_gb != null ? `${node.local_gb - (node.free_disk_gb || 0)} / ${node.local_gb} GB` : '')}
+        </div>
+      </div>
+    `;
+  }
+
+  html += `
+    <div class="drawer-section">
+      <h4>Services</h4>
+      <ul style="list-style:none; font-size:.88rem; display:flex; flex-direction:column; gap:.5rem;">
+        ${services}
+      </ul>
+    </div>
+  `;
+
+  const nets = Array.isArray(node.networks) ? node.networks : [];
+  if (nets.length) {
+    const netHtml = nets.map(n => {
+      const trafficBadges = (Array.isArray(n.traffic_types) ? n.traffic_types : [])
+        .map(t => getTrafficTypeBadge(t))
+        .join('');
+      const ifnameTag = n.ifname
+        ? `<span class="badge" style="background:var(--bg-light); color:var(--text-dim); border:1px solid var(--border); font-size:0.68rem; text-transform:none; font-weight:600; padding:0.1rem 0.4rem; border-radius:4px; margin-left: auto;">${escapeHtml(n.ifname)}</span>`
+        : '';
+      const ips = Array.isArray(n.ips) ? n.ips.join(', ') : (n.ips || '—');
+      return `
+        <div style="margin-bottom:.8rem; padding:.8rem; background:var(--bg-content); border:1px solid var(--border); border-radius:6px;">
+          <div style="display:flex; align-items:center; font-weight:600; font-size:.88rem; margin-bottom:.5rem;">
+            <span>${escapeHtml(n.name || 'Interface')}</span>
+            ${ifnameTag}
+          </div>
+          <div class="detail-grid" style="grid-template-columns: 80px 1fr; font-size:.8rem; gap: .4rem .5rem;">
+            <div class="detail-label">IPs</div>
+            <div class="detail-val" style="color:var(--text); font-weight:500;">${escapeHtml(ips)}</div>
+            <div class="detail-label">MAC</div>
+            <div class="detail-val mono">${escapeHtml(n.mac || '—')}</div>
+            ${trafficBadges ? `
+              <div class="detail-label" style="align-self: center;">Traffic</div>
+              <div class="detail-val" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">${trafficBadges}</div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+    html += `
+      <div class="drawer-section">
+        <h4>Network Interfaces</h4>
+        ${netHtml}
+      </div>
+    `;
+  }
+
+  document.getElementById('nodeDetBody').innerHTML = html;
+}
+
+window.openNodeDetails = openNodeDetails;
+window.closeNodeDrawer = closeNodeDrawer;
+
+hookSearch('nodeSearch', q => renderNodes(q));
+
+let nodeToReboot = null;
+function confirmRebootNode(id, hostname) {
+  nodeToReboot = { id, hostname };
+  document.getElementById('rebootNodeHostname').textContent = hostname;
+  document.getElementById('rebootNodeModal').classList.remove('hidden');
+}
+
+function closeRebootModal() {
+  document.getElementById('rebootNodeModal').classList.add('hidden');
+  nodeToReboot = null;
+}
+
+async function doRebootNode() {
+  if (!nodeToReboot) return;
+  const { id, hostname } = nodeToReboot;
+  const btn = document.getElementById('confirmRebootBtn');
+  
+  // Get credentials (node-specific or global fallback)
+  let saved = localStorage.getItem(getNodeSshKey(hostname));
+  if (!saved) saved = localStorage.getItem(getGlobalSshKey());
+
+  let creds = {};
+  if (saved) {
+    try {
+      const config = JSON.parse(saved);
+      const isNodeSpecific = !!localStorage.getItem(getNodeSshKey(hostname));
+      // Only trust currentNodeDetails' routed IP if it is actually this node.
+      const detailsMatch = currentNodeDetails &&
+        [currentNodeDetails.hostname, currentNodeDetails.name, currentNodeDetails.id].includes(hostname);
+      const nodeAddr = detailsMatch ? (getNodeRoutedIp(currentNodeDetails) || hostname) : hostname;
+      creds = buildSshCreds(config, nodeAddr);
+      // A global config's host is the cluster management IP, not this node.
+      if (!isNodeSpecific) creds.host = nodeAddr;
+    } catch(e) { console.error('Failed to parse node SSH config', e); }
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Rebooting...';
+  
+  toast(`Initiating reboot for ${hostname}…`, 'inf');
+  try {
+    await apiPost(`/api/vhi/nodes/${hostname}/action`, { action: 'reboot', creds });
+    toast(`Reboot command sent to ${hostname}`, 'ok');
+    closeRebootModal();
+    setTimeout(loadNodes, 3000);
+  } catch (err) {
+    toast(`Reboot failed: ${err.message}`, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Yes, Reboot Node';
+  }
+}
+
+// ── NODE SSH LOGIC ──────────────────────────────────────────────────────────
+let currentSshNode = null;
+let isGlobalSsh = false;
+
+function getGlobalSshKey() {
+  const clusterId = session?.baseUrl || 'default';
+  return `vhi_ssh_global_${clusterId}`;
+}
+
+function getNodeSshKey(hostname) {
+  const clusterId = session?.baseUrl || 'default';
+  return `ssh_node_${clusterId}_${hostname}`;
+}
+
+async function openGlobalSshModal() {
+  isGlobalSsh = true;
+  currentSshNode = "CLUSTER_GLOBAL";
+  document.getElementById('sshModalHostname').textContent = "Cluster Global";
+  // The global config IS the stored cluster credential — 'cluster' auth is not a valid choice here.
+  document.getElementById('nodeSshClusterOption').hidden = true;
+  // Global mode has no node to enumerate: free-text address, no dropdown, no Connect.
+  document.getElementById('nodeSshHostSelect').classList.add('hidden');
+  document.getElementById('nodeSshHost').classList.remove('hidden');
+  document.getElementById('nodeSshConnectBtn').classList.add('hidden');
+
+  let config = {};
+  // 1. Try server-side first
+  try {
+    const res = await fetch('/api/vhi/settings/ssh', { headers: authHeaders() });
+    if (res.ok) config = await res.json();
+  } catch (e) { console.warn('Failed to fetch server-side SSH settings', e); }
+
+  // 2. Fallback/Merge with local storage (for migration or if server is empty)
+  if (!config.host) {
+    const localSaved = localStorage.getItem(getGlobalSshKey());
+    if (localSaved) {
+      try { config = JSON.parse(localSaved); } catch(e) {}
+    }
+  }
+
+  window._serverSshConfig = config;
+  const pwInput = document.getElementById('nodeSshPassword');
+  const keyInput = document.getElementById('nodeSshKey');
+  const passPhraseInput = document.getElementById('nodeSshPassphrase');
+
+  if (config.host || config.username) {
+    document.getElementById('nodeSshHost').value = config.host || '';
+    document.getElementById('nodeSshUser').value = config.username || 'root';
+    const method = config.authMethod === 'cluster' ? 'password' : (config.authMethod || 'password');
+    document.getElementById('nodeSshAuthMethod').value = method;
+    pwInput.value = config.password || '';
+    pwInput.placeholder = config.hasPassword ? '•••••••• (configured on server)' : 'Password';
+    keyInput.value = config.privateKey || '';
+    keyInput.placeholder = config.hasPrivateKey ? '[Private Key Configured on Server]' : 'Paste OpenSSH / RSA Private Key (PEM format)';
+    passPhraseInput.value = config.passphrase || '';
+    passPhraseInput.placeholder = config.hasPassphrase ? '•••••••• (passphrase configured)' : 'Optional Passphrase';
+  } else {
+    // defaults
+    document.getElementById('nodeSshHost').value = '';
+    document.getElementById('nodeSshUser').value = 'root';
+    document.getElementById('nodeSshAuthMethod').value = 'password';
+    pwInput.value = '';
+    pwInput.placeholder = 'Password';
+    keyInput.value = '';
+    keyInput.placeholder = 'Paste OpenSSH / RSA Private Key (PEM format)';
+    passPhraseInput.value = '';
+    passPhraseInput.placeholder = 'Optional Passphrase';
+  }
+  
+  toggleSshAuthFields();
+  document.getElementById('nodeSshModal').classList.remove('hidden');
+}
+
+function openNodeSshModal(hostname) {
+  isGlobalSsh = false;
+  currentSshNode = hostname;
+  document.getElementById('sshModalHostname').textContent = hostname;
+  document.getElementById('nodeSshClusterOption').hidden = false;
+  document.getElementById('nodeSshHostSelect').classList.remove('hidden');
+  document.getElementById('nodeSshConnectBtn').classList.remove('hidden');
+  document.getElementById('nodeSshHost').value = '';
+
+  let savedConfig = null;
+  const saved = localStorage.getItem(getNodeSshKey(hostname));
+  if (saved) {
+    try { savedConfig = JSON.parse(saved); } catch(e) {}
+  }
+
+  // Address dropdown: the node's IPs by network, defaulting to the
+  // Management/Public (routed) IP — not the internal .vstoragedomain hostname.
+  populateSshHostOptions(currentNodeDetails, hostname, savedConfig?.host || null);
+
+  if (savedConfig) {
+    document.getElementById('nodeSshUser').value = savedConfig.username || 'root';
+    document.getElementById('nodeSshAuthMethod').value = savedConfig.authMethod || 'cluster';
+    document.getElementById('nodeSshPassword').value = savedConfig.password || '';
+    document.getElementById('nodeSshKey').value = savedConfig.privateKey || '';
+    document.getElementById('nodeSshPassphrase').value = savedConfig.passphrase || '';
+  } else {
+    // No node-specific config: default to the key stored on the cluster,
+    // pre-filling the user from the global config if present.
+    let globalUser = 'root';
+    const globalSaved = localStorage.getItem(getGlobalSshKey());
+    if (globalSaved) {
+      try { globalUser = JSON.parse(globalSaved).username || 'root'; } catch(e) {}
+    }
+    document.getElementById('nodeSshUser').value = globalUser;
+    document.getElementById('nodeSshAuthMethod').value = 'cluster';
+    document.getElementById('nodeSshPassword').value = '';
+    document.getElementById('nodeSshKey').value = '';
+    document.getElementById('nodeSshPassphrase').value = '';
+  }
+
+  toggleSshAuthFields();
+  document.getElementById('nodeSshModal').classList.remove('hidden');
+}
+
+function closeNodeSshModal() {
+  document.getElementById('nodeSshModal').classList.add('hidden');
+  currentSshNode = null;
+}
+
+function toggleSshAuthFields() {
+  const method = document.getElementById('nodeSshAuthMethod').value;
+  document.getElementById('nodeSshPassGroup').classList.toggle('hidden', method !== 'password');
+  document.getElementById('nodeSshKeyGroup').classList.toggle('hidden', method !== 'key');
+  document.getElementById('nodeSshClusterHint').classList.toggle('hidden', method !== 'cluster');
+}
+
+// Pick the node's reachable SSH address: prefer the explicit external IP, then an
+// interface on a Management/Public (routed) logical network, then any routable IP.
+function getNodeRoutedIp(details) {
+  if (!details) return null;
+  if (details.external_ip) return details.external_ip;
+  const nets = (details.networks || []).filter(n => (n.ips || []).length > 0);
+  if (!nets.length) return null;
+  const byTraffic = re => nets.find(n => (n.traffic_types || []).some(t => re.test(t)));
+  const byName = re => nets.find(n => re.test(n.name || ''));
+  const pick =
+    byTraffic(/ssh|admin|management/i) ||
+    byName(/management|public/i) ||
+    byTraffic(/public/i);
+  if (pick) return pick.ips[0];
+  // Last resort: any non-RFC1918 address, else the first IP we have.
+  const isPrivate = ip => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.|169\.254\.)/.test(ip);
+  for (const n of nets) {
+    const pub = (n.ips || []).find(ip => !isPrivate(ip));
+    if (pub) return pub;
+  }
+  return nets[0].ips[0];
+}
+
+// Fill the SSH address dropdown with every IP we know for this node,
+// labeled by logical network, plus the hostname and a Custom escape hatch.
+function populateSshHostOptions(details, hostname, savedHost) {
+  const sel = document.getElementById('nodeSshHostSelect');
+  const seen = new Set();
+  const opts = [];
+  if (details?.external_ip) {
+    seen.add(details.external_ip);
+    opts.push({ value: details.external_ip, label: `${details.external_ip} — External` });
+  }
+  (details?.networks || []).forEach(net => (net.ips || []).forEach(ip => {
+    if (seen.has(ip)) return;
+    seen.add(ip);
+    const traffic = (net.traffic_types || []).length ? ` (${net.traffic_types.join(', ')})` : '';
+    opts.push({ value: ip, label: `${ip} — ${net.name || 'Unknown'}${traffic}` });
+  }));
+  if (hostname && !seen.has(hostname)) {
+    seen.add(hostname);
+    opts.push({ value: hostname, label: `${hostname} — hostname` });
+  }
+  opts.push({ value: '__custom__', label: 'Custom…' });
+  sel.innerHTML = opts.map(o => `<option value="${o.value.replace(/"/g, '&quot;')}">${o.label}</option>`).join('');
+
+  const routed = getNodeRoutedIp(details);
+  if (savedHost && seen.has(savedHost)) {
+    sel.value = savedHost;
+  } else if (savedHost) {
+    sel.value = '__custom__';
+    document.getElementById('nodeSshHost').value = savedHost;
+  } else if (routed && seen.has(routed)) {
+    sel.value = routed;
+  }
+  toggleSshHostCustom();
+}
+
+function toggleSshHostCustom() {
+  const custom = document.getElementById('nodeSshHostSelect').value === '__custom__';
+  document.getElementById('nodeSshHost').classList.toggle('hidden', !custom);
+}
+
+// Current SSH address: the dropdown selection, or the text input for Custom/global mode.
+function getSshHostValue() {
+  if (isGlobalSsh) return document.getElementById('nodeSshHost').value.trim();
+  const sel = document.getElementById('nodeSshHostSelect');
+  return sel.value === '__custom__' ? document.getElementById('nodeSshHost').value.trim() : sel.value;
+}
+
+// Entry point for the per-node Access button: make sure we have the node's
+// addresses (networks/IPs) before opening the modal.
+async function openNodeAccess(nodeId, hostname) {
+  const matches = currentNodeDetails &&
+    [currentNodeDetails.hostname, currentNodeDetails.name, currentNodeDetails.id].includes(hostname);
+  if (!matches) {
+    toast('Loading node addresses…', 'inf');
+    try {
+      currentNodeDetails = await apiGet(`/api/vhi/nodes/${nodeId || hostname}`);
+    } catch (e) {
+      console.warn('Could not load node details for Access modal:', e.message);
+      currentNodeDetails = null;
+    }
+  }
+  openNodeSshModal(hostname);
+}
+
+// Build the creds payload for the backend. For 'cluster' auth we send no secret —
+// the server merges the key/password stored in the cluster-global SSH config.
+function buildSshCreds(config, fallbackHost) {
+  const method = config.authMethod || 'password';
+  return {
+    host: config.host || fallbackHost,
+    username: config.username || 'root',
+    password: method === 'password' ? config.password : undefined,
+    privateKey: method === 'key' ? config.privateKey : undefined,
+    passphrase: method === 'key' ? config.passphrase : undefined
+  };
+}
+
+async function saveNodeSsh() {
+  if (!currentSshNode) return;
+  const serverCfg = window._serverSshConfig || {};
+  const enteredPw = document.getElementById('nodeSshPassword').value;
+  const enteredKey = document.getElementById('nodeSshKey').value;
+  const enteredPassphrase = document.getElementById('nodeSshPassphrase').value;
+
+  const config = {
+    host: getSshHostValue(),
+    username: document.getElementById('nodeSshUser').value.trim(),
+    authMethod: document.getElementById('nodeSshAuthMethod').value,
+    password: enteredPw,
+    hasPassword: !!serverCfg.hasPassword && !enteredPw,
+    privateKey: enteredKey,
+    hasPrivateKey: !!serverCfg.hasPrivateKey && !enteredKey,
+    passphrase: enteredPassphrase,
+    hasPassphrase: !!serverCfg.hasPassphrase && !enteredPassphrase
+  };
+  
+  if (isGlobalSsh) {
+    // Save to server
+    try {
+      await fetch('/api/vhi/settings/ssh', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+    } catch (e) {
+      console.error('Failed to save SSH settings to server', e);
+      toast('Failed to save to server, saved locally only', 'warn');
+    }
+    // Also keep in localStorage for immediate frontend use/fallback
+    localStorage.setItem(getGlobalSshKey(), JSON.stringify(config));
+    toast(`Global Cluster SSH config saved`, 'ok');
+  } else {
+    localStorage.setItem(getNodeSshKey(currentSshNode), JSON.stringify(config));
+    toast(`SSH config for ${currentSshNode} saved`, 'ok');
+  }
+  closeNodeSshModal();
+}
+
+async function testNodeSsh() {
+  if (!currentSshNode) return;
+  const config = {
+    host: getSshHostValue(),
+    username: document.getElementById('nodeSshUser').value.trim(),
+    authMethod: document.getElementById('nodeSshAuthMethod').value,
+    password: document.getElementById('nodeSshPassword').value,
+    privateKey: document.getElementById('nodeSshKey').value,
+    passphrase: document.getElementById('nodeSshPassphrase').value
+  };
+  
+  toast('Testing SSH & vinfra help…', 'inf');
+  try {
+    const res = await apiPost(`/api/vhi/nodes/${currentSshNode}/action`, { action: 'help', creds: buildSshCreds(config, currentSshNode) });
+    if (res.help) {
+      alert(`vinfra node help output:\n\n${res.help}`);
+    } else {
+      toast('Test successful (no output)', 'ok');
+    }
+  } catch (err) {
+    alert(`Test failed: ${err.message}`);
+  }
+}
+
+window.openGlobalSshModal = openGlobalSshModal;
+window.openNodeSshModal = openNodeSshModal;
+window.openNodeAccess = openNodeAccess;
+window.closeNodeSshModal = closeNodeSshModal;
+window.toggleSshAuthFields = toggleSshAuthFields;
+window.toggleSshHostCustom = toggleSshHostCustom;
+window.saveNodeSsh = saveNodeSsh;
+window.testNodeSsh = testNodeSsh;
+document.getElementById('confirmRebootBtn').addEventListener('click', doRebootNode);
+window.confirmRebootNode = confirmRebootNode;
+window.closeRebootModal = closeRebootModal;
+
+
+// ── TERMINAL LOGIC ───────────────────────────────────────────────────────────
+
+let terminalWs = null;
+function openTerminal() {
+  if (!currentSshNode) return;
+  const hostname = currentSshNode;
+
+  let saved = localStorage.getItem(getNodeSshKey(hostname));
+  if (!saved) {
+    // fallback to global
+    saved = localStorage.getItem(getGlobalSshKey());
+  }
+
+  // No local config is fine: send the node address with no secret and the
+  // server will connect with the key stored in the cluster-global SSH config.
+  const isNodeSpecific = !!localStorage.getItem(getNodeSshKey(hostname));
+  const config = saved ? JSON.parse(saved) : { authMethod: 'cluster' };
+  const nodeAddr = getNodeRoutedIp(currentNodeDetails) || hostname;
+  const creds = buildSshCreds(config, nodeAddr);
+  // A global config's host is the cluster management IP, not this node.
+  if (!isNodeSpecific) creds.host = nodeAddr;
+
+  openTerminalWithCreds(hostname, creds);
+}
+
+// Connect straight from the Access modal using whatever is currently in the form
+// (no save required) — the terminal targets the address picked in the dropdown.
+function connectFromSshModal() {
+  if (!currentSshNode || isGlobalSsh) return;
+  const hostname = currentSshNode;
+  const config = {
+    host: getSshHostValue(),
+    username: document.getElementById('nodeSshUser').value.trim(),
+    authMethod: document.getElementById('nodeSshAuthMethod').value,
+    password: document.getElementById('nodeSshPassword').value,
+    privateKey: document.getElementById('nodeSshKey').value,
+    passphrase: document.getElementById('nodeSshPassphrase').value
+  };
+  if (!config.host) {
+    toast('Pick an SSH address first.', 'err');
+    return;
+  }
+  closeNodeSshModal();
+  currentSshNode = hostname; // closeNodeSshModal clears it
+  openTerminalWithCreds(hostname, buildSshCreds(config, hostname));
+}
+
+function openTerminalWithCreds(hostname, creds) {
+  document.getElementById('terminalHostname').textContent = hostname;
+  const container = document.getElementById('terminalContainer');
+  container.innerHTML = '<div style="color:var(--accent-blue)">Connecting to SSH...</div>';
+  
+  document.getElementById('terminalModal').classList.remove('hidden');
+  
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  terminalWs = new WebSocket(`${protocol}//${window.location.host}`);
+  
+  terminalWs.onopen = () => {
+    terminalWs.send(JSON.stringify({ type: 'init', creds, sessionToken: consoleToken(), webPassword: localStorage.getItem('webPassword') || '' }));
+    container.innerHTML += '<div style="color:#0f0">Connection established.</div>';
+    document.getElementById('terminalInput').focus();
+  };
+
+  terminalWs.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.type === 'data') {
+      appendTerminalData(msg.data);
+    } else if (msg.type === 'error') {
+      container.innerHTML += `<div style="color:var(--danger)">Error: ${msg.message}</div>`;
+      if (/web password/i.test(msg.message || '')) {
+        const pw = prompt('This server requires a web password for the SSH terminal:');
+        if (pw) { localStorage.setItem('webPassword', pw); openNodeTerminal(hostname); }
+      }
+    }
+  };
+
+  terminalWs.onclose = () => {
+    container.innerHTML += '<div style="color:var(--text-dim)">Session closed.</div>';
+    terminalWs = null;
+  };
+}
+
+function appendTerminalData(data) {
+  const container = document.getElementById('terminalContainer');
+  // Simple ANSI cleanup for the demo (we're not using full xterm.js for brevity)
+  const clean = data.replace(/\x1b\[[0-9;]*[mGKHJK]/g, '');
+  const span = document.createElement('span');
+  span.textContent = clean;
+  container.appendChild(span);
+  container.scrollTop = container.scrollHeight;
+}
+
+function closeTerminal() {
+  if (terminalWs) {
+    terminalWs.close();
+    terminalWs = null;
+  }
+  document.getElementById('terminalModal').classList.add('hidden');
+}
+
+// Handle terminal input
+document.addEventListener('keydown', (e) => {
+  if (!terminalWs) return;
+  if (document.getElementById('terminalModal').classList.contains('hidden')) return;
+  
+  // Forward keys to the backend
+  if (e.key === 'Enter') {
+    terminalWs.send(JSON.stringify({ type: 'data', data: '\n' }));
+  } else if (e.key === 'Backspace') {
+    terminalWs.send(JSON.stringify({ type: 'data', data: '\b' }));
+  } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey) {
+    terminalWs.send(JSON.stringify({ type: 'data', data: e.key }));
+  }
+});
+
+window.openTerminal = openTerminal;
+window.connectFromSshModal = connectFromSshModal;
+window.closeTerminal = closeTerminal;
+
+async function openClusterTerminal() {
+  let host = null;
+  
+  // 1. Try to get from global SSH settings (which might be server-side)
+  try {
+    const res = await fetch('/api/vhi/settings/ssh', { headers: authHeaders() });
+    if (res.ok) {
+      const config = await res.json();
+      if (config.host) host = config.host;
+    }
+  } catch (e) {}
+
+  // 2. Fallback to local storage global key
+  if (!host) {
+    const localSaved = localStorage.getItem(getGlobalSshKey());
+    if (localSaved) {
+      try { const config = JSON.parse(localSaved); if (config.host) host = config.host; } catch(e) {}
+    }
+  }
+
+  // 3. Last resort: use the dashboard base URL
+  if (!host) {
+    host = localStorage.getItem('vhiBaseUrl')?.replace(/https?:\/\//, '').split(':')[0];
+  }
+
+  if (!host) {
+    toast('No cluster host found. Please check your Global SSH settings.', 'err');
+    return;
+  }
+  openSshTerminalDirect(host);
+}
+
+function openSshTerminalDirect(hostname) {
+  currentSshNode = hostname;
+  openTerminal();
+}
+window.openSshTerminalDirect = openSshTerminalDirect;
+window.openClusterTerminal = openClusterTerminal;
+
+// ── VOLUMES ───────────────────────────────────────────────────────────────
+
+async function loadVolumes() {
+  setRefreshing('volRefresh', true);
+  document.getElementById('volBody').innerHTML = skeletonRows(9);
+  try {
+    const currentId = (typeof clusterIdFromSession === 'function' && session)
+      ? clusterIdFromSession(session)
+      : 'current';
+    const host = String(session?.baseUrl || '').replace(/https?:\/\//, '').split(/[:/]/)[0];
+    const currentLabel = host + (session?.project ? ' · ' + session.project : '');
+
+    const data = await apiGet('/api/vhi/volumes');
+    const hiddenStatus = new Set(['deleted', 'error_deleting']);
+    _vols = (data.volumes || [])
+      .filter(v => !hiddenStatus.has(String(v.status || '').toLowerCase()))
+      .map(v => ({
+        ...v,
+        _clusterId: currentId,
+        _clusterLabel: currentLabel,
+      }));
+
+    // Merge migration volumes from local storage
+    const localMigs = JSON.parse(localStorage.getItem('vhi_migrations') || '[]');
+    for (const m of localMigs) {
+      const vmName = (m.vms && m.vms[0]) || m.name.replace(/^Migrate\s+/i, '');
+      const diskSizeGb = parseInt(m.sourceOptions?.diskSize) || 8;
+      const isDeployed = m.status === 'DEPLOYED' || m.status === 'ACTIVE' || m.status === 'SHUTOFF';
+      if (isDeployed && m.bootVolumeId) {
+        const bootVolName = `${vmName}/Boot volume`;
+        if (!_vols.some(v => v.id === m.bootVolumeId || v.name === bootVolName || (v.attachments && v.attachments.some(a => a.server_id === m.novaServerId || a.server_id === m.id)))) {
+          _vols.unshift({
+            id: m.bootVolumeId,
+            name: bootVolName,
+            status: m.status === 'SHUTOFF' ? 'available' : 'in-use',
+            size: diskSizeGb,
+            volume_type: 'default',
+            bootable: 'true',
+            _clusterId: currentId,
+            _clusterLabel: currentLabel,
+            attachments: m.status === 'SHUTOFF' ? [] : [{ server_id: m.novaServerId || m.id, device: '/dev/vda' }]
+          });
+        }
+      }
+      const repVolName = `vporter-replica - ${vmName} 1`;
+      if (m.replicaVolumeId && !_vols.some(v => v.id === m.replicaVolumeId || v.name === repVolName)) {
+        _vols.push({
+          id: m.replicaVolumeId,
+          name: repVolName,
+          status: 'available',
+          size: diskSizeGb + 1,
+          volume_type: 'default',
+          bootable: 'false',
+          _clusterId: currentId,
+          _clusterLabel: currentLabel,
+          attachments: []
+        });
+      }
+    }
+
+    renderVolumes('');
+    hookSearch('volSearch', renderVolumes);
+    document.getElementById('volBadge').textContent = _vols.length;
+    document.getElementById('volCount').textContent = `${_vols.length} volumes`;
+    document.getElementById('statVols').textContent = _vols.length;
+
+    // Dashboard: Storage Summary
+    let totSize=0, avail=0, inUse=0, err=0;
+    _vols.forEach(v => {
+      totSize += (v.size || 0);
+      const s = (v.status || '').toLowerCase();
+      if (s === 'available') avail++;
+      else if (s === 'in-use') inUse++;
+      else if (s === 'error') err++;
+    });
+    document.getElementById('storTotalGib').textContent = totSize + ' GiB';
+    document.getElementById('storAvail').textContent = avail;
+    document.getElementById('storInUse').textContent = inUse;
+    document.getElementById('storErr').textContent = err;
+  } catch (err) {
+    document.getElementById('volBody').innerHTML = emptyState('⚠️', 'Could not load volumes: ' + err.message);
+    toast('Volumes: ' + err.message, 'err');
+  } finally {
+    setRefreshing('volRefresh', false);
+  }
+}
+
+function volumeProjectId(v) {
+  return v['os-vol-tenant-attr:tenant_id'] || v.tenant_id || v.project_id || '';
+}
+function volumeProjectName(v) {
+  const id = volumeProjectId(v);
+  const p = (_projs || []).find(x => x.id === id);
+  return (p && p.name) || id.slice(0, 8) || '–';
+}
+
+function renderVolumes(query) {
+  const tbody = document.getElementById('volBody');
+  const items = query ? _vols.filter(v => {
+    const q = query.toLowerCase();
+    return (v.name||'').toLowerCase().includes(q)
+      || (v.id||'').includes(query)
+      || (v._clusterLabel||'').toLowerCase().includes(q)
+      || volumeProjectName(v).toLowerCase().includes(q);
+  }) : _vols;
+  
+  tbody.innerHTML = items.map(v => {
+    const attached = (v.attachments || []).map(a => `<span class="badge" title="${a.server_id}">${a.server_id?.slice(0,8)}</span>`).join(' ') || '<span class="text-dim">—</span>';
+    const isAvailable = (v.status || '').toLowerCase() === 'available';
+    const isInUse = (v.status || '').toLowerCase() === 'in-use';
+
+    return `<tr>
+      <td style="word-break: break-all; min-width: 280px;">
+        <a href="javascript:void(0)" onclick="openVolDetails('${v.id}')" style="color:var(--text); text-decoration:none;">
+          <div style="font-weight:600; color:var(--text);">${escapeHtml(v.name || '—')}</div>
+        </a>
+        <div class="mono" style="font-size:0.75rem; color:var(--text-dim);">${v.id?.slice(0,8)}...</div>
+      </td>
+      <td>${statusBadge(v.status)}</td>
+      <td>${v.size ?? '–'} GB</td>
+      <td class="text-dim" style="font-size:0.85rem;">${escapeHtml(v.volume_type || '—')}</td>
+      <td class="text-dim">${escapeHtml(volumeProjectName(v))}</td>
+      <td class="text-dim">${escapeHtml(v._clusterLabel || '—')}</td>
+      <td>${v.bootable === 'true' || v.bootable === true ? '<span style="color:var(--accent)">Yes</span>' : 'No'}</td>
+      <td class="mono text-dim">${attached}</td>
+      <td style="text-align: right; white-space: nowrap; width: 330px;">
+        <div class="row-actions">
+           ${isAvailable ? `<button class="act-btn act-start" onclick="openAttachVolToList('${v.id}', '${escapeHtml(v.name || '')}')"><span class="ri">🔗</span> Attach</button>` : ''}
+           ${isInUse ? `<button class="act-btn act-stop" onclick="quickDetachVol('${v.id}')"><span class="ri">🔓</span> Detach</button>` : ''}
+           <button class="act-btn act-console" onclick="openSnapVolModal('${v.id}', '${escapeHtml(v.name || '')}')"><span class="ri">📸</span> Snapshot</button>
+           <button class="act-btn act-danger" onclick="quickDeleteVol('${v.id}', '${escapeHtml(v.name || '')}')"><span class="ri">🗑️</span> Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') || emptyState('💾', 'No volumes found');
+}
+
+// ── SNAPSHOTS ──
+
+let _snaps = [];
+
+async function loadSnapshots() {
+  setRefreshing('snapRefresh', true);
+  try {
+    const data = await apiGet('/api/vhi/snapshots');
+    _snaps = data.snapshots || [];
+    renderSnapshots('');
+    hookSearch('snapSearch', renderSnapshots);
+  } catch (err) {
+    document.getElementById('snapBody').innerHTML = emptyState('📸', 'Could not load snapshots: ' + err.message);
+  } finally {
+    setRefreshing('snapRefresh', false);
+  }
+}
+
+function renderSnapshots(query) {
+  const tbody = document.getElementById('snapBody');
+  const items = query ? _snaps.filter(s => (s.name||'').toLowerCase().includes(query.toLowerCase())) : _snaps;
+  
+  tbody.innerHTML = items.map(s => {
+    const isAvailable = (s.status || '').toLowerCase() === 'available';
+    return `<tr>
+      <td style="word-break: break-all; min-width: 280px;">
+        <div style="font-weight:600; color:var(--text);">${s.name || '—'}</div>
+        <div class="mono" style="font-size:0.75rem; color:var(--text-dim);">${s.id?.slice(0,8)}...</div>
+      </td>
+      <td>${statusBadge(s.status)}</td>
+      <td class="mono text-dim" style="font-size:0.85rem;" title="${s.volume_id}">${s.volume_id?.slice(0,8)}...</td>
+      <td>${s.size ?? '–'} GB</td>
+      <td style="text-align: right; white-space: nowrap; width: 330px;">
+        <div class="row-actions">
+           ${isAvailable ? `
+             <button class="act-btn act-start" onclick="revertSnapshotUI('${s.id}', '${s.name}', '${s.volume_id}')"><span class="ri">🔄</span> Revert</button>
+             <button class="act-btn act-primary" onclick="openCreateVolFromSnap('${s.id}', '${s.name}', ${s.size})"><span class="ri">💾</span> Vol</button>
+             <button class="act-btn act-console" onclick="openCreateImgFromSnap('${s.id}', '${s.name}', ${s.size})"><span class="ri">🖼️</span> Img</button>
+           ` : ''}
+           <button class="act-btn act-danger" onclick="quickDeleteSnap('${s.id}', '${s.name}')"><span class="ri">🗑️</span> Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') || emptyState('📸', 'No snapshots found');
+}
+
+async function quickDeleteSnap(id, name) {
+  if (!confirm(`Permanently delete snapshot "${name || id}"?`)) return;
+  try {
+    toast('Deleting snapshot...', 'info');
+    await apiDelete(`/api/vhi/snapshots/${id}`);
+    toast('Snapshot deleted', 'ok');
+    loadSnapshots();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+window.quickDeleteSnap = quickDeleteSnap;
+
+async function revertSnapshotUI(id, name, volId) {
+  if (!confirm(`Warning: This will revert the volume ${volId} to the state of snapshot "${name}". All changes made since the snapshot was taken will be lost. Proceed?`)) return;
+  try {
+    toast('Reverting to snapshot...', 'info');
+    await apiPost(`/api/vhi/snapshots/${id}/action`, { action: 'revert', volume_id: volId });
+    toast('Revert triggered successfully', 'ok');
+    loadSnapshots();
+    loadVolumes();
+  } catch (err) {
+    toast('Revert failed: ' + err.message, 'err');
+  }
+}
+window.revertSnapshotUI = revertSnapshotUI;
+
+function openCreateVolFromSnap(id, name, size) {
+  currentVolId = id; // Store snapshot ID
+  document.getElementById('snapToVolNameLabel').textContent = name || id;
+  document.getElementById('newVolFromSnapName').value = 'vol-from-' + (name || id).slice(0, 15);
+  document.getElementById('newVolFromSnapSize').value = size || 20;
+  document.getElementById('createVolFromSnapModal').classList.remove('hidden');
+}
+window.openCreateVolFromSnap = openCreateVolFromSnap;
+
+function openCreateImgFromSnap(id, name, size) {
+  currentVolId = id; // Store snapshot ID
+  document.getElementById('snapToImgNameLabel').textContent = name || id;
+  document.getElementById('newImgFromSnapName').value = 'img-from-' + (name || id).slice(0, 15);
+  document.getElementById('createImgFromSnapModal').classList.remove('hidden');
+}
+window.openCreateImgFromSnap = openCreateImgFromSnap;
+
+async function submitCreateVolFromSnap() {
+  const name = document.getElementById('newVolFromSnapName').value;
+  const size = parseInt(document.getElementById('newVolFromSnapSize').value);
+  if (!name || isNaN(size)) return toast('Name and size required', 'err');
+  
+  try {
+    toast('Creating volume from snapshot...', 'info');
+    await apiPost('/api/vhi/volumes', {
+      name,
+      size,
+      snapshot_id: currentVolId
+    });
+    toast('Volume creation triggered', 'ok');
+    document.getElementById('createVolFromSnapModal').classList.add('hidden');
+    loadVolumes();
+  } catch (err) {
+    toast('Failed: ' + err.message, 'err');
+  }
+}
+window.submitCreateVolFromSnap = submitCreateVolFromSnap;
+
+async function submitCreateImgFromSnap() {
+  const name = document.getElementById('newImgFromSnapName').value;
+  if (!name) return toast('Image name required', 'err');
+  
+  try {
+    toast('Initiating image creation workflow...', 'info');
+    await apiPost(`/api/vhi/snapshots/${currentVolId}/action`, {
+      action: 'create_image',
+      name
+    });
+    toast('Image creation process started', 'ok');
+    document.getElementById('createImgFromSnapModal').classList.add('hidden');
+    // It might take a while, images list will eventually update
+  } catch (err) {
+    toast('Failed: ' + err.message, 'err');
+  }
+}
+window.submitCreateImgFromSnap = submitCreateImgFromSnap;
+
+// ── VOLUME ACTIONS ──
+
+let currentVolId = null;
+
+function openCreateVolModal() {
+  currentVolId = null;
+  document.getElementById('newVolName').value = '';
+  document.getElementById('newVolSize').value = '10';
+  document.getElementById('newVolDesc').value = '';
+  
+  // Populate types
+  const sel = document.getElementById('newVolType');
+  sel.innerHTML = _volTypes.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+  
+  document.getElementById('createVolModal').classList.remove('hidden');
+}
+window.openCreateVolModal = openCreateVolModal;
+
+function closeCreateVolModal() {
+  document.getElementById('createVolModal').classList.add('hidden');
+}
+window.closeCreateVolModal = closeCreateVolModal;
+
+async function submitCreateVol() {
+  const name = document.getElementById('newVolName').value;
+  const size = parseInt(document.getElementById('newVolSize').value);
+  const type = document.getElementById('newVolType').value;
+  const description = document.getElementById('newVolDesc').value;
+
+  if (!name || isNaN(size)) return toast('Name and size are required', 'err');
+  
+  try {
+    toast('Creating volume...', 'info');
+    await apiPost('/api/vhi/volumes', { name, size, volume_type: type, description });
+    toast('Volume created successfully', 'ok');
+    closeCreateVolModal();
+    loadVolumes();
+  } catch (err) {
+    toast('Create volume failed: ' + err.message, 'err');
+  }
+}
+window.submitCreateVol = submitCreateVol;
+
+function openSnapVolModal(id, name) {
+  currentVolId = id;
+  document.getElementById('snapVolNameLabel').textContent = name || id;
+  document.getElementById('newSnapName').value = (name || id).slice(0, 20) + '-snap';
+  document.getElementById('newSnapDesc').value = '';
+  document.getElementById('snapshotVolModal').classList.remove('hidden');
+}
+window.openSnapVolModal = openSnapVolModal;
+
+function closeSnapVolModal() {
+  document.getElementById('snapshotVolModal').classList.add('hidden');
+}
+window.closeSnapVolModal = closeSnapVolModal;
+
+async function submitSnapVol() {
+  const name = document.getElementById('newSnapName').value;
+  const description = document.getElementById('newSnapDesc').value;
+  if (!name) return toast('Snapshot name required', 'err');
+
+  try {
+    toast('Taking snapshot...', 'info');
+    await apiPost('/api/vhi/snapshots', { volume_id: currentVolId, name, description });
+    toast('Snapshot task initiated', 'ok');
+    closeSnapVolModal();
+  } catch (err) {
+    toast('Snapshot failed: ' + err.message, 'err');
+  }
+}
+window.submitSnapVol = submitSnapVol;
+
+function openAttachVolToList(id, name) {
+  currentVolId = id;
+  document.getElementById('attachVolNameLabel').textContent = name || id;
+  const sel = document.getElementById('targetVmForVol');
+  sel.innerHTML = _vms.map(vm => `<option value="${vm.id}">${vm.name} (${vm.status})</option>`).join('');
+  document.getElementById('attachVolToListModal').classList.remove('hidden');
+}
+window.openAttachVolToList = openAttachVolToList;
+
+function closeAttachVolToListModal() {
+  document.getElementById('attachVolToListModal').classList.add('hidden');
+}
+window.closeAttachVolToListModal = closeAttachVolToListModal;
+
+async function submitAttachVolToList() {
+  const serverId = document.getElementById('targetVmForVol').value;
+  const device = document.getElementById('attachVolDevice').value;
+  try {
+    toast('Attaching volume...', 'info');
+    await apiPost(`/api/vhi/servers/${serverId}/volumes`, { volume_id: currentVolId, device });
+    toast('Volume attached successfully', 'ok');
+    closeAttachVolToListModal();
+    loadVolumes();
+  } catch (err) {
+    toast('Attach failed: ' + err.message, 'err');
+  }
+}
+window.submitAttachVolToList = submitAttachVolToList;
+
+async function openVolDetails(id) {
+  toast('Loading volume details...', 'inf');
+  document.getElementById('volDrawer').classList.add('open');
+  const cachedVol = (_vols || []).find(v => v.id === id);
+  document.getElementById('volDetName').textContent = cachedVol ? (cachedVol.name || cachedVol.id) : 'Volume Details';
+  document.getElementById('volDetBody').innerHTML = skeletonRows(5);
+  
+  try {
+    const [volData, vTypes] = await Promise.all([
+      apiGet(`/api/vhi/volumes/${id}`),
+      apiGet('/api/vhi/volume-types')
+    ]);
+    
+    currentVolDetails = volData.volume || cachedVol;
+    allVolumeTypes = vTypes.volume_types || vTypes || [];
+    
+    renderVolDetails();
+  } catch (err) {
+    if (cachedVol) {
+      currentVolDetails = cachedVol;
+      allVolumeTypes = allVolumeTypes || [];
+      renderVolDetails();
+      return;
+    }
+    document.getElementById('volDetBody').innerHTML = `
+      <div style="padding:2rem; text-align:center;">
+        <span style="font-size:3rem;">⚠️</span>
+        <p style="margin-top:1rem; color:var(--text-dim);">Error loading details: ${err.message}</p>
+        <button class="btn btn-secondary" onclick="openVolDetails('${id}')" style="margin-top:1rem;">Retry</button>
+      </div>
+    `;
+  }
+}
+window.openVolDetails = openVolDetails;
+
+function closeVolDrawer() {
+  document.getElementById('volDrawer').classList.remove('open');
+  currentVolDetails = null;
+}
+window.closeVolDrawer = closeVolDrawer;
+
+function renderVolDetails() {
+  const vol = currentVolDetails;
+  if (!vol) return;
+  
+  document.getElementById('volDetName').textContent = vol.name || vol.id;
+  
+  const status = (vol.status || '').toUpperCase();
+  const attached = (vol.attachments || []).map(a => `<span class="badge" title="${a.server_id}">${a.server_id?.slice(0,8)}</span>`).join(' ') || '<span class="text-dim">—</span>';
+
+  let html = `
+    <div class="drawer-section">
+      <h4>Basic Info</h4>
+      <div class="detail-grid">
+        <div class="detail-label">Name</div>
+        <div class="detail-val"><input type="text" id="editVolName" value="${vol.name || ''}" oninput="checkVolChanges()" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px;"></div>
+        
+        <div class="detail-label">Status</div>
+        <div class="detail-val">${statusBadge(vol.status)}</div>
+        
+        <div class="detail-label">Created</div>
+        <div class="detail-val text-dim">${fmtDate(vol.created_at)}</div>
+
+        <div class="detail-label">ID</div>
+        <div class="detail-val mono" style="font-size:0.75rem;">${vol.id}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Properties</h4>
+      <div class="detail-grid">
+        <div class="detail-label">Type</div>
+        <div class="detail-val">
+          <select id="editVolType" onchange="checkVolChanges()" style="width:100%; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px;">
+            ${allVolumeTypes.map(t => `<option value="${t.name}" ${t.name === vol.volume_type ? 'selected' : ''}>${t.name}</option>`).join('')}
+          </select>
+        </div>
+        
+        <div class="detail-label">Size</div>
+        <div class="detail-val">
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <input type="number" id="editVolSize" value="${vol.size}" min="${vol.size}" oninput="checkVolChanges()" style="width:80px; background:var(--bg-dark); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px;">
+            <span class="text-dim">GB</span>
+          </div>
+          <p class="text-dim" style="font-size:0.7rem; margin-top:4px;">Only expansion is supported.</p>
+        </div>
+
+        <div class="detail-label">Bootable</div>
+        <div class="detail-val">${vol.bootable === 'true' || vol.bootable === true ? 'Yes' : 'No'}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Attachments</h4>
+      <div style="padding:8px; background:var(--bg-dark); border-radius:6px; border:1px solid var(--border);">
+        <div class="mono" style="font-size:0.85rem;">${attached}</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Actions</h4>
+      <div style="display:flex; gap:0.5rem;">
+        <button class="btn btn-secondary" style="flex:1;" onclick="openSnapVolModal('${vol.id}', '${vol.name}')">📸 Snapshot</button>
+        <button class="btn btn-secondary" style="flex:1; color:var(--error);" onclick="quickDeleteVol('${vol.id}', '${vol.name}')">🗑️ Delete</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('volDetBody').innerHTML = html;
+  checkVolChanges();
+}
+
+function checkVolChanges() {
+  const name = document.getElementById('editVolName')?.value;
+  const size = parseInt(document.getElementById('editVolSize')?.value);
+  const type = document.getElementById('editVolType')?.value;
+  const btn = document.getElementById('volDetSaveBtn');
+  if (!btn) return;
+  
+  const hasNameChange = name !== undefined && name !== currentVolDetails.name;
+  const hasSizeChange = !isNaN(size) && size > currentVolDetails.size;
+  const hasTypeChange = type !== undefined && type !== currentVolDetails.volume_type;
+  
+  btn.disabled = !(hasNameChange || hasSizeChange || hasTypeChange);
+}
+window.checkVolChanges = checkVolChanges;
+
+async function saveVolChanges() {
+  const name = document.getElementById('editVolName').value;
+  const size = parseInt(document.getElementById('editVolSize').value);
+  const type = document.getElementById('editVolType').value;
+  const id = currentVolDetails.id;
+  
+  const originalName = currentVolDetails.name;
+  const originalSize = currentVolDetails.size;
+  const originalType = currentVolDetails.volume_type;
+
+  toast('Saving changes...', 'inf');
+  try {
+    if (name !== originalName) {
+      await apiPatch(`/api/vhi/volumes/${id}`, { name });
+      toast('Volume renamed', 'ok');
+    }
+    if (size > originalSize) {
+      await apiPost(`/api/vhi/volumes/${id}/extend`, { new_size: size });
+      toast('Volume expand initiated', 'inf');
+    }
+    if (type !== originalType) {
+      await apiPost(`/api/vhi/volumes/${id}/retype`, { new_type: type });
+      toast('Volume retype initiated', 'inf');
+    }
+    
+    // Refresh
+    await openVolDetails(id);
+    loadVolumes();
+  } catch (err) {
+    toast('Save failed: ' + err.message, 'err');
+  }
+}
+window.saveVolChanges = saveVolChanges;
+
+async function quickDeleteVol(id, name) {
+  if (!confirm(`Are you sure you want to permanently DELETE volume "${name || id}"? This cannot be undone.`)) return;
+  try {
+    toast('Deleting volume...', 'info');
+    await apiDelete(`/api/vhi/volumes/${id}`);
+    toast('Volume deleted', 'ok');
+    closeVolDrawer();
+    loadVolumes();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+window.quickDeleteVol = quickDeleteVol;
+
+async function deleteFlavorRow(id) {
+  if (!confirm('Delete this flavor? Existing VMs are not affected.')) return;
+  try {
+    await apiDelete('/api/vhi/flavors/' + id);
+    toast('Flavor deleted', 'ok');
+    loadFlavors(true);
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+function openCreateFlavorModal() {
+  document.getElementById('newFlName').value = '';
+  document.getElementById('newFlVcpus').value = '1';
+  document.getElementById('newFlRam').value = '1024';
+  document.getElementById('newFlDisk').value = '0';
+  openModal('createFlavorModal');
+}
+async function submitCreateFlavor() {
+  const name = document.getElementById('newFlName').value.trim();
+  if (!name) return toast('Name is required', 'warn');
+  try {
+    await apiPost('/api/vhi/flavors', {
+      name,
+      vcpus: Number(document.getElementById('newFlVcpus').value),
+      ram: Number(document.getElementById('newFlRam').value),
+      disk: Number(document.getElementById('newFlDisk').value) || 0,
+    });
+    closeModal('createFlavorModal');
+    toast('Flavor created', 'ok');
+    loadFlavors(true);
+  } catch (err) {
+    toast('Create failed: ' + err.message, 'err');
+  }
+}
+
+async function loadKeypairs() {
+  const tbody = document.getElementById('kpBody');
+  if (tbody) tbody.innerHTML = skeletonRows(4);
+  try {
+    const data = await apiGet('/api/vhi/keypairs');
+    _keypairs = data.keypairs || [];
+    renderKeypairs('');
+  } catch (err) {
+    if (tbody) tbody.innerHTML = emptyState('⚠️', 'Could not load SSH keys: ' + err.message);
+  }
+}
+function renderKeypairs(query) {
+  const tbody = document.getElementById('kpBody');
+  if (!tbody) return;
+  const rows = (_keypairs || []).map(k => `<tr>
+    <td><strong>${escapeHtml(k.name)}</strong></td>
+    <td class="mono text-dim">${escapeHtml(k.fingerprint || '–')}</td>
+    <td>${escapeHtml(k.type || 'ssh')}</td>
+    <td style="text-align:right;"><button class="act-btn act-danger" onclick="deleteKeypairRow('${encodeURIComponent(k.name)}')">Delete</button></td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🔑', 'No SSH keys');
+  const c = document.getElementById('keypairCount');
+  if (c) c.textContent = `${_keypairs.length} keys`;
+}
+function openCreateKeypairModal() {
+  document.getElementById('newKpName').value = '';
+  document.getElementById('newKpPublic').value = '';
+  openModal('createKeypairModal');
+}
+async function submitCreateKeypair() {
+  const name = document.getElementById('newKpName').value.trim();
+  if (!name) return toast('Name is required', 'warn');
+  const public_key = document.getElementById('newKpPublic').value.trim();
+  try {
+    const data = await apiPost('/api/vhi/keypairs', { name, public_key: public_key || undefined });
+    closeModal('createKeypairModal');
+    if (data.keypair && data.keypair.private_key) {
+      prompt('Private key (save this now — it will not be shown again):', data.keypair.private_key);
+    }
+    toast('SSH key created', 'ok');
+    loadKeypairs();
+  } catch (err) {
+    toast('Create failed: ' + err.message, 'err');
+  }
+}
+async function deleteKeypairRow(encName) {
+  const name = decodeURIComponent(encName);
+  if (!confirm(`Delete SSH key "${name}"?`)) return;
+  try {
+    await apiDelete('/api/vhi/keypairs/' + encodeURIComponent(name));
+    toast('SSH key deleted', 'ok');
+    loadKeypairs();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+hookSearch('flavorSearch', renderFlavors);
+hookSearch('kpSearch', renderKeypairs);
+
+window.openCreateFlavorModal = openCreateFlavorModal;
+window.submitCreateFlavor = submitCreateFlavor;
+window.deleteFlavorRow = deleteFlavorRow;
+window.openCreateKeypairModal = openCreateKeypairModal;
+window.submitCreateKeypair = submitCreateKeypair;
+window.deleteKeypairRow = deleteKeypairRow;
+
+// ── IMAGES ────────────────────────────────────────────────────────────────
+
+async function loadImages() {
+  setRefreshing('imgRefresh', true);
+  document.getElementById('imgBody').innerHTML = skeletonRows(6);
+  try {
+    const data = await apiGet('/api/vhi/images');
+    _imgs = data.images || [];
+    renderImages('');
+    hookSearch('imgSearch', renderImages);
+    document.getElementById('imgBadge').textContent = _imgs.length;
+    document.getElementById('imgCount').textContent = `${_imgs.length} images`;
+    
+    const statImgsEl = document.getElementById('statImgs');
+    if (statImgsEl) statImgsEl.textContent = _imgs.length;
+  } catch (err) {
+    document.getElementById('imgBody').innerHTML = emptyState('⚠️', 'Could not load images: ' + err.message);
+    toast('Images: ' + err.message, 'err');
+  } finally {
+    setRefreshing('imgRefresh', false);
+  }
+}
+
+function renderImages(query) {
+  const tbody = document.getElementById('imgBody');
+  const isAdmin = !!session?.isAdmin;
+  const rows = _imgs.map(img => {
+    const os = img.os_distro || img['os-distro'] || '–';
+    const isPublic = img.visibility === 'public';
+    // Making an image public is admin-only (Glance publicize_image policy)
+    const visBtn = isPublic
+      ? (isAdmin ? `<button class="act-btn" onclick="setImageVisibility('${img.id}','private')">Make Private</button>` : '')
+      : (isAdmin
+          ? `<button class="act-btn" onclick="setImageVisibility('${img.id}','public')">Make Public</button>`
+          : `<button class="act-btn" disabled style="opacity:.45; cursor:not-allowed;" title="Only administrators can publish images to all projects">Make Public</button>`);
+    return `<tr>
+      <td><strong>${img.name || '–'}</strong></td>
+      <td>${statusBadge(img.status)}</td>
+      <td class="text-dim">${os}</td>
+      <td class="text-dim">${fmtBytes(img.size)}</td>
+      <td class="text-dim">${img.disk_format || '–'}</td>
+      <td>${isPublic ? '<span class="badge badge-active">Public</span>' : '<span class="badge badge-default">Private</span>'}</td>
+      <td>${visBtn} <button class="act-btn act-danger" onclick="deleteImageRow('${img.id}', this)">Delete</button></td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🗂', 'No images found');
+}
+
+async function setImageVisibility(imageId, visibility) {
+  try {
+    await apiPatch('/api/vhi/images/' + imageId, { visibility });
+    toast(`Image is now ${visibility}`, 'ok');
+    loadImages();
+  } catch (err) {
+    toast(/403/.test(err.message)
+      ? 'Not permitted: only administrators can make images public.'
+      : 'Visibility change failed: ' + err.message, 'err');
+  }
+}
+
+async function deleteImageRow(imageId, btn) {
+  const img = _imgs.find(i => i.id === imageId);
+  if (!confirm(`Delete image “${img?.name || imageId}”? VMs already booted from it keep running, but it can no longer be deployed.`)) return;
+  btn.disabled = true;
+  try {
+    await apiDelete('/api/vhi/images/' + imageId);
+    toast('Image deleted', 'ok');
+    loadImages();
+  } catch (err) {
+    btn.disabled = false;
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+// ── IMAGE UPLOAD ──────────────────────────────────────────────────────────
+
+const upImgModal = document.getElementById('uploadImgModal');
+document.getElementById('imgUploadBtn').addEventListener('click', () => {
+  document.getElementById('upImgFile').value = '';
+  document.getElementById('upImgName').value = '';
+  document.getElementById('upImgOs').value = '';
+  document.getElementById('upImgStatus').textContent = '';
+  document.getElementById('upImgProgressWrap').style.display = 'none';
+  const visSel = document.getElementById('upImgVisibility');
+  const visNote = document.getElementById('upImgVisNote');
+  if (session?.isAdmin) {
+    visSel.querySelector('option[value=public]').disabled = false;
+    visNote.textContent = '';
+  } else {
+    visSel.value = 'private';
+    visSel.querySelector('option[value=public]').disabled = true;
+    visNote.textContent = 'Only administrators can publish images to all projects.';
+  }
+  upImgModal.classList.remove('hidden');
+});
+document.getElementById('closeUploadImgModal').addEventListener('click', () => upImgModal.classList.add('hidden'));
+document.getElementById('cancelUploadImgBtn').addEventListener('click', () => upImgModal.classList.add('hidden'));
+
+// Auto-fill name + disk format from the chosen file
+document.getElementById('upImgFile').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const nameEl = document.getElementById('upImgName');
+  if (!nameEl.value) nameEl.value = f.name.replace(/\.(qcow2|img|iso|raw|vmdk|vhdx?)$/i, '');
+  const ext = (f.name.match(/\.(\w+)$/) || [])[1]?.toLowerCase();
+  const fmtMap = { qcow2: 'qcow2', img: 'qcow2', iso: 'iso', raw: 'raw', vmdk: 'vmdk', vhd: 'vhd', vhdx: 'vhd' };
+  if (fmtMap[ext]) document.getElementById('upImgFormat').value = fmtMap[ext];
+});
+
+document.getElementById('submitUploadImgBtn').addEventListener('click', async () => {
+  const file = document.getElementById('upImgFile').files[0];
+  const name = document.getElementById('upImgName').value.trim();
+  const statusEl = document.getElementById('upImgStatus');
+  statusEl.style.color = '';
+  if (!file) { statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Choose an image file first.'; return; }
+  if (!name) { statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Image name is required.'; return; }
+
+  const btn = document.getElementById('submitUploadImgBtn');
+  btn.disabled = true; btn.textContent = 'Uploading…';
+  try {
+    // 1. Create the image record (queued)
+    statusEl.textContent = 'Creating image record…';
+    const created = await apiPost('/api/vhi/images', {
+      name,
+      disk_format: document.getElementById('upImgFormat').value,
+      os_distro: document.getElementById('upImgOs').value.trim() || undefined,
+      visibility: document.getElementById('upImgVisibility').value,
+    });
+    const imageId = created.image.id;
+
+    // 2. Stream the file with progress (XHR gives us upload progress events)
+    statusEl.textContent = `Uploading ${(file.size / 1073741824).toFixed(2)} GB…`;
+    document.getElementById('upImgProgressWrap').style.display = 'block';
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', '/api/vhi/images/' + imageId + '/file');
+      const h = authHeaders();
+      delete h['Content-Type'];
+      Object.entries(h).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.upload.onprogress = (ev) => {
+        if (!ev.lengthComputable) return;
+        const pct = Math.round(ev.loaded / ev.total * 100);
+        document.getElementById('upImgProgressBar').style.width = pct + '%';
+        document.getElementById('upImgProgressText').textContent =
+          `${pct}% — ${(ev.loaded / 1048576).toFixed(0)} / ${(ev.total / 1048576).toFixed(0)} MB`;
+      };
+      xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status}): ${xhr.responseText.slice(0, 200)}`));
+      xhr.onerror = () => reject(new Error('Upload failed: network error'));
+      xhr.send(file);
+    });
+
+    statusEl.style.color = 'var(--success)';
+    statusEl.textContent = 'Upload complete — image is now active.';
+    toast(`Image “${name}” uploaded`, 'ok');
+    setTimeout(() => { upImgModal.classList.add('hidden'); loadImages(); }, 1200);
+  } catch (err) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = /403/.test(err.message)
+      ? 'Not permitted: only administrators can create public images. Switch visibility to Private.'
+      : err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Upload';
+  }
+});
+
+// ── DOMAINS / IDENTITY ────────────────────────────────────────────────────
+
+function domainNameById(id) {
+  if (!id) return '–';
+  const d = (_domains || []).find(x => x.id === id);
+  if (d) return d.name || id;
+  if (id === 'default') return 'Default';
+  return id.slice(0, 8) + '…';
+}
+
+function isSystemDomain(d) {
+  const name = (d && d.name || '').toLowerCase();
+  return name === 'default' || (d && d.id === 'default');
+}
+
+const HIDDEN_SERVICE_DOMAINS = new Set(['heat', 'magnum']);
+
+function isHiddenServiceDomain(d) {
+  return HIDDEN_SERVICE_DOMAINS.has((d && d.name || '').toLowerCase());
+}
+
+function domainBranding(d) {
+  return isSystemDomain(d) ? 'Default' : 'Personal';
+}
+
+function domainLoginUrl() {
+  const raw = (session && session.baseUrl) || localStorage.getItem('vhiBaseUrl') || '';
+  const host = String(raw).replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+  return host ? 'https://' + host + ':8800/login' : '–';
+}
+
+function enabledState(on) {
+  return '<span class="state-cell"><span class="status-dot' + (on ? '' : ' off') + '"></span>' + (on ? 'Enabled' : 'Disabled') + '</span>';
+}
+
+function assignmentLabel(a) {
+  const n = ((a && a.role && a.role.name) || '').toLowerCase();
+  if (a && a.scope && a.scope.domain) {
+    if (n.includes('admin')) return 'Domain administrator';
+    return (a.role && a.role.name) || 'Domain role';
+  }
+  if (n.includes('member')) return 'Project member';
+  if (n.includes('admin')) return 'Project administrator';
+  return (a && a.role && a.role.name) || '—';
+}
+
+function rolesForUser(userId) {
+  const names = [];
+  for (const a of _roleAssignments || []) {
+    if (!(a.user && a.user.id === userId)) continue;
+    names.push(assignmentLabel(a));
+  }
+  return [...new Set(names)].join(', ') || '—';
+}
+
+function userType(u) {
+  if (u && (u.federated || u.idp_id || (u.extra && u.extra.idp_id))) return 'Federated';
+  return 'Local';
+}
+
+function fmtWhen(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString();
+}
+
+function activateDomainTab(name) {
+  document.querySelectorAll('#domainSubTabs .sub-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.domtab === name);
+  });
+  document.querySelectorAll('#panel-domains .tab-content-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('tab-dom-' + name);
+  if (panel) panel.classList.add('active');
+}
+
+function fillDomainSettingsForm(domain) {
+  if (!domain) return;
+  const nameEl = document.getElementById('domSetName');
+  const idEl = document.getElementById('domSetId');
+  const enEl = document.getElementById('domSetEnabled');
+  const descEl = document.getElementById('domSetDesc');
+  const brandEl = document.getElementById('domBrandTheme');
+  if (nameEl) nameEl.value = domain.name || '';
+  if (idEl) idEl.value = domain.id || '';
+  if (enEl) enEl.checked = domain.enabled !== false;
+  if (descEl) descEl.value = domain.description || '';
+  if (brandEl) brandEl.value = domainBranding(domain);
+}
+
+async function loadDomains() {
+  setRefreshing('domainRefresh', true);
+  const tbody = document.getElementById('domainBody');
+  if (tbody) tbody.innerHTML = skeletonRows(5);
+  try {
+    const data = await apiGet('/api/vhi/domains');
+    _domains = (data.domains || []).filter(d => !isHiddenServiceDomain(d));
+    renderDomains('');
+    hookSearch('domainSearch', renderDomains);
+    const badge = document.getElementById('domainBadge');
+    const count = document.getElementById('domainCount');
+    if (badge) badge.textContent = _domains.length;
+    if (count) count.textContent = `${_domains.length} domains`;
+  } catch (err) {
+    if (tbody) tbody.innerHTML = emptyState('⚠️', 'Could not load domains: ' + err.message);
+    toast('Projects and users: ' + err.message, 'err');
+  } finally {
+    setRefreshing('domainRefresh', false);
+  }
+}
+
+function renderDomains(query) {
+  const tbody = document.getElementById('domainBody');
+  if (!tbody) return;
+  const loginUrl = domainLoginUrl();
+  const rows = (_domains || []).map(d => {
+    const sys = isSystemDomain(d) ? '<span class="tag-system">System</span>' : '';
+    const desc = d.description ? escapeHtml(d.description) : 'N/A';
+    return `<tr onclick="openDomainDetail('${d.id}')" style="cursor:pointer;">
+      <td><div class="name-cell"><span class="row-ico">🌐</span><strong>${escapeHtml(d.name || '–')}</strong>${sys}</div></td>
+      <td>${enabledState(d.enabled !== false)}</td>
+      <td class="text-dim">${desc}</td>
+      <td>${escapeHtml(domainBranding(d))}</td>
+      <td class="text-dim"><span class="url-clip" title="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</span></td>
+    </tr>`;
+  });
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🏛', 'No domains found');
+}
+
+function closeDomainDetail() {
+  _activeDomain = null;
+  closeProjectDrawer();
+  const detail = document.getElementById('domainDetailView');
+  const list = document.getElementById('domainListView');
+  if (detail) detail.classList.add('view-hidden');
+  if (list) list.classList.remove('view-hidden');
+}
+
+async function openDomainDetail(id) {
+  const domain = (_domains || []).find(d => d.id === id);
+  _activeDomain = domain || { id };
+  document.getElementById('domainListView').classList.add('view-hidden');
+  document.getElementById('domainDetailView').classList.remove('view-hidden');
+  document.getElementById('domainDetailTitle').textContent = _activeDomain.name || id;
+  document.getElementById('domainDetailBadge').textContent = _activeDomain.enabled !== false ? 'Enabled' : 'Disabled';
+  fillDomainSettingsForm(_activeDomain);
+  activateDomainTab('users');
+  await loadDomainResources();
+}
+
+async function loadDomainResources() {
+  if (!_activeDomain) return;
+  const id = _activeDomain.id;
+  setRefreshing('domainDetailRefresh', true);
+  try {
+    const [proj, users, groups, detail, roles] = await Promise.all([
+      apiGet('/api/vhi/projects?domain_id=' + encodeURIComponent(id)),
+      apiGet('/api/vhi/users?domain_id=' + encodeURIComponent(id)),
+      apiGet('/api/vhi/groups?domain_id=' + encodeURIComponent(id)).catch(() => ({ groups: [] })),
+      apiGet('/api/vhi/domains/' + encodeURIComponent(id)).catch(() => null),
+      apiGet('/api/vhi/role-assignments?domain_id=' + encodeURIComponent(id) + '&include_projects=1').catch(() => ({ role_assignments: [] })),
+    ]);
+    if (detail && detail.domain) {
+      _activeDomain = detail.domain;
+      document.getElementById('domainDetailTitle').textContent = _activeDomain.name || id;
+      document.getElementById('domainDetailBadge').textContent = _activeDomain.enabled !== false ? 'Enabled' : 'Disabled';
+      fillDomainSettingsForm(_activeDomain);
+    }
+    _domainProjects = proj.projects || [];
+    _domainUsers = users.users || [];
+    _groups = groups.groups || [];
+    _roleAssignments = roles.role_assignments || [];
+    renderDomainProjects('');
+    renderDomainUsers('');
+    renderDomainGroups('');
+    hookSearch('projSearch', renderDomainProjects);
+    hookSearch('userSearch', renderDomainUsers);
+    hookSearch('groupSearch', renderDomainGroups);
+    if (_selectedProject) {
+      const fresh = _domainProjects.find(p => p.id === _selectedProject.id);
+      if (fresh) fillProjectDrawer(fresh);
+    }
+  } catch (err) {
+    toast('Could not load domain: ' + err.message, 'err');
+  } finally {
+    setRefreshing('domainDetailRefresh', false);
+  }
+}
+
+function renderDomainProjects(query) {
+  const tbody = document.getElementById('projBody');
+  if (!tbody) return;
+  const sel = _selectedProject && _selectedProject.id;
+  const rows = (_domainProjects || []).map(p => `<tr class="${p.id === sel ? 'selected' : ''}" onclick="openProjectDrawer('${p.id}')" style="cursor:pointer;">
+    <td><div class="name-cell"><span class="row-ico">💼</span><strong>${escapeHtml(p.name || '–')}</strong></div></td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('🏢', 'No projects in this domain');
+}
+
+function renderDomainUsers(query) {
+  const tbody = document.getElementById('userBody');
+  if (!tbody) return;
+  const rows = (_domainUsers || []).map(u => `<tr>
+    <td><div class="name-cell"><span class="row-ico">👤</span><strong>${escapeHtml(u.name || '–')}</strong></div></td>
+    <td>${enabledState(u.enabled !== false)}</td>
+    <td>${escapeHtml(userType(u))}</td>
+    <td class="text-dim">${escapeHtml(u.email || '—')}</td>
+    <td class="text-dim">${escapeHtml(u.description || '—')}</td>
+    <td>${escapeHtml(rolesForUser(u.id))}</td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('👥', 'No users in this domain');
+}
+
+function renderDomainGroups(query) {
+  const tbody = document.getElementById('groupBody');
+  if (!tbody) return;
+  const rows = (_groups || []).map(g => `<tr>
+    <td><strong>${escapeHtml(g.name || '–')}</strong></td>
+    <td class="text-dim">${escapeHtml(g.description || '—')}</td>
+    <td class="mono text-dim">${escapeHtml(g.id)}</td>
+  </tr>`);
+  const filtered = filterRows(rows, query);
+  tbody.innerHTML = filtered.length ? filtered.join('') : emptyState('👤', 'No groups in this domain');
+}
+
+async function saveDomainSettings() {
+  if (!_activeDomain) return;
+  try {
+    await apiPatch('/api/vhi/domains/' + encodeURIComponent(_activeDomain.id), {
+      enabled: document.getElementById('domSetEnabled').checked,
+      description: document.getElementById('domSetDesc').value.trim(),
+    });
+    toast('Domain settings saved', 'ok');
+    await loadDomains();
+    await loadDomainResources();
+  } catch (err) {
+    toast('Save failed: ' + err.message, 'err');
+  }
+}
+
+function openCreateDomainModal() {
+  document.getElementById('newDomainName').value = '';
+  document.getElementById('newDomainDesc').value = '';
+  document.getElementById('newDomainEnabled').checked = true;
+  openModal('createDomainModal');
+}
+
+async function submitCreateDomain() {
+  const name = document.getElementById('newDomainName').value.trim();
+  if (!name) { toast('Domain name is required', 'err'); return; }
+  try {
+    await apiPost('/api/vhi/domains', {
+      name,
+      description: document.getElementById('newDomainDesc').value.trim(),
+      enabled: document.getElementById('newDomainEnabled').checked,
+    });
+    closeModal('createDomainModal');
+    toast('Domain created', 'ok');
+    await loadDomains();
+  } catch (err) {
+    toast('Create domain failed: ' + err.message, 'err');
+  }
+}
+
+async function openCreateUserModal() {
+  if (!_activeDomain) return;
+  document.getElementById('newUserName').value = '';
+  document.getElementById('newUserPassword').value = '';
+  document.getElementById('newUserEmail').value = '';
+  document.getElementById('newUserDesc').value = '';
+  const sel = document.getElementById('newUserRole');
+  sel.innerHTML = '<option value="">No role assignment</option>';
+  try {
+    const data = await apiGet('/api/vhi/roles');
+    (data.roles || []).forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.id;
+      opt.textContent = r.name;
+      sel.appendChild(opt);
+    });
+  } catch (_) { /* roles list is optional */ }
+  openModal('createUserModal');
+}
+
+async function submitCreateUser() {
+  if (!_activeDomain) return;
+  const name = document.getElementById('newUserName').value.trim();
+  const password = document.getElementById('newUserPassword').value;
+  if (!name) { toast('Login is required', 'err'); return; }
+  if (!password) { toast('Password is required', 'err'); return; }
+  try {
+    const res = await apiPost('/api/vhi/users', {
+      name,
+      password,
+      email: document.getElementById('newUserEmail').value.trim(),
+      description: document.getElementById('newUserDesc').value.trim(),
+      domain_id: _activeDomain.id,
+      role_id: document.getElementById('newUserRole').value || undefined,
+    });
+    closeModal('createUserModal');
+    if (res.role_error) toast('User created, but role was not assigned: ' + res.role_error, 'err');
+    else toast('User created', 'ok');
+    await loadDomainResources();
+  } catch (err) {
+    toast('Create user failed: ' + err.message, 'err');
+  }
+}
+
+function openCreateGroupModal() {
+  if (!_activeDomain) return;
+  document.getElementById('newGroupName').value = '';
+  document.getElementById('newGroupDesc').value = '';
+  openModal('createGroupModal');
+}
+
+async function submitCreateGroup() {
+  if (!_activeDomain) return;
+  const name = document.getElementById('newGroupName').value.trim();
+  if (!name) { toast('Group name is required', 'err'); return; }
+  try {
+    await apiPost('/api/vhi/groups', {
+      name,
+      description: document.getElementById('newGroupDesc').value.trim(),
+      domain_id: _activeDomain.id,
+    });
+    closeModal('createGroupModal');
+    toast('Group created', 'ok');
+    await loadDomainResources();
+  } catch (err) {
+    toast('Create group failed: ' + err.message, 'err');
+  }
+}
+
+function openIdpModal() {
+  document.getElementById('idpIssuer').value = '';
+  document.getElementById('idpClientId').value = '';
+  openModal('idpModal');
+}
+
+function submitIdpNote() {
+  closeModal('idpModal');
+  toast('OpenID Connect IdP is configured on the VHI cluster; this console cannot write federation yet', 'ok');
+}
+
+function projectUsersFor(projectId) {
+  const seen = new Set();
+  const out = [];
+  for (const a of _roleAssignments || []) {
+    if (!(a.scope && a.scope.project && a.scope.project.id === projectId)) continue;
+    const uid = a.user && a.user.id;
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    const u = (_domainUsers || []).find(x => x.id === uid);
+    out.push({
+      id: uid,
+      name: (a.user && a.user.name) || (u && u.name) || uid,
+      role: assignmentLabel(a),
+    });
+  }
+  return out;
+}
+
+function fillProjectDrawer(p) {
+  _selectedProject = p;
+  document.getElementById('projDetName').textContent = p.name || 'Project';
+  const disableBtn = document.getElementById('projDisableBtn');
+  if (disableBtn) disableBtn.textContent = p.enabled === false ? 'Enable' : 'Disable';
+  const users = projectUsersFor(p.id);
+  const tab = document.getElementById('projUsersTab');
+  if (tab) tab.textContent = 'Users (' + users.length + ')';
+  document.getElementById('projDetProps').innerHTML =
+    '<div class="detail-label">Name</div><div class="detail-val">' + escapeHtml(p.name || '–') + '</div>' +
+    '<div class="detail-label">Description</div><div class="detail-val">' + escapeHtml(p.description || '—') + '</div>' +
+    '<div class="detail-label">State</div><div class="detail-val">' + enabledState(p.enabled !== false) + '</div>' +
+    '<div class="detail-label">ID</div><div class="detail-val mono">' + escapeHtml(p.id) + '</div>' +
+    '<div class="detail-label">Creation time</div><div class="detail-val">' + escapeHtml(fmtWhen(p.created_at)) + '</div>';
+  document.getElementById('projDetUsers').innerHTML = users.length
+    ? '<table><thead><tr><th>Login</th><th>Role</th></tr></thead><tbody>' +
+      users.map(u => '<tr><td>' + escapeHtml(u.name) + '</td><td>' + escapeHtml(u.role) + '</td></tr>').join('') +
+      '</tbody></table>'
+    : '<p class="text-dim">No users assigned to this project.</p>';
+}
+
+function openProjectDrawer(id) {
+  const p = (_domainProjects || []).find(x => x.id === id);
+  if (!p) return;
+  fillProjectDrawer(p);
+  showProjectDrawerTab('properties');
+  document.getElementById('projectDrawer').classList.add('open');
+  renderDomainProjects(document.getElementById('projSearch')?.value || '');
+}
+
+function closeProjectDrawer() {
+  _selectedProject = null;
+  const drawer = document.getElementById('projectDrawer');
+  if (drawer) drawer.classList.remove('open');
+  const tbody = document.getElementById('projBody');
+  if (tbody) tbody.querySelectorAll('tr.selected').forEach(tr => tr.classList.remove('selected'));
+}
+
+function showProjectDrawerTab(name) {
+  document.querySelectorAll('#projectDrawer .drawer-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.projtab === name);
+  });
+  document.querySelectorAll('#projectDrawer .drawer-pane').forEach(p => p.classList.remove('active'));
+  const pane = document.getElementById('projpane-' + name);
+  if (pane) pane.classList.add('active');
+}
+
+async function editProjectFromDrawer() {
+  if (!_selectedProject) return;
+  const next = prompt('Project description', _selectedProject.description || '');
+  if (next === null) return;
+  try {
+    await apiPatch('/api/vhi/projects/' + encodeURIComponent(_selectedProject.id), { description: next });
+    toast('Project updated', 'ok');
+    await loadDomainResources();
+  } catch (err) {
+    toast('Update failed: ' + err.message, 'err');
+  }
+}
+
+function manageProjectUsers() {
+  closeProjectDrawer();
+  activateDomainTab('users');
+}
+
+async function toggleProjectEnabled() {
+  if (!_selectedProject) return;
+  const enable = _selectedProject.enabled === false;
+  const label = enable ? 'Enable' : 'Disable';
+  if (!confirm(label + ' project "' + _selectedProject.name + '"?')) return;
+  try {
+    await apiPatch('/api/vhi/projects/' + encodeURIComponent(_selectedProject.id), { enabled: enable });
+    toast('Project ' + (enable ? 'enabled' : 'disabled'), 'ok');
+    await loadDomainResources();
+  } catch (err) {
+    toast(label + ' failed: ' + err.message, 'err');
+  }
+}
+
+async function deleteProjectFromDrawer() {
+  if (!_selectedProject) return;
+  if (!confirm('Delete project "' + _selectedProject.name + '"? This cannot be undone.')) return;
+  try {
+    await apiDelete('/api/vhi/projects/' + encodeURIComponent(_selectedProject.id));
+    toast('Project deleted', 'ok');
+    closeProjectDrawer();
+    await loadDomainResources();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+async function loadProjects() {
+  try {
+    const data = await apiGet('/api/vhi/projects');
+    _projs = data.projects || [];
+    if (_vols.length) renderVolumes(document.getElementById('volSearch')?.value || '');
+  } catch (err) {
+    console.warn('Failed to load projects:', err.message);
+  }
+}
+
+async function loadUsers() {
+  try {
+    const data = await apiGet('/api/vhi/users');
+    _users = data.users || [];
+  } catch (err) {
+    console.warn('Failed to load users:', err.message);
+  }
+}
+
+document.getElementById('domainRefresh')?.addEventListener('click', loadDomains);
+document.getElementById('domainDetailRefresh')?.addEventListener('click', loadDomainResources);
+document.querySelectorAll('#domainSubTabs .sub-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    activateDomainTab(tab.dataset.domtab);
+    if (tab.dataset.domtab !== 'projects') closeProjectDrawer();
+  });
+});
+document.querySelectorAll('#domSettingsNav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#domSettingsNav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.dom-set-pane').forEach(p => p.classList.remove('active'));
+    const pane = document.getElementById('domset-' + btn.dataset.domset);
+    if (pane) pane.classList.add('active');
+  });
+});
+
+window.openDomainDetail = openDomainDetail;
+window.closeDomainDetail = closeDomainDetail;
+window.saveDomainSettings = saveDomainSettings;
+window.openCreateDomainModal = openCreateDomainModal;
+window.submitCreateDomain = submitCreateDomain;
+window.openCreateUserModal = openCreateUserModal;
+window.submitCreateUser = submitCreateUser;
+window.openCreateGroupModal = openCreateGroupModal;
+window.submitCreateGroup = submitCreateGroup;
+window.openIdpModal = openIdpModal;
+window.submitIdpNote = submitIdpNote;
+window.openProjectDrawer = openProjectDrawer;
+window.closeProjectDrawer = closeProjectDrawer;
+window.showProjectDrawerTab = showProjectDrawerTab;
+window.editProjectFromDrawer = editProjectFromDrawer;
+window.manageProjectUsers = manageProjectUsers;
+window.toggleProjectEnabled = toggleProjectEnabled;
+window.deleteProjectFromDrawer = deleteProjectFromDrawer;
+
+// ── OVERVIEW TIMESTAMP ────────────────────────────────────────────────────
+function updateOverviewTs() {
+  const el = document.getElementById('overviewTs');
+  if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ── SETTINGS MODAL ────────────────────────────────────────────────────────
+
+const settingsModal = document.getElementById('settingsModal');
+const llmProviderInput = document.getElementById('llmProvider');
+const llmApiKeyInput = document.getElementById('llmApiKey');
+const llmBaseUrlInput = document.getElementById('llmBaseUrl');
+const vhiSshHostInput = document.getElementById('vhiSshHost');
+const vhiSshUserInput = document.getElementById('vhiSshUser');
+const vhiSshPasswordInput = document.getElementById('vhiSshPassword');
+
+function openSettingsModal() {
+  llmProviderInput.value = localStorage.getItem('llmProvider') || 'anthropic';
+  llmApiKeyInput.value = localStorage.getItem('llmApiKey') || '';
+  llmBaseUrlInput.value = localStorage.getItem('llmBaseUrl') || '';
+  
+  // Try to load cluster-scoped SSH settings first
+  let sshConfig = {};
+  if (session) {
+    try {
+      const saved = localStorage.getItem(getGlobalSshKey());
+      if (saved) sshConfig = JSON.parse(saved);
+    } catch(e) {}
+  }
+  
+  vhiSshHostInput.value = sshConfig.host || localStorage.getItem('vhiSshHost') || '';
+  vhiSshUserInput.value = sshConfig.username || localStorage.getItem('vhiSshUser') || 'root';
+  vhiSshPasswordInput.value = sshConfig.password || localStorage.getItem('vhiSshPassword') || '';
+  
+  settingsModal.classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+  settingsModal.classList.add('hidden');
+}
+
+function updateConnectionStatus() {
+  const hasKey = !!localStorage.getItem('llmApiKey');
+  const hasProvider = !!localStorage.getItem('llmProvider');
+  const isConnected = hasKey && hasProvider;
+  
+  const settingsBtn = document.getElementById('settingsToggle');
+  const chatBtn = document.getElementById('chatToggle');
+  
+  if (settingsBtn && chatBtn) {
+    if (isConnected) {
+      settingsBtn.classList.add('connected');
+      chatBtn.classList.add('connected');
+    } else {
+      settingsBtn.classList.remove('connected');
+      chatBtn.classList.remove('connected');
+    }
+  }
+}
+
+// Initial connection check & sync with server config
+(async () => {
+    try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+            const config = await res.json();
+            // Only populate if local storage is empty to avoid overwriting user's browser-specific keys
+            if (!localStorage.getItem('llmProvider') && config.llmProvider) {
+                localStorage.setItem('llmProvider', config.llmProvider);
+            }
+            // Server no longer exposes its API key; chat falls back to the
+            // server-side key automatically when none is set locally.
+            if (!localStorage.getItem('llmBaseUrl') && config.llmBaseUrl) {
+                localStorage.setItem('llmBaseUrl', config.llmBaseUrl);
+            }
+        }
+    } catch (e) {
+        console.warn('Sync LLM config failed', e);
+    }
+    updateConnectionStatus();
+})();
+
+document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+  localStorage.setItem('llmProvider', llmProviderInput.value);
+  localStorage.setItem('llmApiKey', llmApiKeyInput.value);
+  localStorage.setItem('llmBaseUrl', llmBaseUrlInput.value);
+  
+  const sshConfig = {
+    host: vhiSshHostInput.value.trim(),
+    username: vhiSshUserInput.value.trim(),
+    password: vhiSshPasswordInput.value,
+    authMethod: 'password' // default for global settings modal
+  };
+
+  // Save cluster-scoped if session active
+  if (session) {
+    localStorage.setItem(getGlobalSshKey(), JSON.stringify(sshConfig));
+    try {
+      await apiPost('/api/vhi/settings/ssh', sshConfig);
+    } catch(e) {
+      console.warn('Failed to save SSH settings to server', e);
+    }
+  } else {
+    // legacy fallback
+    localStorage.setItem('vhiSshHost', sshConfig.host);
+    localStorage.setItem('vhiSshUser', sshConfig.username);
+    localStorage.setItem('vhiSshPassword', sshConfig.password);
+  }
+
+  toast('Settings saved successfully', 'ok');
+  updateConnectionStatus();
+  closeSettingsModal();
+});
+
+document.getElementById('settingsToggle').addEventListener('click', openSettingsModal);
+document.getElementById('closeSettingsModal').addEventListener('click', closeSettingsModal);
+document.getElementById('cancelSettingsBtn').addEventListener('click', closeSettingsModal);
+
+// ── AI CHAT DRAWER ────────────────────────────────────────────────────────
+
+const chatDrawer  = document.getElementById('chatDrawer');
+const chatToggle  = document.getElementById('chatToggle');
+const chatClose   = document.getElementById('chatClose');
+const chatMsgs    = document.getElementById('chatMessages');
+const chatInput   = document.getElementById('chatInput');
+const chatSendBtn = document.getElementById('chatSend');
+
+let chatOpen = false;
+let chatHistory = []; // [{role,content}]
+
+function setChatOpen(open) {
+  if (!chatDrawer) return;
+  chatOpen = open;
+  chatDrawer.classList.toggle('open', open);
+  chatToggle?.classList.toggle('open', open);
+  if (chatToggle && chatToggle.tagName !== 'A') {
+    chatToggle.title = open ? 'Close AI Chat' : 'Open AI Chat';
+  }
+  if (open && chatInput) setTimeout(() => chatInput.focus(), 280);
+}
+
+if (chatToggle && chatToggle.tagName !== 'A') {
+  chatToggle.addEventListener('click', () => setChatOpen(!chatOpen));
+}
+chatClose?.addEventListener('click', () => setChatOpen(false));
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && chatOpen) setChatOpen(false);
+});
+
+chatInput?.addEventListener('input', () => {
+  chatInput.style.height = '42px';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 130) + 'px';
+});
+chatInput?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
+});
+chatSendBtn?.addEventListener('click', sendChat);
+
+function appendMsg(role, text, cls = '') {
+  const msgClass = 'msg ' + (role === 'user' ? 'msg-user' : 'msg-ai') + (cls ? ' ' + cls : '');
+  const div = document.createElement('div');
+  div.className = msgClass;
+  div.textContent = text;
+  if (chatMsgs) {
+    chatMsgs.appendChild(div);
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  }
+  return div;
+}
+
+function buildSystemContext() {
+  const cluster = session?.baseUrl || 'unknown';
+  const vmSummary = _vms.length ? `${_vms.length} VMs (${_vms.filter(v => v.status === 'ACTIVE').length} active)` : 'No VMs';
+  const nodeSummary = _nodes.length ? `${_nodes.length} nodes` : 'No nodes';
+  
+  // Inventory details to help the LLM suggest IDs
+  const policies = _volTypes.map(t => t.name).join(', ') || 'None';
+  const nets = _nets.map(n => `${n.name || 'unnamed'} (${n.id.slice(0,8)})`).join(', ') || 'None';
+  const imgs = _imgs.slice(0, 10).map(i => `${i.name || 'unnamed'} (${i.id.slice(0,8)})`).join(', ') || 'None';
+  const flavors = _flavors.slice(0, 8).map(f => `${f.name} (${f.id.slice(0,8)})`).join(', ') || 'None';
+
+  return `You are VZ Bot, an AI assistant for Virtuozzo Hybrid Infrastructure (VHI).
+Cluster: ${cluster}
+State: ${vmSummary}, ${nodeSummary}, ${_vols.length} volumes, ${_nets.length} networks, ${_imgs.length} images.
+Storage Policies: ${policies}
+Available Networks: ${nets}
+Available Images (Top 10): ${imgs}
+Available Flavors (Top 8): ${flavors}
+
+Guidelines:
+1. Use provided IDs/Names if the user refers to resources.
+2. If asked to create something, use the available policies/flavors/networks.
+3. If IDs are missing, ask the user or use 'list_*' tools to find them.
+4. Answer concisely. Use markdown tables for lists.`;
+}
+
+async function sendChat() {
+  const text = (chatInput?.value || '').trim();
+  if (!text) return;
+
+  if (chatInput) {
+    chatInput.value = '';
+    chatInput.style.height = '42px';
+  }
+  if (chatSendBtn) chatSendBtn.disabled = true;
+
+  appendMsg('user', text);
+  chatHistory.push({ role: 'user', content: text });
+
+  const thinkingEl = appendMsg('assistant', 'Thinking…', 'thinking');
+
+  try {
+    const payload = {
+      message: text,
+      conversationId: 'web-session',
+      systemContext: buildSystemContext(),
+      chatHistory: chatHistory.slice(-10),
+      llmProvider: localStorage.getItem('llmProvider') || undefined,
+      apiKey: localStorage.getItem('llmApiKey') || undefined,
+      llmBaseUrl: localStorage.getItem('llmBaseUrl') || undefined,
+      vhiBaseUrl: typeof session !== 'undefined' ? session?.baseUrl : undefined,
+      vhiUser: typeof session !== 'undefined' ? session?.username : undefined,
+      vhiPassword: typeof session !== 'undefined' ? session?.password : undefined,
+      vhiProject: typeof session !== 'undefined' ? session?.project : undefined,
+      vhiSshHost: (() => { try { return JSON.parse(localStorage.getItem(getGlobalSshKey())).host; } catch(e) { return undefined; } })(),
+      vhiSshUser: (() => { try { return JSON.parse(localStorage.getItem(getGlobalSshKey())).username; } catch(e) { return undefined; } })(),
+      vhiSshPassword: (() => { try { return JSON.parse(localStorage.getItem(getGlobalSshKey())).password; } catch(e) { return undefined; } })(),
+      webPassword: localStorage.getItem('webPassword') || '',
+    };
+
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const data = await r.json().catch(() => ({}));
+
+    if (!r.ok) {
+      document.getElementById('settingsToggle')?.classList.remove('connected');
+      document.getElementById('chatToggle')?.classList.remove('connected');
+      throw new Error(data.error || `HTTP ${r.status}`);
+    }
+
+    const reply = data.reply || 'No response from AI agent.';
+    thinkingEl.classList.remove('thinking');
+    thinkingEl.textContent = reply;
+    if (chatMsgs) chatMsgs.scrollTop = chatMsgs.scrollHeight;
+
+    chatHistory.push({ role: 'assistant', content: reply });
+
+  } catch (err) {
+    thinkingEl.classList.remove('thinking');
+    thinkingEl.textContent = '⚠ ' + (err.message || 'Request failed');
+  } finally {
+    if (chatSendBtn) chatSendBtn.disabled = false;
+    chatInput?.focus();
+  }
+}
+
+// ── Billing Export ────────────────────────────────────────────────────────
+
+function openExportModal() {
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  document.getElementById('exportFrom').value = yesterday.toISOString().split('T')[0];
+  document.getElementById('exportTo').value = now.toISOString().split('T')[0];
+  document.getElementById('exportBillingModal').classList.remove('hidden');
+}
+
+function closeExportModal() {
+  document.getElementById('exportBillingModal').classList.add('hidden');
+}
+
+async function runExport() {
+  const from = document.getElementById('exportFrom').value;
+  const to = document.getElementById('exportTo').value;
+  
+  if (!from || !to) return toast('Please select both dates', 'inf');
+  
+  const fromIso = new Date(from + 'T00:00:00').toISOString();
+  // To date should include the whole day
+  const toIso = new Date(to + 'T23:59:59').toISOString();
+  
+  try {
+    const url = `/api/vhi/billing-export?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`;
+    
+    // Use a hidden anchor to trigger download
+    const link = document.createElement('a');
+    link.href = url;
+    // We need to add auth headers if the endpoint requires them, 
+    // but browser download (a.href) doesn't support headers easily.
+    // However, our backend check credentials via headers.
+    // So we'll fetch it first and create a blob.
+    
+    toast('Generating CSV...', 'inf');
+    const res = await fetch(url, { headers: authHeaders() });
+    if (!res.ok) throw new Error('Export failed');
+    
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `billing-export-${from}-to-${to}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(downloadUrl);
+    document.body.removeChild(a);
+    
+    toast('Download started', 'ok');
+    closeExportModal();
+  } catch (err) {
+    toast('Export error: ' + err.message, 'err');
+  }
+}
+
+
+
+function startDashboard() {
+  const startPanel = new URLSearchParams(location.search).get('panel');
+  if (startPanel === 'dr') { location.replace('/dr'); return; }
+  if (startPanel === 'migrations') { location.replace('/migrations'); return; }
+  if (startPanel === 'marketplace') { location.replace('/marketplace'); return; }
+  if (startPanel === 'chat' || startPanel === 'assistant') { location.replace('/assistant'); return; }
+  if (startPanel === 'scheduler') { location.replace('/scheduler'); return; }
+  if (startPanel && document.getElementById('panel-' + startPanel)) showDashboardPanel(startPanel);
+  loadAll();
+}
+
+bootVhiSession(startDashboard);

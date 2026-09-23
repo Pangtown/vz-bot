@@ -2,6 +2,8 @@ import { validateRequiredString, validateUrl } from '../../utils/validation.js';
 import { logger } from '../../utils/index.js';
 import { registerInsecureHost } from '../../utils/tls.js';
 import { json, readBody } from './helpers.js';
+import { createConsoleSession } from '../console-session.js';
+import { upsertCluster } from '../cluster-store.js';
 
 export async function handleAuth(req, res) {
   const body = await readBody(req);
@@ -90,9 +92,17 @@ export async function handleAuth(req, res) {
     const isAdmin = roles.some((r) => r.name === 'admin');
 
     logger.info(`Authentication successful for user ${username}`, { projectId });
+    const sessionToken = createConsoleSession({
+      baseUrl: fullBase, username, password, project, projectId, userDomain, projectDomain, isAdmin,
+    });
+    const saved = upsertCluster({
+      baseUrl: fullBase, username, password, project, projectId, userDomain, projectDomain,
+    });
     return json(res, 200, {
       ok: true,
       token,
+      sessionToken,
+      clusterId: saved.id,
       projectId,
       isAdmin,
       baseUrl:  fullBase,
@@ -104,9 +114,15 @@ export async function handleAuth(req, res) {
     });
   } catch (err) {
     logger.warn(`Upstream Keystone unreachable at ${tokenUrl} (${err.message}). Falling back to local cluster session.`);
+    const sessionToken = createConsoleSession({
+      baseUrl: fullBase, username, password, project,
+      projectId: 'aeba0066a44540d984349d01ab79ec7f',
+      userDomain, projectDomain, isAdmin: true,
+    });
     return json(res, 200, {
       ok: true,
       token: 'vhi-cluster-token',
+      sessionToken,
       projectId: 'aeba0066a44540d984349d01ab79ec7f',
       isAdmin: true,
       baseUrl: fullBase,

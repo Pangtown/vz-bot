@@ -81,7 +81,7 @@ async function sendChat() {
     })();
     const r = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({
         message: text,
         conversationId: 'web-session',
@@ -97,6 +97,7 @@ async function sendChat() {
         vhiSshHost: ssh.host,
         vhiSshUser: ssh.username,
         vhiSshPassword: ssh.password,
+        webPassword: localStorage.getItem('webPassword') || '',
       }),
     });
     const data = await r.json().catch(() => ({}));

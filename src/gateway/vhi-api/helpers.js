@@ -1,5 +1,8 @@
+import { timingSafeEqual } from 'crypto';
 import { normalizeUrl } from '../../monitoring/ssh-storage.js';
 import { registerInsecureHost } from '../../utils/tls.js';
+import { tokenFromRequest, touchConsoleSession } from '../console-session.js';
+import { clusterContext, clusterId } from '../cluster-store.js';
 
 export function json(res, statusCode, payload) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json' });
@@ -12,15 +15,52 @@ export async function readBody(req) {
   return buf ? JSON.parse(buf) : {};
 }
 
+export function safeEqual(provided, expected) {
+  if (typeof provided !== 'string' || typeof expected !== 'string') return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export function verifyWebPassword(req) {
   const expected = process.env.WEB_PASSWORD;
-  if (!expected) return true;
+  if (!expected) return false;
   const provided = req.headers['x-web-password'] 
     || (req.headers['authorization']?.startsWith('Bearer ') ? req.headers['authorization'].slice(7).trim() : null);
-  return !!provided && provided === expected;
+  return safeEqual(provided, expected);
 }
 
 export function extractContext(req) {
+  const sess = touchConsoleSession(tokenFromRequest(req));
+  const h = req.headers || {};
+  const savedId = h['x-vhi-cluster-id'];
+  if (savedId && (sess || verifyWebPassword(req))) {
+    const saved = clusterContext(savedId);
+    if (saved) {
+      registerInsecureHost(saved.vhiBaseUrl);
+      return { ...saved, vhiSshHost: '', vhiSshUser: 'root', vhiSshPassword: '' };
+    }
+  }
+  if (sess) {
+    const vhiBaseUrl = normalizeUrl(h['x-vhi-base-url'] || sess.baseUrl);
+    if (vhiBaseUrl) registerInsecureHost(vhiBaseUrl);
+    const sameCluster = vhiBaseUrl === normalizeUrl(sess.baseUrl);
+    const project = h['x-vhi-project'] || sess.project || 'admin';
+    const otherPassword = sameCluster ? '' : (h['x-vhi-password']
+      || clusterContext(clusterId(vhiBaseUrl, project))?.vhiPassword || '');
+    return {
+      vhiBaseUrl,
+      vhiUser: h['x-vhi-user'] || sess.username,
+      vhiPassword: sameCluster ? sess.password : otherPassword,
+      vhiProject: project,
+      vhiDomain: h['x-vhi-domain'] || sess.userDomain || 'Default',
+      vhiProjectDomain: h['x-vhi-project-domain'] || sess.projectDomain || sess.userDomain || 'Default',
+      vhiProjectId: h['x-vhi-project-id'] || sess.projectId || '',
+      vhiSshHost: h['x-vhi-ssh-host'] || '',
+      vhiSshUser: h['x-vhi-ssh-user'] || 'root',
+      vhiSshPassword: h['x-vhi-ssh-password'] || '',
+    };
+  }
   const isWebAuthed = verifyWebPassword(req);
   const rawBase = req.headers['x-vhi-base-url'] || (isWebAuthed ? process.env.VHI_BASE_URL : '') || '';
   const vhiBaseUrl = normalizeUrl(rawBase);
