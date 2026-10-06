@@ -637,8 +637,9 @@ function renderAppSidebar() {
     }
     return `<a class="nav-item" href="/?panel=${encodeURIComponent(id)}" data-panel="${id}"><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${badge(badgeId)}</a>`;
   }
-  function pageItem(id, href, icon, label, badgeId, linkId) {
-    return `<a class="nav-item${active === id ? ' active' : ''}" href="${href}" data-panel="${id}"${linkId ? ` id="${linkId}"` : ''}><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${badge(badgeId)}</a>`;
+  function pageItem(id, href, icon, label, badgeId, linkId, isExperimental) {
+    const expTag = isExperimental ? `<span class="nav-tag-experimental" title="Experimental feature">Exp</span>` : '';
+    return `<a class="nav-item${active === id ? ' active' : ''}" href="${href}" data-panel="${id}"${linkId ? ` id="${linkId}"` : ''}><span class="nav-icon">${icon}</span><span class="nav-label">${label}</span>${expTag}${badge(badgeId)}</a>`;
   }
   function sectionBlock(id, title, itemsHtml) {
     return `<div class="nav-group" data-section="${id}">` +
@@ -655,8 +656,8 @@ function renderAppSidebar() {
       panelItem('audit', '📜', 'Audit Log')) +
     sectionBlock('tools', 'Tools',
       pageItem('marketplace', '/marketplace', '🛒', 'Marketplace', '', 'marketplaceNavLink') +
-      pageItem('migrations', '/migrations', '🔄', 'Migrations', 'migrationBadge', 'migrationsNavLink') +
-      pageItem('dr', '/dr', '🛟', 'Disaster Recovery', 'drBadge', 'drNavLink') +
+      pageItem('migrations', '/migrations', '🔄', 'Migrations', 'migrationBadge', 'migrationsNavLink', true) +
+      pageItem('dr', '/dr', '🛟', 'Disaster Recovery', 'drBadge', 'drNavLink', true) +
       pageItem('assistant', '/assistant', '🤖', 'AI Assistant', '', 'assistantNavLink') +
       pageItem('scheduler', '/scheduler', '⏱', 'Scheduler', '', 'schedulerNavLink')) +
     sectionBlock('compute', 'Compute',

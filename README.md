@@ -49,6 +49,16 @@ Web console and AI assistant for **Virtuozzo Hybrid Infrastructure (VHI) 7.x**. 
 
 Background health, billing, and node-inventory polls run against saved clusters (the first saved cluster for health and billing). Scheduled jobs, migrations, and DR plans store the credentials they were created with.
 
+## Experimental Features
+
+The following tools are currently labeled as **Experimental** (Technical Preview):
+
+- **Disaster Recovery (`/dr`)**: Cross-cluster warm-standby replication and failover orchestration.
+- **Migrations (`/migrations`)**: Cross-cloud workload migration (VMware / Hyper-V to Virtuozzo Hybrid Infrastructure).
+
+> [!WARNING]
+> Experimental tools are under active development. Ensure source workloads and storage volumes are fully backed up before executing replication, failover, or migration workflows.
+
 ## Tests
 
 ```bash

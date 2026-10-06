@@ -1,11 +1,25 @@
 node_modules/
 .env
+.env.local
 memory/
 *.log
 .DS_Store
 backups/
-data/
 scratch/
 tmp/
 *.txt
+*.bak
+*.db
+*.jsonl
+
+# Test & diagnostic dumps
+*_fault.json
+*exhaust*.json
+*diag*.json
+*results*.json
+
+# Runtime data directory: ignore all state/credentials but allow example templates
+data/*
+!data/*.example
+!data/.gitkeep
 

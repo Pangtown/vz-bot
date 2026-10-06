@@ -1,5 +1,0 @@
---- Poll Test Start ---
---- Testing Audit Poll ---
-Audit Result: undefined
-
---- Testing Alert Poll ---
